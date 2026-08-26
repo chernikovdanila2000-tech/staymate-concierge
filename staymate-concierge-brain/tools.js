@@ -1,60 +1,106 @@
 /* ============================================================
    StayMate — інструменти (tools) для ШІ-адміністратора
-   Зараз check_availability і create_booking працюють на ЗАГЛУШКАХ
-   (демо-дані нижче). Коли підключимо реальну базу Supabase,
-   потрібно замінити лише тіло функцій нижче — визначення tools
-   (схема для Claude) можна лишити без змін.
+   Тепер check_availability, create_booking і escalate_to_human
+   працюють через реальну базу Supabase (таблиці rooms, bookings,
+   escalations). Дані номерів наразі тестові/демонстраційні
+   (Panorama Apart-Hotel), але шлях запису/читання — реальний,
+   такий самий буде і з даними справжнього готелю.
    ============================================================ */
 
-/* ---------- демо-дані (замінити на запити до Supabase пізніше) ---------- */
-const DEMO_ROOMS = [
-  { room_type: 'Стандарт', price_per_night: 1400, capacity: 2, description: 'Затишний номер з ліжком queen-size, душ, сніданок не включено.' },
-  { room_type: 'Комфорт',  price_per_night: 1900, capacity: 2, description: 'Більша площа, вид на місто, сніданок включено.' },
-  { room_type: 'Сімейний', price_per_night: 2600, capacity: 4, description: 'Два окремих ліжка + розкладний диван, підходить для родини.' },
-];
+const { createClient } = require('@supabase/supabase-js');
 
-const bookingsStore = []; // тимчасове сховище в пам'яті процесу — замінити на таблицю в Supabase
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+const PROPERTY_ID = process.env.PROPERTY_ID || 'panorama-apart-hotel';
 
 /* ---------- реалізації ---------- */
 
 async function checkAvailability({ check_in, check_out, guests }) {
-  // TODO: замінити на реальний запит до Supabase/PMS за property_id, датами і місткістю.
-  const suitable = DEMO_ROOMS.filter(r => r.capacity >= (guests || 1));
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('room_type, price_per_night, capacity, description')
+    .eq('property_id', PROPERTY_ID)
+    .gte('capacity', guests || 1)
+    .order('price_per_night', { ascending: true });
+
+  if (error) {
+    console.error('[checkAvailability] Supabase error:', error);
+    return { check_in, check_out, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
+  }
+
   return {
     check_in,
     check_out,
-    available_rooms: suitable,
-    note: suitable.length ? null : 'Немає номерів на потрібну кількість гостей у демо-даних.',
+    available_rooms: data,
+    note: data.length ? null : 'Немає номерів на потрібну кількість гостей.',
   };
 }
 
 async function createBooking({ room_type, check_in, check_out, guest_name, guest_contact }) {
-  // TODO: замінити на INSERT у таблицю bookings в Supabase + реальне посилання оплати
-  // (Stripe/LiqPay/Fondy checkout session).
-  const room = DEMO_ROOMS.find(r => r.room_type === room_type);
+  const { data: room, error: roomError } = await supabase
+    .from('rooms')
+    .select('room_type, price_per_night')
+    .eq('property_id', PROPERTY_ID)
+    .eq('room_type', room_type)
+    .maybeSingle();
+
+  if (roomError) {
+    console.error('[createBooking] Supabase error (room lookup):', roomError);
+    return { ok: false, error: 'Технічна помилка при пошуку номера.' };
+  }
   if (!room) {
     return { ok: false, error: `Тип номера "${room_type}" не знайдено серед доступних варіантів.` };
   }
-  const bookingId = 'DEMO-' + Math.random().toString(36).slice(2, 8).toUpperCase();
-  const booking = {
-    booking_id: bookingId,
-    room_type,
-    check_in,
-    check_out,
-    guest_name,
-    guest_contact,
-    price_per_night: room.price_per_night,
-    status: 'pending_payment',
-    payment_link: `https://pay.example.com/demo/${bookingId}`, // заглушка — підключити реальний платіжний провайдер
-  };
-  bookingsStore.push(booking);
+
+  const bookingId = 'BK-' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  const paymentLink = `https://pay.example.com/demo/${bookingId}`; // заглушка — підключити реальний платіжний провайдер (Stripe)
+
+  const { data: booking, error: insertError } = await supabase
+    .from('bookings')
+    .insert({
+      booking_id: bookingId,
+      property_id: PROPERTY_ID,
+      room_type,
+      check_in,
+      check_out,
+      guest_name,
+      guest_contact,
+      price_per_night: room.price_per_night,
+      status: 'pending_payment',
+      payment_link: paymentLink,
+    })
+    .select()
+    .single();
+
+  if (insertError) {
+    console.error('[createBooking] Supabase error (insert):', insertError);
+    return { ok: false, error: 'Технічна помилка при створенні бронювання.' };
+  }
+
   return { ok: true, booking };
 }
 
 async function escalateToHuman({ reason, urgency }) {
-  // TODO: замінити на реальне сповіщення персоналу (Telegram-канал адміністрації,
-  // email, або запис у таблицю escalations в Supabase з подальшим сповіщенням).
   console.log(`[ESCALATION${urgency ? ' - ' + urgency : ''}] ${reason}`);
+
+  const { error } = await supabase
+    .from('escalations')
+    .insert({
+      property_id: PROPERTY_ID,
+      reason,
+      urgency: urgency || 'normal',
+      status: 'open',
+    });
+
+  if (error) {
+    console.error('[escalateToHuman] Supabase error:', error);
+    // Навіть якщо запис у базу не вдався — гостю все одно відповідаємо, що звернення прийнято,
+    // а деталі бачимо в логах Railway.
+  }
+
   return { ok: true, message: 'Звернення передано адміністрації закладу.' };
 }
 

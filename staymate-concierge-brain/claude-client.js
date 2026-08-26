@@ -28,7 +28,7 @@ async function callClaude(messages) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt(),
+      system: buildSystemPrompt({ propertyName: process.env.PROPERTY_NAME || 'демо-готель StayMate' }),
       tools: toolDefinitions,
       messages,
     }),
