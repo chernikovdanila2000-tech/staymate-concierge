@@ -1,0 +1,17 @@
+{
+  "name": "staymate-concierge",
+  "version": "1.0.0",
+  "description": "StayMate — ШІ-адміністратор готелю: сервер + Telegram webhook",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
