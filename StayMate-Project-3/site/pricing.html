@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StayMate — Тарифи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase-config.js"></script>
+<style>
+/* ============ StayMate — shared styles ============ */
+:root{
+  --radius-s:6px; --radius-m:14px; --radius-l:28px; --maxw:1180px;
+}
+html[data-theme="light"]{
+  --bg:#F6F6F3; --surface:#FFFFFF;
+  --ink:#17181B; --ink-soft:#4B4D53; --muted:#84868D;
+  --line:#E4E4E0; --line-strong:#CFD0CB;
+  --accent:#33513F; --accent-text:#33513F; --accent-ink:#EAF0EC; --accent-soft:#E7ECE8;
+  --warn:#8C4A34;
+  --chat-ai-bg:#17181B; --chat-ai-fg:#FFFFFF; --chat-tag:#8FCBA8;
+  --shadow-soft:0 30px 60px -30px rgba(23,24,27,0.18);
+  --input-bg:#F6F6F3;
+  --grid-line:rgba(23,24,27,0.22);
+}
+html[data-theme="dark"]{
+  --bg:#111214; --surface:#18191C;
+  --ink:#F2F2F0; --ink-soft:#C2C3C8; --muted:#8A8C93;
+  --line:#28292D; --line-strong:#37383D;
+  --accent:#7CE0A8; --accent-text:#7CE0A8; --accent-ink:#0F1A14; --accent-soft:#1B2621;
+  --warn:#E29372;
+  --chat-ai-bg:#232427; --chat-ai-fg:#F2F2F0; --chat-tag:#7CE0A8;
+  --shadow-soft:0 30px 60px -30px rgba(0,0,0,0.6);
+  --input-bg:#1D1E22;
+  --grid-line:rgba(255,255,255,0.18);
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  font-size:16px; line-height:1.5;
+  transition:background .35s ease, color .35s ease;
+}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif; font-weight:600; letter-spacing:-0.02em; margin:0;}
+.mono{font-family:'IBM Plex Mono',monospace; letter-spacing:0.02em;}
+p{margin:0;}
+a{color:inherit; text-decoration:none;}
+img{max-width:100%; display:block;}
+button{font-family:inherit; cursor:pointer;}
+::selection{background:var(--accent); color:var(--accent-ink);}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 32px;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+}
+
+/* ---------- reveal on scroll ---------- */
+.reveal{opacity:0; transform:translateY(18px); transition:opacity .7s cubic-bezier(.16,.8,.24,1), transform .7s cubic-bezier(.16,.8,.24,1);}
+.reveal.is-visible{opacity:1; transform:translateY(0);}
+
+/* ---------- header / nav ---------- */
+header{position:sticky; top:0; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+nav.wrap{display:flex; align-items:center; justify-content:space-between; height:76px; gap:20px;}
+.logo{display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; flex-shrink:0;}
+.logo-mark{width:26px; height:26px; border-radius:7px; background:var(--ink); position:relative; flex-shrink:0;}
+.logo-mark::after{content:""; position:absolute; left:7px; top:7px; width:8px; height:8px; border-radius:50%; background:var(--accent);}
+.nav-links{display:flex; gap:28px; align-items:center;}
+.nav-links a.nav-link{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap;}
+.nav-links a.nav-link:hover, .nav-links a.nav-link.active{color:var(--ink);}
+.nav-cta{background:var(--ink); color:var(--bg); padding:10px 20px; border-radius:100px; font-size:14px; font-weight:500; border:none; transition:transform .25s cubic-bezier(.16,.8,.24,1), background .25s ease; display:inline-flex; align-items:center; gap:8px; white-space:nowrap;}
+html[data-theme="dark"] .nav-cta{color:var(--accent-ink); background:var(--accent);}
+.nav-cta:hover{opacity:.88; transform:translateY(-1px);}
+.nav-tools{display:flex; align-items:center; gap:10px; margin-left:6px;}
+
+.lang-switch{position:relative;}
+.lang-btn{display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--line-strong); border-radius:100px; padding:8px 12px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; color:var(--ink-soft);}
+.lang-btn:hover{border-color:var(--ink);}
+.lang-menu{position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:var(--shadow-soft); padding:6px; min-width:130px; display:none; z-index:70;}
+.lang-menu.open{display:block;}
+.lang-menu button{display:block; width:100%; text-align:left; background:none; border:none; padding:9px 12px; border-radius:6px; font-size:13.5px; color:var(--ink-soft);}
+.lang-menu button:hover{background:var(--bg); color:var(--ink);}
+.lang-menu button.active{color:var(--accent-text); font-weight:600;}
+
+.theme-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; transition:border-color .2s ease;}
+.theme-btn:hover{border-color:var(--ink);}
+.theme-btn svg{width:16px; height:16px;}
+.icon-sun{display:none;}
+html[data-theme="dark"] .icon-moon{display:none;}
+html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
+
+.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center;}
+.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); position:relative;}
+
+.mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
+.mobile-panel.open{display:block;}
+.mobile-panel a{display:block; padding:16px 4px; font-size:16px; border-bottom:1px solid var(--line); color:var(--ink-soft);}
+.mobile-panel a.active{color:var(--ink); font-weight:600;}
+
+@media (max-width:920px){
+  .nav-links a.nav-link{display:none;}
+  .nav-cta, .nav-account-link{display:none;}
+  .burger{display:flex;}
+  .wrap{padding:0 20px;}
+  .nav-tools{gap:8px;}
+}
+
+/* ---------- buttons ---------- */
+.btn-primary{background:var(--ink); color:var(--bg); padding:15px 26px; border-radius:100px; font-size:15px; font-weight:500; border:none; transition:transform .25s cubic-bezier(.16,.8,.24,1), opacity .25s ease, box-shadow .25s ease; display:inline-flex; align-items:center; gap:8px;}
+html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accent-ink);}
+.btn-primary:hover{opacity:.88; transform:translateY(-2px); box-shadow:0 10px 24px -12px rgba(0,0,0,0.35);}
+.btn-primary:focus-visible, .btn-secondary:focus-visible, .nav-cta:focus-visible{outline:2px solid var(--accent); outline-offset:3px;}
+.btn-secondary{background:transparent; color:var(--ink); padding:15px 24px; border-radius:100px; font-size:15px; font-weight:500; border:1px solid var(--line-strong); transition:border-color .25s ease, background .25s ease; display:inline-flex; align-items:center; gap:8px;}
+.btn-secondary:hover{border-color:var(--ink); background:var(--surface);}
+
+/* ---------- page hero (sub-pages) ---------- */
+.page-hero{padding:64px 0 48px; border-bottom:1px solid var(--line); position:relative; overflow:hidden;}
+.page-hero .wrap{position:relative; z-index:1;}
+.page-hero .kicker{margin-bottom:14px;}
+.page-hero h1{font-size:clamp(30px,4vw,44px); line-height:1.1;}
+.page-hero p{margin-top:16px; font-size:17px; color:var(--ink-soft); max-width:600px; line-height:1.6;}
+
+/* ---------- 3D animated grid-floor background ---------- */
+.grid-floor{position:absolute; left:0; right:0; bottom:-38%; height:78%; perspective:640px; overflow:hidden; z-index:0; pointer-events:none;}
+.grid-floor-plane{position:absolute; left:-60%; right:-60%; top:0; bottom:0; margin:auto; height:220%; width:220%;
+  background-image:linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size:54px 54px;
+  transform:rotateX(60deg);
+  transform-origin:50% 0%;
+  opacity:.75;
+  animation:gridDrift 16s linear infinite;
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+  mask-image:linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
+}
+@keyframes gridDrift{ from{background-position:0 0;} to{background-position:0 54px;} }
+
+/* ---------- 3D animated background: large variant spanning nav + hero on the home page ---------- */
+.hero-3d-wrap{position:relative;}
+.grid-floor-full{position:absolute; inset:0; clip-path:inset(0); z-index:0; pointer-events:none; perspective:760px;}
+.grid-floor-full .grid-floor-plane{position:absolute; left:-60%; right:-60%; top:0; bottom:-45%; margin:auto; height:270%; width:220%;
+  background-image:linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size:60px 60px;
+  transform:rotateX(60deg);
+  transform-origin:50% 0%;
+  opacity:.8;
+  animation:gridDrift 16s linear infinite;
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0%, black 10%, black 100%);
+  mask-image:linear-gradient(to bottom, transparent 0%, black 10%, black 100%);
+}
+
+/* ---------- 3D tilt-on-hover for cards ---------- */
+.tilt-3d{transition:transform .15s ease-out, box-shadow .3s ease; will-change:transform;}
+
+/* ---------- plan note (PMS / Channel Manager) ---------- */
+.plan-note{font-size:12.5px; color:var(--muted); line-height:1.55; font-style:italic; margin:-6px 0 22px; padding-top:14px; border-top:1px dashed var(--line);}
+
+/* ---------- auth pages (login / register / account) ---------- */
+.notice-banner{background:var(--accent-soft); border:1px solid var(--line); border-radius:var(--radius-s); padding:14px 16px; font-size:13px; color:var(--ink-soft); margin-bottom:24px; display:none; line-height:1.55;}
+.auth-card{max-width:440px; margin:0 auto; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:36px;}
+.auth-foot{margin-top:22px; text-align:center; font-size:13.5px; color:var(--muted);}
+.auth-error{display:none; background:color-mix(in srgb, var(--warn) 14%, transparent); border:1px solid var(--warn); color:var(--warn); font-size:13px; padding:10px 14px; border-radius:var(--radius-s); margin-bottom:18px; line-height:1.5;}
+.account-row{display:flex; align-items:center; justify-content:space-between; padding:18px 0; border-bottom:1px solid var(--line); gap:16px; flex-wrap:wrap;}
+.account-row:last-child{border-bottom:none;}
+.account-row .a-label{font-size:12.5px; color:var(--muted);}
+.account-row .a-value{font-size:15.5px; font-weight:600;}
+.nav-account-link{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap;}
+.nav-account-link:hover{color:var(--ink);}
+
+/* ---------- hero (home) ---------- */
+.hero{padding:88px 0 104px; position:relative; overflow:hidden;}
+.hero-grid{display:grid; grid-template-columns:1.05fr 0.95fr; gap:64px; align-items:center; position:relative; z-index:1;}
+.eyebrow{display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--accent-text); background:var(--accent-soft); border:1px solid var(--line); padding:6px 12px; border-radius:100px; margin-bottom:22px;}
+.eyebrow-dot{width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 2.2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.hero h1{font-size:clamp(34px,4.4vw,54px); line-height:1.06; color:var(--ink);}
+.hero h1 em{font-style:normal; color:var(--accent-text);}
+.hero-sub{margin-top:22px; font-size:18px; color:var(--ink-soft); max-width:480px; line-height:1.6;}
+.hero-actions{margin-top:34px; display:flex; gap:14px; flex-wrap:wrap;}
+.hero-proof{margin-top:44px; display:flex; gap:28px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--muted); flex-wrap:wrap;}
+.hero-proof b{display:block; font-family:'Space Grotesk',sans-serif; font-size:22px; color:var(--ink); font-weight:600;}
+
+/* ---------- chat demo ---------- */
+.chat-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:22px; box-shadow:var(--shadow-soft); position:relative;}
+.chat-card::before{content:""; position:absolute; inset:-18px; background:radial-gradient(60% 60% at 70% 20%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%); z-index:-1;}
+.chat-head{display:flex; align-items:center; justify-content:space-between; padding-bottom:16px; margin-bottom:16px; border-bottom:1px solid var(--line);}
+.chat-head-id{display:flex; align-items:center; gap:10px;}
+.chat-avatar{width:34px; height:34px; border-radius:50%; background:var(--ink); display:flex; align-items:center; justify-content:center; color:var(--bg); font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:600;}
+.chat-head-name{font-size:14px; font-weight:600;}
+.chat-head-status{font-size:12px; color:var(--accent-text); display:flex; align-items:center; gap:6px;}
+.chat-head-status::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--accent);}
+.chat-body{height:340px; display:flex; flex-direction:column; gap:10px; overflow:hidden; position:relative;}
+.bubble{max-width:82%; padding:11px 14px; border-radius:16px; font-size:13.5px; line-height:1.45; opacity:0; transform:translateY(8px); animation:bubbleIn .45s cubic-bezier(.16,.8,.24,1) forwards;}
+@keyframes bubbleIn{to{opacity:1; transform:translateY(0);}}
+.bubble.guest{align-self:flex-start; background:var(--bg); border:1px solid var(--line); border-bottom-left-radius:5px; color:var(--ink);}
+.bubble.ai{align-self:flex-end; background:var(--chat-ai-bg); color:var(--chat-ai-fg); border-bottom-right-radius:5px;}
+.bubble.ai .tag{display:block; font-family:'IBM Plex Mono',monospace; font-size:10px; color:var(--chat-tag); margin-bottom:4px; letter-spacing:0.05em; text-transform:uppercase;}
+.typing{align-self:flex-end; display:flex; gap:4px; padding:12px 14px; background:var(--chat-ai-bg); border-radius:16px; border-bottom-right-radius:5px; opacity:0; animation:bubbleIn .3s forwards;}
+.typing span{width:5px; height:5px; border-radius:50%; background:var(--chat-ai-fg); opacity:.5; animation:blink 1.1s infinite;}
+.typing span:nth-child(2){animation-delay:.15s;}
+.typing span:nth-child(3){animation-delay:.3s;}
+@keyframes blink{0%,100%{opacity:.3;}50%{opacity:.9;}}
+.chat-foot{margin-top:16px; padding-top:14px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
+.chat-foot-badge{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);}
+.chat-foot-badge b{color:var(--accent-text);}
+@media (max-width:940px){.hero-grid{grid-template-columns:1fr; gap:48px;} .hero{padding:56px 0 72px;} .hero-sub{max-width:none;}}
+
+/* ---------- section shell ---------- */
+section{padding:96px 0;}
+.section-head{max-width:640px; margin-bottom:56px;}
+.kicker{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--accent-text); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:14px; display:block;}
+.section-head h2{font-size:clamp(28px,3.2vw,40px); line-height:1.12;}
+.section-head p{margin-top:16px; font-size:16.5px; color:var(--ink-soft); line-height:1.6;}
+.surface-section{background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+
+/* ---------- process ---------- */
+.process-row{display:grid; grid-template-columns:repeat(4,1fr); gap:0; border:1px solid var(--line); border-radius:var(--radius-m); overflow:hidden;}
+.process-step{padding:30px 26px; border-right:1px solid var(--line); position:relative; background:var(--surface);}
+.process-step:last-child{border-right:none;}
+.process-step .step-tag{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); display:block; margin-bottom:18px;}
+.process-step h3{font-size:17px; margin-bottom:9px; font-weight:600;}
+.process-step p{font-size:14px; color:var(--ink-soft); line-height:1.55;}
+.process-step::after{content:"→"; position:absolute; right:-13px; top:30px; color:var(--muted); font-size:16px; background:var(--surface); width:24px; text-align:center; z-index:2;}
+.process-step:last-child::after{content:"";}
+@media (max-width:860px){.process-row{grid-template-columns:1fr;} .process-step{border-right:none; border-bottom:1px solid var(--line);} .process-step:last-child{border-bottom:none;} .process-step::after{display:none;}}
+
+/* ---------- capability grid ---------- */
+.cap-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-m); overflow:hidden;}
+.cap-card{background:var(--surface); padding:32px 28px; transition:background .25s ease;}
+.cap-icon{width:38px; height:38px; border-radius:10px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; margin-bottom:18px;}
+.cap-icon svg path, .cap-icon svg circle, .cap-icon svg rect{stroke:var(--accent-text);}
+.cap-card h3{font-size:16.5px; margin-bottom:9px; font-weight:600;}
+.cap-card p{font-size:14px; color:var(--ink-soft); line-height:1.6;}
+@media (max-width:860px){.cap-grid{grid-template-columns:1fr;}}
+
+/* ---------- photo break ---------- */
+.photo-break{position:relative; min-height:340px; border-radius:var(--radius-l); overflow:hidden;
+  background:linear-gradient(155deg, rgba(23,24,27,0.88), rgba(23,24,27,0.55) 55%, color-mix(in srgb, var(--accent) 45%, #17181B));
+  display:flex; align-items:flex-end;}
+.photo-break-inner{padding:34px; color:#fff; max-width:520px;}
+.photo-break .kicker{color:#9FD4B7;}
+.photo-break h3{font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:600; margin-bottom:10px; color:#fff;}
+.photo-break p{font-size:14.5px; color:rgba(255,255,255,0.75); line-height:1.6;}
+
+/* ---------- pricing ---------- */
+.pricing-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; align-items:stretch;}
+.plan{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:34px 28px; display:flex; flex-direction:column; transition:transform .3s cubic-bezier(.16,.8,.24,1), box-shadow .3s ease;}
+.plan:hover{transform:translateY(-4px); box-shadow:var(--shadow-soft);}
+.plan.featured{background:var(--surface); color:var(--ink); border:1.5px solid var(--accent); position:relative;}
+.plan.featured .plan-badge{position:absolute; top:-13px; left:28px; background:var(--accent); color:var(--accent-ink); font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; padding:5px 12px; border-radius:100px;}
+.plan-name{font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:600;}
+.plan-desc{font-size:13.5px; color:var(--muted); margin-top:6px; min-height:34px;}
+.plan-price{margin-top:22px; display:flex; align-items:baseline; gap:6px;}
+.plan-price b{font-family:'Space Grotesk',sans-serif; font-size:38px; font-weight:600;}
+.plan-price > span{font-size:13.5px; color:var(--muted);}
+.plan-list{list-style:none; padding:0; margin:26px 0 30px; display:flex; flex-direction:column; gap:12px; flex:1;}
+.plan-list li{font-size:14px; padding-left:22px; position:relative; color:var(--ink-soft); line-height:1.5;}
+.plan-list li::before{content:"✓"; position:absolute; left:0; top:0; color:var(--accent-text); font-size:12px; font-weight:700;}
+.plan-cta{width:100%; padding:14px; border-radius:100px; border:1px solid var(--line-strong); background:transparent; font-size:14.5px; font-weight:500; color:var(--ink); transition:all .2s ease;}
+.plan-cta:hover{border-color:var(--ink);}
+.plan.featured .plan-cta{background:var(--accent); color:var(--accent-ink); border-color:var(--accent);}
+.plan.featured .plan-cta:hover{opacity:.85;}
+@media (max-width:940px){.pricing-grid{grid-template-columns:1fr; max-width:420px; margin:0 auto;}}
+
+/* ---------- payment / checkout ---------- */
+.pay-panel{max-width:520px; margin:0 auto; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:36px;}
+.pay-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:26px; flex-wrap:wrap; gap:10px;}
+.pay-head h3{font-size:18px; font-weight:600;}
+.pay-plan-tag{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--accent-text); background:var(--accent-soft); padding:5px 10px; border-radius:100px;}
+.field{margin-bottom:16px;}
+.field label{font-size:12.5px; color:var(--ink-soft); display:block; margin-bottom:7px; font-weight:500;}
+.field input, .field select, .field textarea{width:100%; padding:13px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'IBM Plex Mono',monospace; background:var(--input-bg); color:var(--ink); transition:border-color .2s ease;}
+.field input:focus, .field select:focus, .field textarea:focus{outline:none; border-color:var(--accent);}
+.field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.pay-submit{width:100%; margin-top:8px; background:var(--ink); color:var(--bg); border:none; padding:16px; border-radius:100px; font-size:15px; font-weight:500; display:flex; align-items:center; justify-content:center; gap:10px; transition:opacity .25s ease;}
+html[data-theme="dark"] .pay-submit{background:var(--accent); color:var(--accent-ink);}
+.pay-submit:hover{opacity:.88;}
+.pay-submit:disabled{opacity:.65; cursor:progress;}
+.spinner{width:15px; height:15px; border-radius:50%; border:2px solid color-mix(in srgb, var(--bg) 35%, transparent); border-top-color:var(--bg); animation:spin .7s linear infinite; display:none;}
+html[data-theme="dark"] .spinner{border:2px solid color-mix(in srgb, var(--accent-ink) 35%, transparent); border-top-color:var(--accent-ink);}
+.spinner.on{display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.pay-secure{margin-top:16px; text-align:center; font-size:12px; color:var(--muted); display:flex; align-items:center; justify-content:center; gap:6px;}
+.pay-success{display:none; text-align:center; padding:20px 0;}
+.pay-success.on{display:block;}
+.pay-success .check{width:56px; height:56px; border-radius:50%; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; margin:0 auto 18px;}
+.pay-success h3{font-size:19px; margin-bottom:8px;}
+.pay-success p{font-size:14px; color:var(--ink-soft); margin-bottom:22px;}
+.pay-success .btn-primary{display:inline-flex;}
+
+/* ---------- instructions ---------- */
+.lock-panel{background:var(--surface); border:1px dashed var(--line-strong); border-radius:var(--radius-m); padding:64px 32px; text-align:center;}
+.lock-icon{width:52px; height:52px; border-radius:14px; background:var(--bg); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; margin:0 auto 20px;}
+.lock-panel h3{font-size:19px; margin-bottom:10px;}
+.lock-panel p{font-size:14.5px; color:var(--muted); max-width:360px; margin:0 auto;}
+.lock-panel .btn-secondary{margin-top:24px;}
+.steps-wrap{display:none;}
+.steps-wrap.on{display:block;}
+.steps-list{display:flex; flex-direction:column;}
+.step-item{display:grid; grid-template-columns:64px 1fr; gap:24px; padding:28px 0; border-bottom:1px solid var(--line);}
+.step-item:last-child{border-bottom:none;}
+.step-num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; color:var(--line-strong);}
+.step-item.done .step-num{color:var(--accent-text);}
+.step-item h3{font-size:17px; margin-bottom:8px; font-weight:600;}
+.step-item p{font-size:14.5px; color:var(--ink-soft); line-height:1.6; max-width:560px;}
+.step-item code{font-family:'IBM Plex Mono',monospace; background:var(--bg); border:1px solid var(--line); padding:2px 8px; border-radius:5px; font-size:13px; color:var(--accent-text);}
+.key-box{margin-top:14px; display:flex; align-items:center; gap:10px; background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-s); padding:12px 14px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--ink-soft); max-width:420px; flex-wrap:wrap;}
+.copy-btn{margin-left:auto; background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:6px 11px; font-size:12px; color:var(--ink); flex-shrink:0;}
+.copy-btn:hover{border-color:var(--ink);}
+
+/* ---------- contacts ---------- */
+.contact-grid{display:grid; grid-template-columns:0.9fr 1.1fr; gap:64px;}
+.contact-list{display:flex; flex-direction:column; gap:0; margin-top:8px;}
+.contact-row{display:flex; align-items:center; gap:16px; padding:18px 0; border-bottom:1px solid var(--line);}
+.contact-row .c-icon{width:40px; height:40px; border-radius:10px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.contact-row .c-icon svg path, .contact-row .c-icon svg circle{stroke:var(--accent-text);}
+.contact-row .c-label{font-size:12px; color:var(--muted); margin-bottom:3px;}
+.contact-row .c-value{font-size:15px; font-weight:500;}
+@media (max-width:860px){.contact-grid{grid-template-columns:1fr; gap:40px;}}
+
+/* ---------- generic content pages helpers ---------- */
+.simple-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:20px;}
+@media (max-width:760px){.simple-grid{grid-template-columns:1fr;}}
+.info-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:28px;}
+.info-card h3{font-size:16.5px; margin-bottom:10px;}
+.info-card p{font-size:14px; color:var(--ink-soft); line-height:1.6;}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--line); padding:40px 0;}
+.footer-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;}
+.footer-links{display:flex; gap:24px; font-size:13.5px; color:var(--muted); flex-wrap:wrap;}
+.footer-links a:hover{color:var(--ink);}
+.footer-mono{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);}
+
+/* ---------- toast ---------- */
+.toast{position:fixed; bottom:26px; left:50%; transform:translate(-50%, 20px); background:var(--ink); color:var(--bg); padding:14px 22px; border-radius:100px; font-size:14px; display:flex; align-items:center; gap:10px; opacity:0; pointer-events:none; transition:all .35s cubic-bezier(.16,.8,.24,1); z-index:100;}
+html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink);}
+.toast.on{opacity:1; transform:translate(-50%, 0);}
+
+</style>
+<script>(function(){try{var m=localStorage.getItem('stayMateThemeMode')||'dark';document.documentElement.setAttribute('data-theme',m);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+</head>
+<body>
+
+<header>
+  <nav class="wrap">
+    <a href="index.html" class="logo"><span class="logo-mark"></span>StayMate</a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link" data-i18n="nav.home">Головна</a>
+      <a href="features.html" class="nav-link" data-i18n="nav.features">Можливості</a>
+      <a href="how-it-works.html" class="nav-link" data-i18n="nav.how">Як це працює</a>
+      <a href="pricing.html" class="nav-link" data-i18n="nav.pricing">Тарифи</a>
+      <a href="instructions.html" class="nav-link" data-i18n="nav.instructions">Інструкція</a>
+      <a href="contacts.html" class="nav-link" data-i18n="nav.contacts">Контакти</a>
+    </div>
+    <div class="nav-tools">
+      <div class="lang-switch">
+        <button class="lang-btn" id="langBtn" type="button"><span id="langBtnLabel">UK</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <div class="lang-menu" id="langMenu">
+          <button data-lang="uk" type="button">Українська</button>
+          <button data-lang="ru" type="button">Русский</button>
+          <button data-lang="en" type="button">English</button>
+        </div>
+      </div>
+      <button class="theme-btn" type="button" data-i18n-aria="theme.toggleLabel" aria-label="Змінити тему">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <a href="cabinet/" class="nav-account-link" id="navAccountLink" data-i18n="nav.login">Увійти</a>
+      <a href="cabinet/" class="nav-cta" data-i18n="nav.cta">Підключити</a>
+      <button class="burger" id="burgerBtn" type="button" data-i18n-aria="burger.label" aria-label="Меню"><span></span></button>
+    </div>
+  </nav>
+  <div class="mobile-panel" id="mobilePanel">
+    <a href="index.html" data-i18n="nav.home">Головна</a>
+    <a href="features.html" data-i18n="nav.features">Можливості</a>
+    <a href="how-it-works.html" data-i18n="nav.how">Як це працює</a>
+    <a href="pricing.html" data-i18n="nav.pricing">Тарифи</a>
+    <a href="cabinet/" data-i18n="nav.connect">Підключити</a>
+    <a href="instructions.html" data-i18n="nav.instructions">Інструкція</a>
+    <a href="cabinet/" class="nav-account-link" data-i18n="nav.login">Увійти</a>
+  </div>
+</header>
+<section class="page-hero">
+  <div class="grid-floor" aria-hidden="true"><div class="grid-floor-plane"></div></div>
+  <div class="wrap">
+    <span class="kicker" data-i18n="pricing.hero.kicker">Тарифи</span>
+    <h1 data-i18n="pricing.hero.title">Одна підписка на об'єкт</h1>
+    <p data-i18n="pricing.hero.desc">Без прихованих відсотків із бронювань. Оплата щомісячна, скасувати можна в будь-який момент.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="pricing-grid reveal">
+      <div class="plan tilt-3d">
+        <div class="plan-name" data-i18n="plan.start.name">Старт</div>
+        <div class="plan-desc" data-i18n="plan.start.desc">Для одного об'єкта до 5 номерів</div>
+        <div class="plan-price"><b>€<span data-i18n="plan.start.price">100</span></b><span data-i18n="pricing.period">/ міс</span></div>
+        <ul class="plan-list">
+          <li data-i18n="plan.start.f1">Відповіді в одному каналі</li>
+          <li data-i18n="plan.start.f2">Перевірка наявності за календарем</li>
+          <li data-i18n="plan.start.f3">До 300 діалогів на місяць</li>
+          <li data-i18n="plan.start.f4">Приймання оплати за посиланням</li>
+        </ul>
+        <a href="checkout.html?plan=start" class="plan-cta" style="display:block;text-align:center;text-decoration:none;" data-i18n="plan.cta">Обрати</a>
+      </div>
+
+      <div class="plan featured tilt-3d">
+        <span class="plan-badge" data-i18n="plan.badge">найчастіше обирають</span>
+        <div class="plan-name" data-i18n="plan.pro.name">Профі</div>
+        <div class="plan-desc" data-i18n="plan.pro.desc">Для об'єкта до 25 номерів</div>
+        <div class="plan-price"><b>€<span data-i18n="plan.pro.price">200</span></b><span data-i18n="pricing.period">/ міс</span></div>
+        <ul class="plan-list">
+          <li data-i18n="plan.pro.f1">Усі канали: WhatsApp, Telegram, сайт</li>
+          <li data-i18n="plan.pro.f2">Підключення до PMS і синхронізація</li>
+          <li data-i18n="plan.pro.f3">Необмежена кількість діалогів</li>
+          <li data-i18n="plan.pro.f4">Приймання оплати й автобронювання</li>
+          <li data-i18n="plan.pro.f5">Передача складних випадків менеджеру</li>
+        </ul>
+        <p class="plan-note" data-i18n="plan.auto.note">Автобронювання і перевірка номерів у реальному часі розкриваються повною мірою, коли ваш об'єкт підключено до PMS або Channel Manager.</p>
+        <a href="checkout.html?plan=pro" class="plan-cta" style="display:block;text-align:center;text-decoration:none;" data-i18n="plan.cta">Обрати</a>
+      </div>
+
+      <div class="plan tilt-3d">
+        <div class="plan-name" data-i18n="plan.network.name">Мережа</div>
+        <div class="plan-desc" data-i18n="plan.network.desc">Для декількох об'єктів</div>
+        <div class="plan-price"><b>€<span data-i18n="plan.network.price">300</span></b><span data-i18n="pricing.period">/ міс</span></div>
+        <ul class="plan-list">
+          <li data-i18n="plan.network.f1">Усе з тарифу «Профі»</li>
+          <li data-i18n="plan.network.f2">До 10 об'єктів в одному кабінеті</li>
+          <li data-i18n="plan.network.f3">Окремі правила для кожного об'єкта</li>
+          <li data-i18n="plan.network.f4">Пріоритетна підтримка</li>
+        </ul>
+        <p class="plan-note" data-i18n="plan.auto.note">Автобронювання і перевірка номерів у реальному часі розкриваються повною мірою, коли ваш об'єкт підключено до PMS або Channel Manager.</p>
+        <a href="checkout.html?plan=network" class="plan-cta" style="display:block;text-align:center;text-decoration:none;" data-i18n="plan.cta">Обрати</a>
+      </div>
+    </div>
+  </div>
+</section>
+<footer>
+  <div class="wrap footer-row">
+    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayMate</div>
+    <div class="footer-links">
+      <a href="features.html" data-i18n="nav.features">Можливості</a>
+      <a href="pricing.html" data-i18n="nav.pricing">Тарифи</a>
+      <a href="contacts.html" data-i18n="nav.contacts">Контакти</a>
+    </div>
+    <span class="footer-mono" data-i18n="footer.rights">© 2026 StayMate</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+<script>
+/* ============ StayMate — i18n ============ */
+const I18N = {
+uk: {
+  "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
+  "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити",
+  "nav.login":"Увійти","nav.account":"Кабінет",
+  "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
+  "footer.rights":"© 2026 StayMate",
+  "toast.contactSent":"Повідомлення надіслано — відповімо протягом дня",
+  "toast.paySuccess":"Оплата пройшла успішно","toast.keyCopied":"Ключ скопійовано",
+  "config.notSetup":"Supabase ще не налаштовано розробником сайту. Відкрийте файл supabase-config.js і вставте свої ключі проєкту.",
+
+  "login.hero.kicker":"Вхід","login.hero.title":"Увійти в кабінет",
+  "login.hero.desc":"Доступ до статусу підписки та інструкції — з будь-якого пристрою.",
+  "login.email.label":"Email","login.password.label":"Пароль","login.submit":"Увійти",
+  "login.noAccount":"Ще немає акаунта?","login.toRegister":"Зареєструватися",
+  "login.error.generic":"Не вдалося увійти. Перевірте email і пароль (або підтвердіть email після реєстрації).",
+
+  "register.hero.kicker":"Реєстрація","register.hero.title":"Створити акаунт StayMate",
+  "register.hero.desc":"Знадобиться, щоб оформити підписку і зберігати доступ до кабінету з будь-якого пристрою. Перші 3 дні — безкоштовно, без прив\u2019язки картки.",
+  "register.name.label":"Ім'я","register.email.label":"Email","register.password.label":"Пароль","register.submit":"Зареєструватися",
+  "register.haveAccount":"Вже є акаунт?","register.toLogin":"Увійти",
+  "register.success.title":"Акаунт створено","register.success.desc":"Якщо у Supabase увімкнено підтвердження email — перевірте пошту й перейдіть за посиланням. Якщо вимкнено — вхід уже виконано, зараз перенаправимо до кабінету.",
+  "register.error.generic":"Не вдалося зареєструватися. Можливо, такий email вже використано.",
+
+  "account.hero.kicker":"Кабінет","account.hero.title":"Ваш акаунт","account.hero.desc":"Статус підписки та доступ до інструкції підключення.",
+  "account.loading":"Завантаження…",
+  "account.notLoggedIn.title":"Ви не увійшли","account.notLoggedIn.desc":"Увійдіть в акаунт, щоб побачити статус підписки.","account.notLoggedIn.cta":"Увійти",
+  "account.email.label":"Email","account.plan.label":"Тариф","account.status.label":"Статус",
+  "account.plan.none":"Немає активної підписки","account.status.active":"Активна","account.status.inactive":"Не активна","account.status.trial":"Пробний період — залишилось {days} дн.","account.status.trialEnded":"Пробний період завершився",
+  "account.cta.pricing":"Обрати тариф","account.cta.instructions":"Перейти до інструкції","account.logout":"Вийти",
+
+  "checkout.authgate.title":"Спочатку увійдіть в акаунт","checkout.authgate.desc":"Підписка прив'язується до вашого акаунта StayMate, щоб залишатися доступною з будь-якого пристрою.",
+
+  "home.eyebrow":"StayMate вже відповідає 214 гостям прямо зараз",
+  "home.h1pre":"Гості пишуть вночі.","home.h1em":"Відповідає StayMate.",
+  "home.sub":"ІІ-адміністратор підключається до ваших каналів, перевіряє вільні номери, приймає оплату і бронює — поки ви спите або зайняті заїздом.",
+  "home.cta1":"Обрати тариф","home.cta2":"Як це працює",
+  "home.proof1val":"24/7","home.proof1label":"без вихідних і обіду",
+  "home.proof2val":"< 9 сек","home.proof2label":"середній час відповіді",
+  "home.proof3val":"3 мови","home.proof3label":"одразу з коробки",
+  "home.chat.status":"на зв'язку","home.chat.object":"апартаменти «Промінь»",
+  "home.chat.foot.status":"статус ·","home.chat.foot.confirmed":"бронь підтверджена",
+  "chat.g1":"Доброго вечора! Є вільна студія на 14–17 серпня?",
+  "chat.a1tag":"перевірка наявності","chat.a1":"Так, студія №3 вільна на ці дати. 3 ночі — €186, включно з прибиранням.",
+  "chat.g2":"Чудово, бронюю. Як оплатити?",
+  "chat.a2tag":"оплата","chat.a2":"Надіслав захищене посилання на оплату. Після оплати бронь підтвердиться автоматично.",
+  "chat.g3":"Оплатила ✅",
+  "chat.a3tag":"бронь створена","chat.a3":"Дякую! Студію №3 заброньовано за вами. Інструкція із заїзду прийде за день до прибуття.",
+  "home.process.kicker":"Сценарій","home.process.title":"Один діалог — чотири дії",
+  "home.process.desc":"StayMate проходить весь шлях гостя сам: від першого повідомлення до підтвердженої броні, без перемикання на менеджера.",
+  "home.process.more":"Детальніше про сценарій →",
+  "process.step1.tag":"01 · повідомлення","process.step1.title":"Відповідає гостю",
+  "process.step1.desc":"Розуміє питання будь-якою мовою, відповідає за правилами об'єкта — заїзд, депозит, паркування, тварини.",
+  "process.step2.tag":"02 · наявність","process.step2.title":"Перевіряє номери",
+  "process.step2.desc":"Дивиться актуальний календар зайнятості через вашу PMS або систему обліку — без ручних звірянь.",
+  "process.step3.tag":"03 · оплата","process.step3.title":"Приймає платіж",
+  "process.step3.desc":"Виставляє посилання на оплату через захищений платіжний шлюз, підтверджує надходження.",
+  "process.step4.tag":"04 · бронь","process.step4.title":"Створює бронювання",
+  "process.step4.desc":"Фіксує бронь у системі та надсилає гостю підтвердження з деталями заїзду.",
+  "home.feat.kicker":"Можливості","home.feat.title":"Що вміє StayMate",
+  "home.feat.desc":"Не просто чат-бот із заготовленими відповідями — агент, який розуміє контекст і знає, коли передати діалог людині.",
+  "home.feat.more":"Усі можливості →",
+  "cap.card1.title":"Працює у ваших каналах","cap.card1.desc":"WhatsApp, Telegram, Instagram і чат на сайті — гість пише туди, де йому зручно.",
+  "cap.card2.title":"Підключається до вашої PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator та інші — синхронізація наявності в реальному часі.",
+  "cap.card3.title":"Знає правила об'єкта","cap.card3.desc":"Завантажте умови проживання один раз — StayMate відповідатиме строго за ними.",
+  "cap.card4.title":"Передає складні випадки","cap.card4.desc":"Якщо ситуація нестандартна — скарга, спір, форс-мажор — діалог іде до менеджера.",
+  "cap.card5.title":"Приймає оплату","cap.card5.desc":"Депозит, повна оплата чи передоплата — гість платить за захищеним посиланням, ви бачите статус.",
+  "cap.card6.title":"Росте разом з об'єктом","cap.card6.desc":"Один апартамент чи мережа з тридцяти — логіка підключається на кожен об'єкт окремо.",
+  "home.cta.title":"Готові підключити StayMate?","home.cta.desc":"Оберіть тариф і активуйте підписку за кілька хвилин.","home.cta.button":"Обрати тариф",
+
+  "features.hero.kicker":"Можливості","features.hero.title":"Що вміє StayMate",
+  "features.hero.desc":"Повний перелік того, що агент робить самостійно — від першого повідомлення гостя до підтвердженої броні.",
+  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayMate говорить від імені вашого об'єкта",
+  "features.photo.desc":"Ім'я, тон спілкування і фото можна налаштувати під конкретні апартаменти — гість не відчує різниці зі звичайним листуванням з адміністратором.",
+
+  "how.hero.kicker":"Сценарій","how.hero.title":"Як це працює",
+  "how.hero.desc":"Один діалог гостя проходить чотири кроки — StayMate не передає його далі, поки все не підтверджено.",
+  "how.extra.kicker":"Нестандартні ситуації","how.extra.title":"Коли підключається людина",
+  "how.extra.desc":"StayMate добре знає межі своєї компетенції і не намагається вирішити все сам.",
+  "how.card1.title":"Складний або спірний запит","how.card1.desc":"Скарга, конфлікт, нетипове прохання — діалог одразу передається менеджеру разом з історією листування.",
+  "how.card2.title":"Немає вільних номерів","how.card2.desc":"StayMate пропонує найближчі вільні дати або записує гостя в лист очікування, якщо це налаштовано.",
+
+  "pricing.hero.kicker":"Тарифи","pricing.hero.title":"Одна підписка на об'єкт",
+  "pricing.hero.desc":"Без прихованих відсотків із бронювань. Оплата щомісячна, скасувати можна в будь-який момент.",
+  "plan.badge":"найчастіше обирають","pricing.period":"/ міс","plan.cta":"Обрати",
+  "plan.start.name":"Старт","plan.start.desc":"До 5 об'єктів, без автобронювання","plan.start.price":"100",
+  "plan.start.f1":"До 5 об'єктів у кабінеті","plan.start.f2":"Відповідає гостям і перевіряє наявність",
+  "plan.start.f3":"Формує готові дані бронювання для адміністратора","plan.start.f4":"Без автоматичного бронювання й оплати",
+  "plan.pro.name":"Профі","plan.pro.desc":"До 20 об'єктів, повна автоматизація","plan.pro.price":"200",
+  "plan.pro.f1":"До 20 об'єктів у кабінеті","plan.pro.f2":"Усі канали: WhatsApp, Telegram, сайт",
+  "plan.pro.f3":"Підключення до PMS і синхронізація","plan.pro.f4":"Самостійно бронює і приймає оплату",
+  "plan.pro.f5":"Передає складні випадки менеджеру",
+  "plan.network.name":"Мережа","plan.network.desc":"Без обмежень на об'єкти","plan.network.price":"300",
+  "plan.network.f1":"Необмежена кількість об'єктів","plan.network.f2":"Усе з тарифу «Профі»: бронювання й оплата",
+  "plan.network.f3":"Передає лише скарги та складні ситуації","plan.network.f4":"Пріоритетна підтримка",
+  "plan.auto.note":"Автобронювання і перевірка номерів у реальному часі розкриваються повною мірою, коли ваш об'єкт підключено до PMS або Channel Manager.",
+
+  "checkout.hero.kicker":"Оформлення","checkout.hero.title":"Обрати тариф",
+  "checkout.hero.desc":"Заповніть дані, щоб активувати підписку StayMate. Це демонстраційна форма оплати.",
+  "pay.head.title":"Оформлення підписки",
+  "pay.email.label":"Email для доступу","pay.card.label":"Номер картки","pay.exp.label":"Термін дії","pay.cvc.label":"CVC",
+  "pay.submit.default":"Оплатити підписку","pay.submit.loading":"Обробляємо оплату…",
+  "pay.secure":"Захищене з'єднання · демо-форма",
+  "pay.success.title":"Підписку активовано","pay.success.desc":"Кабінет та інструкція з підключення вже доступні нижче.",
+  "pay.success.cta":"Перейти до інструкції",
+
+  "connect.hero.kicker":"Початок роботи","connect.hero.title":"Підключити StayMate до вашого профілю",
+  "connect.hero.desc":"Три кроки від оплати до першого діалогу з гостем.",
+  "connect.step1.title":"Оберіть тариф","connect.step1.desc":"Підпишіться на план, що відповідає розміру вашого об'єкта.",
+  "connect.step2.title":"Отримайте ключ доступу","connect.step2.desc":"Одразу після оплати відкриється особистий ключ і покрокова інструкція.",
+  "connect.step3.title":"Підключіть канали та правила","connect.step3.desc":"Додайте месенджери, PMS і умови проживання — і запускайте StayMate на реальних гостях.",
+  "connect.cta.primary":"Обрати тариф","connect.cta.secondary":"Вже оплатили? Перейти до інструкції",
+
+  "instr.hero.kicker":"Підключення","instr.hero.title":"Інструкція з налаштування",
+  "instr.hero.desc":"Відкривається одразу після оплати підписки — тут будуть ваш ключ доступу і кроки підключення.",
+  "lock.title":"Доступно після оплати","lock.desc":"Оформіть підписку — і інструкція з персональним ключем доступу відкриється прямо на цій сторінці.","lock.cta":"Обрати тариф",
+  "key.copy":"Скопіювати",
+  "step.s1.title":"Отримайте ключ доступу","step.s1.desc":"Ключ уже створено для вашого кабінету — він показаний вище. Він знадобиться на наступному кроці.",
+  "step.s2.title":"Підключіть канал спілкування","step.s2.desc":"У особистому кабінеті відкрийте розділ «Канали» → оберіть WhatsApp, Telegram або чат для сайту → вставте ключ доступу.",
+  "step.s3.title":"Зв'яжіть систему бронювання","step.s3.desc":"Вкажіть вашу PMS (Cloudbeds, Beds24 тощо) або завантажте таблицю номерів вручну — StayMate звірятиметься з нею.",
+  "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayMate дотримуватиметься.",
+  "step.s5.title":"Перевірте й запустіть","step.s5.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність — і увімкніть канал для реальних гостей.",
+
+  "contacts.hero.kicker":"Контакти","contacts.hero.title":"Залишились питання?",
+  "contacts.hero.desc":"Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.",
+  "contact.email.label":"Пошта","contact.telegram.label":"Telegram",
+  "contact.response.label":"Відповідь на звернення","contact.response.value":"протягом робочого дня",
+  "form.name.label":"Ім'я","form.name.ph":"Ваше ім'я","form.email.label":"Email","form.email.ph":"you@hotel.com",
+  "form.msg.label":"Повідомлення","form.msg.ph":"Розкажіть про об'єкт і що хочете автоматизувати",
+  "form.submit":"Надіслати повідомлення"
+},
+ru: {
+  "nav.home":"Главная","nav.features":"Возможности","nav.how":"Как это работает","nav.pricing":"Тарифы",
+  "nav.connect":"Подключить","nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cta":"Подключить",
+  "nav.login":"Войти","nav.account":"Кабинет",
+  "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
+  "footer.rights":"© 2026 StayMate",
+  "toast.contactSent":"Сообщение отправлено — ответим в течение дня",
+  "toast.paySuccess":"Оплата прошла успешно","toast.keyCopied":"Ключ скопирован",
+  "config.notSetup":"Supabase ещё не настроен разработчиком сайта. Откройте файл supabase-config.js и вставьте свои ключи проекта.",
+
+  "login.hero.kicker":"Вход","login.hero.title":"Войти в кабинет",
+  "login.hero.desc":"Доступ к статусу подписки и инструкции — с любого устройства.",
+  "login.email.label":"Email","login.password.label":"Пароль","login.submit":"Войти",
+  "login.noAccount":"Ещё нет аккаунта?","login.toRegister":"Зарегистрироваться",
+  "login.error.generic":"Не удалось войти. Проверьте email и пароль (или подтвердите email после регистрации).",
+
+  "register.hero.kicker":"Регистрация","register.hero.title":"Создать аккаунт StayMate",
+  "register.hero.desc":"Понадобится, чтобы оформить подписку и сохранять доступ к кабинету с любого устройства. Первые 3 дня — бесплатно, без привязки карты.",
+  "register.name.label":"Имя","register.email.label":"Email","register.password.label":"Пароль","register.submit":"Зарегистрироваться",
+  "register.haveAccount":"Уже есть аккаунт?","register.toLogin":"Войти",
+  "register.success.title":"Аккаунт создан","register.success.desc":"Если в Supabase включено подтверждение email — проверьте почту и перейдите по ссылке. Если выключено — вход уже выполнен, сейчас перенаправим в кабинет.",
+  "register.error.generic":"Не удалось зарегистрироваться. Возможно, такой email уже используется.",
+
+  "account.hero.kicker":"Кабинет","account.hero.title":"Ваш аккаунт","account.hero.desc":"Статус подписки и доступ к инструкции подключения.",
+  "account.loading":"Загрузка…",
+  "account.notLoggedIn.title":"Вы не вошли","account.notLoggedIn.desc":"Войдите в аккаунт, чтобы увидеть статус подписки.","account.notLoggedIn.cta":"Войти",
+  "account.email.label":"Email","account.plan.label":"Тариф","account.status.label":"Статус",
+  "account.plan.none":"Нет активной подписки","account.status.active":"Активна","account.status.inactive":"Не активна","account.status.trial":"Пробный период — осталось {days} дн.","account.status.trialEnded":"Пробный период завершился",
+  "account.cta.pricing":"Выбрать тариф","account.cta.instructions":"Перейти к инструкции","account.logout":"Выйти",
+
+  "checkout.authgate.title":"Сначала войдите в аккаунт","checkout.authgate.desc":"Подписка привязывается к вашему аккаунту StayMate, чтобы оставаться доступной с любого устройства.",
+
+  "home.eyebrow":"StayMate уже отвечает 214 гостям прямо сейчас",
+  "home.h1pre":"Гости пишут ночью.","home.h1em":"Отвечает StayMate.",
+  "home.sub":"ИИ-администратор подключается к вашим каналам, проверяет свободные номера, принимает оплату и бронирует — пока вы спите или заняты заездом.",
+  "home.cta1":"Выбрать тариф","home.cta2":"Как это работает",
+  "home.proof1val":"24/7","home.proof1label":"без выходных и обеда",
+  "home.proof2val":"< 9 сек","home.proof2label":"среднее время ответа",
+  "home.proof3val":"3 языка","home.proof3label":"сразу из коробки",
+  "home.chat.status":"на связи","home.chat.object":"апартаменты «Луч»",
+  "home.chat.foot.status":"статус ·","home.chat.foot.confirmed":"бронь подтверждена",
+  "chat.g1":"Добрый вечер! Есть свободная студия на 14–17 августа?",
+  "chat.a1tag":"проверка наличия","chat.a1":"Да, студия №3 свободна на эти даты. 3 ночи — €186, включая уборку.",
+  "chat.g2":"Отлично, бронирую. Как оплатить?",
+  "chat.a2tag":"оплата","chat.a2":"Отправил защищённую ссылку на оплату. После оплаты бронь подтвердится автоматически.",
+  "chat.g3":"Оплатила ✅",
+  "chat.a3tag":"бронь создана","chat.a3":"Спасибо! Студия №3 забронирована за вами. Инструкция по заезду придёт за день до прибытия.",
+  "home.process.kicker":"Сценарий","home.process.title":"Один диалог — четыре действия",
+  "home.process.desc":"StayMate проходит весь путь гостя сам: от первого сообщения до подтверждённой брони, без переключения на менеджера.",
+  "home.process.more":"Подробнее о сценарии →",
+  "process.step1.tag":"01 · сообщение","process.step1.title":"Отвечает гостю",
+  "process.step1.desc":"Понимает вопрос на любом языке, отвечает по правилам объекта — заезд, депозит, парковка, животные.",
+  "process.step2.tag":"02 · наличие","process.step2.title":"Проверяет номера",
+  "process.step2.desc":"Смотрит актуальный календарь занятости через вашу PMS или систему учёта — без ручных сверок.",
+  "process.step3.tag":"03 · оплата","process.step3.title":"Принимает платёж",
+  "process.step3.desc":"Выставляет ссылку на оплату через защищённый платёжный шлюз, подтверждает поступление.",
+  "process.step4.tag":"04 · бронь","process.step4.title":"Создаёт бронирование",
+  "process.step4.desc":"Фиксирует бронь в системе и присылает гостю подтверждение с деталями заезда.",
+  "home.feat.kicker":"Возможности","home.feat.title":"Что умеет StayMate",
+  "home.feat.desc":"Не просто чат-бот с заготовленными ответами — агент, который понимает контекст и знает, когда передать диалог человеку.",
+  "home.feat.more":"Все возможности →",
+  "cap.card1.title":"Работает в ваших каналах","cap.card1.desc":"WhatsApp, Telegram, Instagram и чат на сайте — гость пишет туда, где ему удобно.",
+  "cap.card2.title":"Подключается к вашей PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator и другие — синхронизация наличия в реальном времени.",
+  "cap.card3.title":"Знает правила объекта","cap.card3.desc":"Загрузите условия проживания один раз — StayMate будет отвечать строго по ним.",
+  "cap.card4.title":"Передаёт сложные случаи","cap.card4.desc":"Если ситуация нестандартная — жалоба, спор, форс-мажор — диалог уходит менеджеру.",
+  "cap.card5.title":"Принимает оплату","cap.card5.desc":"Депозит, полная оплата или предоплата — гость платит по защищённой ссылке, вы видите статус.",
+  "cap.card6.title":"Растёт вместе с объектом","cap.card6.desc":"Один апартамент или сеть из тридцати — логика подключается на каждый объект отдельно.",
+  "home.cta.title":"Готовы подключить StayMate?","home.cta.desc":"Выберите тариф и активируйте подписку за несколько минут.","home.cta.button":"Выбрать тариф",
+
+  "features.hero.kicker":"Возможности","features.hero.title":"Что умеет StayMate",
+  "features.hero.desc":"Полный перечень того, что агент делает самостоятельно — от первого сообщения гостя до подтверждённой брони.",
+  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayMate говорит от лица вашего объекта",
+  "features.photo.desc":"Имя, тон общения и фото можно настроить под конкретные апартаменты — гость не почувствует разницы с обычной перепиской с администратором.",
+
+  "how.hero.kicker":"Сценарий","how.hero.title":"Как это работает",
+  "how.hero.desc":"Один диалог гостя проходит четыре шага — StayMate не передаёт его дальше, пока всё не подтверждено.",
+  "how.extra.kicker":"Нестандартные ситуации","how.extra.title":"Когда подключается человек",
+  "how.extra.desc":"StayMate хорошо знает границы своей компетенции и не пытается решить всё сам.",
+  "how.card1.title":"Сложный или спорный запрос","how.card1.desc":"Жалоба, конфликт, нетипичная просьба — диалог сразу передаётся менеджеру вместе с историей переписки.",
+  "how.card2.title":"Нет свободных номеров","how.card2.desc":"StayMate предлагает ближайшие свободные даты или записывает гостя в лист ожидания, если это настроено.",
+
+  "pricing.hero.kicker":"Тарифы","pricing.hero.title":"Одна подписка на объект",
+  "pricing.hero.desc":"Без скрытых процентов с бронирований. Оплата ежемесячная, отменить можно в любой момент.",
+  "plan.badge":"чаще всего выбирают","pricing.period":"/ мес","plan.cta":"Выбрать",
+  "plan.start.name":"Старт","plan.start.desc":"До 5 объектов, без автобронирования","plan.start.price":"100",
+  "plan.start.f1":"До 5 объектов в кабинете","plan.start.f2":"Отвечает гостям и проверяет наличие",
+  "plan.start.f3":"Формирует готовые данные брони для администратора","plan.start.f4":"Без автоматического бронирования и оплаты",
+  "plan.pro.name":"Профи","plan.pro.desc":"До 20 объектов, полная автоматизация","plan.pro.price":"200",
+  "plan.pro.f1":"До 20 объектов в кабинете","plan.pro.f2":"Все каналы: WhatsApp, Telegram, сайт",
+  "plan.pro.f3":"Подключение к PMS и синхронизация","plan.pro.f4":"Самостоятельно бронирует и принимает оплату",
+  "plan.pro.f5":"Передаёт сложные случаи менеджеру",
+  "plan.network.name":"Сеть","plan.network.desc":"Без ограничений на объекты","plan.network.price":"300",
+  "plan.network.f1":"Неограниченное количество объектов","plan.network.f2":"Всё из тарифа «Профи»: бронь и оплата",
+  "plan.network.f3":"Передаёт только жалобы и сложные ситуации","plan.network.f4":"Приоритетная поддержка",
+  "plan.auto.note":"Автобронирование и проверка номеров в реальном времени раскрываются в полной мере, когда ваш объект подключён к PMS или Channel Manager.",
+
+  "checkout.hero.kicker":"Оформление","checkout.hero.title":"Выбрать тариф",
+  "checkout.hero.desc":"Заполните данные, чтобы активировать подписку StayMate. Это демонстрационная форма оплаты.",
+  "pay.head.title":"Оформление подписки",
+  "pay.email.label":"Email для доступа","pay.card.label":"Номер карты","pay.exp.label":"Срок действия","pay.cvc.label":"CVC",
+  "pay.submit.default":"Оплатить подписку","pay.submit.loading":"Обрабатываем оплату…",
+  "pay.secure":"Защищённое соединение · демо-форма",
+  "pay.success.title":"Подписка активна","pay.success.desc":"Кабинет и инструкция по подключению уже доступны ниже.",
+  "pay.success.cta":"Перейти к инструкции",
+
+  "connect.hero.kicker":"Начало работы","connect.hero.title":"Подключить StayMate к вашему профилю",
+  "connect.hero.desc":"Три шага от оплаты до первого диалога с гостем.",
+  "connect.step1.title":"Выберите тариф","connect.step1.desc":"Подпишитесь на план, соответствующий размеру вашего объекта.",
+  "connect.step2.title":"Получите ключ доступа","connect.step2.desc":"Сразу после оплаты откроется личный ключ и пошаговая инструкция.",
+  "connect.step3.title":"Подключите каналы и правила","connect.step3.desc":"Добавьте мессенджеры, PMS и условия проживания — и запускайте StayMate на реальных гостях.",
+  "connect.cta.primary":"Выбрать тариф","connect.cta.secondary":"Уже оплатили? Перейти к инструкции",
+
+  "instr.hero.kicker":"Подключение","instr.hero.title":"Инструкция по настройке",
+  "instr.hero.desc":"Открывается сразу после оплаты подписки — здесь будут ваш ключ доступа и шаги подключения.",
+  "lock.title":"Доступно после оплаты","lock.desc":"Оформите подписку — и инструкция с персональным ключом доступа откроется прямо на этой странице.","lock.cta":"Выбрать тариф",
+  "key.copy":"Скопировать",
+  "step.s1.title":"Получите ключ доступа","step.s1.desc":"Ключ уже создан для вашего кабинета — он показан выше. Он понадобится на следующем шаге.",
+  "step.s2.title":"Подключите канал общения","step.s2.desc":"В личном кабинете откройте раздел «Каналы» → выберите WhatsApp, Telegram или чат для сайта → вставьте ключ доступа.",
+  "step.s3.title":"Свяжите систему бронирования","step.s3.desc":"Укажите вашу PMS (Cloudbeds, Beds24 и т.п.) или загрузите таблицу номеров вручную — StayMate будет сверяться с ней.",
+  "step.s4.title":"Загрузите правила объекта","step.s4.desc":"Заезд/выезд, депозит, животные, парковка — короткий текстовый файл с условиями, которых StayMate будет придерживаться.",
+  "step.s5.title":"Протестируйте и запустите","step.s5.desc":"Напишите тестовое сообщение от лица гостя, проверьте ответ и наличие — и включите канал для реальных гостей.",
+
+  "contacts.hero.kicker":"Контакты","contacts.hero.title":"Остались вопросы?",
+  "contacts.hero.desc":"Ответим по подключению, тарифам или интеграции с вашей системой бронирования.",
+  "contact.email.label":"Почта","contact.telegram.label":"Telegram",
+  "contact.response.label":"Ответ на обращения","contact.response.value":"в течение рабочего дня",
+  "form.name.label":"Имя","form.name.ph":"Ваше имя","form.email.label":"Email","form.email.ph":"you@hotel.com",
+  "form.msg.label":"Сообщение","form.msg.ph":"Расскажите об объекте и что хотите автоматизировать",
+  "form.submit":"Отправить сообщение"
+},
+en: {
+  "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
+  "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected",
+  "nav.login":"Log in","nav.account":"Account",
+  "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
+  "footer.rights":"© 2026 StayMate",
+  "toast.contactSent":"Message sent — we'll reply within a day",
+  "toast.paySuccess":"Payment successful","toast.keyCopied":"Key copied",
+  "config.notSetup":"Supabase hasn't been configured by the site owner yet. Open supabase-config.js and paste your project keys.",
+
+  "login.hero.kicker":"Log in","login.hero.title":"Log in to your account",
+  "login.hero.desc":"Check your subscription status and setup guide from any device.",
+  "login.email.label":"Email","login.password.label":"Password","login.submit":"Log in",
+  "login.noAccount":"Don't have an account yet?","login.toRegister":"Sign up",
+  "login.error.generic":"Couldn't log in. Check your email and password (or confirm your email after signing up).",
+
+  "register.hero.kicker":"Sign up","register.hero.title":"Create a StayMate account",
+  "register.hero.desc":"You'll need this to subscribe and keep access to your dashboard from any device. First 3 days are free, no card required.",
+  "register.name.label":"Name","register.email.label":"Email","register.password.label":"Password","register.submit":"Sign up",
+  "register.haveAccount":"Already have an account?","register.toLogin":"Log in",
+  "register.success.title":"Account created","register.success.desc":"If email confirmation is enabled in Supabase, check your inbox and follow the link. If it's disabled, you're already signed in and we'll redirect you now.",
+  "register.error.generic":"Couldn't sign up. That email may already be in use.",
+
+  "account.hero.kicker":"Account","account.hero.title":"Your account","account.hero.desc":"Subscription status and access to the setup guide.",
+  "account.loading":"Loading…",
+  "account.notLoggedIn.title":"You're not logged in","account.notLoggedIn.desc":"Log in to see your subscription status.","account.notLoggedIn.cta":"Log in",
+  "account.email.label":"Email","account.plan.label":"Plan","account.status.label":"Status",
+  "account.plan.none":"No active subscription","account.status.active":"Active","account.status.inactive":"Inactive","account.status.trial":"Trial — {days} day(s) left","account.status.trialEnded":"Trial ended",
+  "account.cta.pricing":"Choose a plan","account.cta.instructions":"Go to setup guide","account.logout":"Log out",
+
+  "checkout.authgate.title":"Log in first","checkout.authgate.desc":"Your subscription is tied to your StayMate account, so it stays available on any device.",
+
+  "home.eyebrow":"StayMate is answering 214 guests right now",
+  "home.h1pre":"Guests message at night.","home.h1em":"StayMate replies.",
+  "home.sub":"An AI front-desk agent connects to your channels, checks room availability, takes payment and books the stay — while you sleep or handle a check-in.",
+  "home.cta1":"Choose a plan","home.cta2":"How it works",
+  "home.proof1val":"24/7","home.proof1label":"no days off, no lunch break",
+  "home.proof2val":"< 9 sec","home.proof2label":"average reply time",
+  "home.proof3val":"3 languages","home.proof3label":"out of the box",
+  "home.chat.status":"online","home.chat.object":"Ray Apartments",
+  "home.chat.foot.status":"status ·","home.chat.foot.confirmed":"booking confirmed",
+  "chat.g1":"Good evening! Any studio free Aug 14–17?",
+  "chat.a1tag":"checking availability","chat.a1":"Yes, Studio #3 is free those dates. 3 nights — €186, cleaning included.",
+  "chat.g2":"Great, I'll book it. How do I pay?",
+  "chat.a2tag":"payment","chat.a2":"Sent a secure payment link. The booking confirms automatically once it's paid.",
+  "chat.g3":"Paid ✅",
+  "chat.a3tag":"booking created","chat.a3":"Thank you! Studio #3 is booked for you. Check-in instructions arrive the day before arrival.",
+  "home.process.kicker":"Scenario","home.process.title":"One conversation, four actions",
+  "home.process.desc":"StayMate handles the whole guest journey itself: from the first message to a confirmed booking, no hand-off to a manager.",
+  "home.process.more":"More about the scenario →",
+  "process.step1.tag":"01 · message","process.step1.title":"Replies to the guest",
+  "process.step1.desc":"Understands the question in any language, answers per your house rules — check-in, deposit, parking, pets.",
+  "process.step2.tag":"02 · availability","process.step2.title":"Checks room availability",
+  "process.step2.desc":"Reads the live occupancy calendar via your PMS or tracking system — no manual reconciliation.",
+  "process.step3.tag":"03 · payment","process.step3.title":"Takes the payment",
+  "process.step3.desc":"Issues a payment link through a secure gateway and confirms once funds arrive.",
+  "process.step4.tag":"04 · booking","process.step4.title":"Creates the booking",
+  "process.step4.desc":"Records the booking in your system and sends the guest a confirmation with arrival details.",
+  "home.feat.kicker":"Features","home.feat.title":"What StayMate can do",
+  "home.feat.desc":"Not just a scripted chatbot — an agent that understands context and knows when to hand off to a human.",
+  "home.feat.more":"All features →",
+  "cap.card1.title":"Works in your channels","cap.card1.desc":"WhatsApp, Telegram, Instagram and your website chat — guests write wherever suits them.",
+  "cap.card2.title":"Connects to your PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator and others — availability stays in sync in real time.",
+  "cap.card3.title":"Knows your house rules","cap.card3.desc":"Upload your policies once — StayMate will answer strictly by them.",
+  "cap.card4.title":"Escalates tricky cases","cap.card4.desc":"When something's non-standard — a complaint, a dispute, force majeure — the chat goes to a manager.",
+  "cap.card5.title":"Takes payment","cap.card5.desc":"Deposit, full payment or prepayment — guests pay via a secure link and you see the status.",
+  "cap.card6.title":"Grows with your property","cap.card6.desc":"One apartment or a network of thirty — logic is configured per property.",
+  "home.cta.title":"Ready to connect StayMate?","home.cta.desc":"Pick a plan and activate your subscription in minutes.","home.cta.button":"Choose a plan",
+
+  "features.hero.kicker":"Features","features.hero.title":"What StayMate can do",
+  "features.hero.desc":"The full list of what the agent handles on its own — from a guest's first message to a confirmed booking.",
+  "features.photo.kicker":"Your brand, not ours","features.photo.title":"StayMate speaks as your property",
+  "features.photo.desc":"Name, tone of voice and photos can be tailored to your specific apartments — guests won't feel a difference from chatting with a regular front-desk manager.",
+
+  "how.hero.kicker":"Scenario","how.hero.title":"How it works",
+  "how.hero.desc":"A single guest conversation goes through four steps — StayMate doesn't hand it off until everything is confirmed.",
+  "how.extra.kicker":"Edge cases","how.extra.title":"When a human steps in",
+  "how.extra.desc":"StayMate knows the limits of its own judgement and doesn't try to resolve everything itself.",
+  "how.card1.title":"A complex or disputed request","how.card1.desc":"A complaint, a conflict, an unusual ask — the chat is handed to a manager immediately, with the full history.",
+  "how.card2.title":"No rooms available","how.card2.desc":"StayMate offers the nearest free dates or adds the guest to a waitlist, if that's configured.",
+
+  "pricing.hero.kicker":"Pricing","pricing.hero.title":"One subscription per property",
+  "pricing.hero.desc":"No hidden booking commissions. Billed monthly, cancel anytime.",
+  "plan.badge":"most popular","pricing.period":"/ mo","plan.cta":"Choose",
+  "plan.start.name":"Start","plan.start.desc":"Up to 5 properties, no auto-booking","plan.start.price":"100",
+  "plan.start.f1":"Up to 5 properties in one account","plan.start.f2":"Replies to guests and checks availability",
+  "plan.start.f3":"Hands off ready booking details to your admin","plan.start.f4":"No automatic booking or payment",
+  "plan.pro.name":"Pro","plan.pro.desc":"Up to 20 properties, fully automated","plan.pro.price":"200",
+  "plan.pro.f1":"Up to 20 properties in one account","plan.pro.f2":"All channels: WhatsApp, Telegram, website",
+  "plan.pro.f3":"PMS connection and sync","plan.pro.f4":"Books and takes payment on its own",
+  "plan.pro.f5":"Hands off complex cases to a manager",
+  "plan.network.name":"Network","plan.network.desc":"No property limit","plan.network.price":"300",
+  "plan.network.f1":"Unlimited number of properties","plan.network.f2":"Everything in Pro: booking and payment",
+  "plan.network.f3":"Escalates only complaints and serious issues","plan.network.f4":"Priority support",
+  "plan.auto.note":"Real-time availability checks and auto-booking unfold to their full extent once your property is connected to a PMS or Channel Manager.",
+
+  "checkout.hero.kicker":"Checkout","checkout.hero.title":"Choose a plan",
+  "checkout.hero.desc":"Fill in your details to activate a StayMate subscription. This is a demo payment form.",
+  "pay.head.title":"Subscribe",
+  "pay.email.label":"Email for access","pay.card.label":"Card number","pay.exp.label":"Expiry","pay.cvc.label":"CVC",
+  "pay.submit.default":"Pay for subscription","pay.submit.loading":"Processing payment…",
+  "pay.secure":"Secure connection · demo form",
+  "pay.success.title":"Subscription active","pay.success.desc":"Your dashboard and setup guide are now available below.",
+  "pay.success.cta":"Go to setup guide",
+
+  "connect.hero.kicker":"Getting started","connect.hero.title":"Connect StayMate to your profile",
+  "connect.hero.desc":"Three steps from payment to your first guest conversation.",
+  "connect.step1.title":"Choose a plan","connect.step1.desc":"Subscribe to the plan that matches the size of your property.",
+  "connect.step2.title":"Get your access key","connect.step2.desc":"Right after payment, your personal key and a step-by-step guide unlock.",
+  "connect.step3.title":"Connect channels and rules","connect.step3.desc":"Add messengers, your PMS and house rules — then launch StayMate on real guests.",
+  "connect.cta.primary":"Choose a plan","connect.cta.secondary":"Already paid? Go to the setup guide",
+
+  "instr.hero.kicker":"Setup","instr.hero.title":"Setup guide",
+  "instr.hero.desc":"Unlocks right after you pay for a subscription — your access key and connection steps will appear here.",
+  "lock.title":"Available after payment","lock.desc":"Subscribe and the guide with your personal access key unlocks right on this page.","lock.cta":"Choose a plan",
+  "key.copy":"Copy",
+  "step.s1.title":"Get your access key","step.s1.desc":"Your key is already created for your account — shown above. You'll need it for the next step.",
+  "step.s2.title":"Connect a messaging channel","step.s2.desc":"In your dashboard, open “Channels” → pick WhatsApp, Telegram or the website chat → paste your access key.",
+  "step.s3.title":"Link your booking system","step.s3.desc":"Point it to your PMS (Cloudbeds, Beds24, etc.) or upload a room sheet manually — StayMate will check against it.",
+  "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayMate will follow.",
+  "step.s5.title":"Test and launch","step.s5.desc":"Send a test message as a guest, check the reply and availability — then switch the channel on for real guests.",
+
+  "contacts.hero.kicker":"Contact","contacts.hero.title":"Still have questions?",
+  "contacts.hero.desc":"We'll help with setup, pricing, or integrating your booking system.",
+  "contact.email.label":"Email","contact.telegram.label":"Telegram",
+  "contact.response.label":"Response time","contact.response.value":"within one business day",
+  "form.name.label":"Name","form.name.ph":"Your name","form.email.label":"Email","form.email.ph":"you@hotel.com",
+  "form.msg.label":"Message","form.msg.ph":"Tell us about your property and what you'd like to automate",
+  "form.submit":"Send message"
+}
+};
+
+function t(key, lang){
+  const dict = I18N[lang] || I18N.uk;
+  return (dict[key] !== undefined) ? dict[key] : (I18N.uk[key] !== undefined ? I18N.uk[key] : key);
+}
+
+function applyI18n(lang){
+  document.documentElement.setAttribute('lang', lang);
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n'), lang); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = t(el.getAttribute('data-i18n-html'), lang); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'), lang)); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el=>{ el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'), lang)); });
+  document.querySelectorAll('.lang-menu button').forEach(b=>{ b.classList.toggle('active', b.dataset.lang === lang); });
+  const label = document.getElementById('langBtnLabel');
+  if(label) label.textContent = lang.toUpperCase();
+  document.querySelectorAll('a[data-href-base]').forEach(a=>{
+    /* keep query params like ?plan= intact while switching pages, language itself is stored globally, not in URL */
+  });
+}
+
+function setLang(lang){
+  try{ localStorage.setItem('stayMateLang', lang); }catch(e){}
+  window.__stayMateLang = lang;
+  applyI18n(lang);
+}
+
+function getLang(){
+  let saved = null;
+  try{ saved = localStorage.getItem('stayMateLang'); }catch(e){}
+  return saved || window.__stayMateLang || 'uk';
+}
+
+</script>
+<script>
+/* ============ StayMate — app.js (shared by every page) ============ */
+
+/* ---------- theme: dark by default, manual override remembered ---------- */
+function getThemeMode(){
+  let saved = null;
+  try{ saved = localStorage.getItem('stayMateThemeMode'); }catch(e){}
+  return saved || 'dark';
+}
+function applyTheme(){
+  const mode = getThemeMode();
+  document.documentElement.setAttribute('data-theme', mode);
+}
+function toggleTheme(){
+  const current = getThemeMode();
+  const next = current === 'dark' ? 'light' : 'dark';
+  try{ localStorage.setItem('stayMateThemeMode', next); }catch(e){}
+  applyTheme();
+}
+applyTheme();
+
+/* ---------- language: init on load ---------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  applyI18n(getLang());
+  initNav();
+  initReveal();
+  initMisc();
+  initTilt3D();
+  initAccountNav();
+});
+
+/* ---------- auth: shared helpers built on top of window.sb (see supabase-config.js) ---------- */
+async function authGetSession(){
+  if(!window.sb) return null;
+  const { data } = await window.sb.auth.getSession();
+  return data?.session || null;
+}
+async function authSignUp(name, email, password){
+  const { data, error } = await window.sb.auth.signUp({
+    email, password, options:{ data:{ full_name: name } }
+  });
+  if(error) throw error;
+  return data;
+}
+async function authSignIn(email, password){
+  const { data, error } = await window.sb.auth.signInWithPassword({ email, password });
+  if(error) throw error;
+  return data;
+}
+async function authSignOut(){
+  if(window.sb) await window.sb.auth.signOut();
+}
+async function saveSubscription(plan, price){
+  const session = await authGetSession();
+  if(!session || !window.sb) return null;
+  return window.sb.from('subscriptions').upsert({
+    user_id: session.user.id, plan, price, active:true, trial_ends_at:null, updated_at:new Date().toISOString()
+  });
+}
+async function startTrialIfNone(){
+  /* called right after signup: gives a brand-new account 3 days of full access
+     without payment, on the plan they picked during registration (default "profi"
+     if none was pre-selected). Safe to call more than once — only inserts if the
+     user has no subscription row yet. */
+  const session = await authGetSession();
+  if(!session || !window.sb) return null;
+  const existing = await getSubscription();
+  if(existing) return existing;
+  const trialEnds = new Date(Date.now() + 3*24*60*60*1000).toISOString();
+  const { data } = await window.sb.from('subscriptions').upsert({
+    user_id: session.user.id, plan:'profi', price:200, active:true,
+    trial_ends_at: trialEnds, updated_at:new Date().toISOString()
+  }).select().maybeSingle();
+  return data;
+}
+async function getSubscription(){
+  const session = await authGetSession();
+  if(!session || !window.sb) return null;
+  const { data } = await window.sb.from('subscriptions').select('*').eq('user_id', session.user.id).maybeSingle();
+  return data;
+}
+function isTrialActive(sub){
+  if(!sub || !sub.trial_ends_at) return false;
+  return new Date(sub.trial_ends_at).getTime() > Date.now();
+}
+function isSubscriptionActive(sub){
+  if(!sub) return false;
+  if(sub.trial_ends_at) return isTrialActive(sub);
+  return !!sub.active;
+}
+
+/* ---------- nav: swap "Увійти" ↔ account email once session is known ---------- */
+async function initAccountNav(){
+  const links = document.querySelectorAll('.nav-account-link');
+  if(!links.length) return;
+  if(typeof SUPABASE_CONFIGURED !== 'undefined' && !SUPABASE_CONFIGURED){
+    links.forEach(a=>{ a.textContent = t('nav.login', getLang()); a.setAttribute('href','cabinet/'); });
+    return;
+  }
+  const session = await authGetSession();
+  links.forEach(a=>{
+    if(session){
+      a.textContent = session.user.email.split('@')[0];
+      a.setAttribute('href','account.html');
+    } else {
+      a.textContent = t('nav.login', getLang());
+      a.setAttribute('href','cabinet/');
+    }
+  });
+}
+
+/* ---------- 3D tilt-on-hover (pricing / capability / info cards) ---------- */
+function initTilt3D(){
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if(!window.matchMedia('(hover: hover)').matches) return;
+  document.querySelectorAll('.tilt-3d').forEach(card=>{
+    card.addEventListener('mousemove', (e)=>{
+      const r = card.getBoundingClientRect();
+      const x = e.clientX - r.left, y = e.clientY - r.top;
+      const rx = ((y - r.height/2) / (r.height/2)) * -6;
+      const ry = ((x - r.width/2) / (r.width/2)) * 6;
+      card.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-4px)`;
+    });
+    card.addEventListener('mouseleave', ()=>{ card.style.transform=''; });
+  });
+}
+
+/* ---------- nav: mobile menu, lang menu, active link, theme button ---------- */
+function initNav(){
+  const burger = document.getElementById('burgerBtn');
+  const mobilePanel = document.getElementById('mobilePanel');
+  if(burger && mobilePanel){
+    burger.addEventListener('click', ()=> mobilePanel.classList.toggle('open'));
+  }
+
+  const langBtn = document.getElementById('langBtn');
+  const langMenu = document.getElementById('langMenu');
+  if(langBtn && langMenu){
+    langBtn.addEventListener('click', (e)=>{ e.stopPropagation(); langMenu.classList.toggle('open'); });
+    document.addEventListener('click', ()=> langMenu.classList.remove('open'));
+    langMenu.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click', ()=>{ setLang(b.dataset.lang); langMenu.classList.remove('open'); });
+    });
+  }
+
+  document.querySelectorAll('.theme-btn').forEach(btn=>{
+    btn.addEventListener('click', toggleTheme);
+  });
+
+  const path = location.pathname.split('/').pop() || 'index.html';
+  document.querySelectorAll('a.nav-link, .mobile-panel a').forEach(a=>{
+    const href = a.getAttribute('href');
+    if(href === path) a.classList.add('active');
+  });
+}
+
+/* ---------- reveal on scroll ---------- */
+function initReveal(){
+  const els = document.querySelectorAll('.reveal');
+  if(!els.length) return;
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); } });
+  }, {threshold:0.12});
+  els.forEach(el=>io.observe(el));
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function showToast(text){
+  const toast = document.getElementById('toast');
+  if(!toast) return;
+  toast.textContent = text;
+  toast.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>toast.classList.remove('on'), 2600);
+}
+
+/* ---------- misc per-page wiring ---------- */
+function initMisc(){
+  /* home page chat demo */
+  const chatBody = document.getElementById('chatBody');
+  if(chatBody) runChatLoop(chatBody);
+
+  /* checkout page */
+  const payForm = document.getElementById('payForm');
+  if(payForm) initCheckout();
+
+  /* instructions page */
+  const lockPanel = document.getElementById('lockPanel');
+  if(lockPanel) initInstructions();
+
+  /* contact form */
+  const contactForm = document.getElementById('contactForm');
+  if(contactForm){
+    contactForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      showToast(t('toast.contactSent', getLang()));
+      contactForm.reset();
+    });
+  }
+
+  /* copy key button */
+  const copyBtn = document.getElementById('copyKeyBtn');
+  if(copyBtn){
+    copyBtn.addEventListener('click', ()=>{
+      const text = document.getElementById('apiKeyText')?.textContent || '';
+      navigator.clipboard?.writeText(text.trim());
+      showToast(t('toast.keyCopied', getLang()));
+    });
+  }
+
+  /* auth pages */
+  if(document.getElementById('loginForm')) initLoginPage();
+  if(document.getElementById('registerForm')) initRegisterPage();
+  if(document.getElementById('accountPage')) initAccountPage();
+
+  /* supabase-not-configured notice, shown on any page that has the placeholder.
+     Includes an on-page diagnostic line so the real runtime state is visible
+     directly in a screenshot, without needing devtools. */
+  const notice = document.getElementById('supabaseNotice');
+  if(notice){
+    const configuredDefined = typeof SUPABASE_CONFIGURED !== 'undefined';
+    const sdkLoaded = typeof window.supabase !== 'undefined';
+    const urlDefined = typeof SUPABASE_URL !== 'undefined';
+    const diag = ' [debug: url_defined=' + urlDefined +
+      (urlDefined ? ' url="…' + String(SUPABASE_URL).slice(-30) + '"' : '') +
+      ', CONFIGURED=' + (configuredDefined ? String(SUPABASE_CONFIGURED) : 'undefined') +
+      ', supabase_sdk_loaded=' + sdkLoaded +
+      ', page=' + location.pathname.split('/').pop() + ']';
+    if(configuredDefined && !SUPABASE_CONFIGURED){
+      notice.style.display = 'block';
+      notice.textContent = t('config.notSetup', getLang()) + diag;
+    } else if(!configuredDefined){
+      notice.style.display = 'block';
+      notice.style.color = '#c0392b';
+      notice.textContent = 'supabase-config.js не завантажився взагалі.' + diag;
+    } else {
+      /* configured correctly: force-hide (in case markup/CSS ever defaults to visible),
+         and log the diag quietly for devtools users */
+      notice.style.display = 'none';
+      console.log('StayMate Supabase diag:', diag);
+    }
+  }
+}
+
+/* ---------- login page ---------- */
+function initLoginPage(){
+  const form = document.getElementById('loginForm');
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const errEl = document.getElementById('authError');
+    errEl.style.display = 'none';
+    if(!window.sb){ errEl.textContent = t('config.notSetup', getLang()); errEl.style.display='block'; return; }
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const btn = document.getElementById('loginSubmitBtn');
+    btn.disabled = true;
+    try{
+      await authSignIn(email, password);
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get('redirect');
+      location.href = redirect ? decodeURIComponent(redirect) : 'account.html';
+    }catch(err){
+      errEl.textContent = t('login.error.generic', getLang()) + ' [' + (err && (err.type || err.message) ? (err.type || err.message) : err) + ']';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
+  const params = new URLSearchParams(location.search);
+  const redirect = params.get('redirect');
+  if(redirect){
+    document.getElementById('toRegisterLink')?.setAttribute('href', 'register.html?redirect=' + encodeURIComponent(redirect));
+  }
+}
+
+/* ---------- register page ---------- */
+function initRegisterPage(){
+  const form = document.getElementById('registerForm');
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const errEl = document.getElementById('authError');
+    errEl.style.display = 'none';
+    if(!window.sb){ errEl.textContent = t('config.notSetup', getLang()); errEl.style.display='block'; return; }
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const btn = document.getElementById('registerSubmitBtn');
+    btn.disabled = true;
+    try{
+      const data = await authSignUp(name, email, password);
+      document.getElementById('registerFormState').style.display = 'none';
+      document.getElementById('registerSuccessState').classList.add('on');
+      if(data.session){
+        try{ await startTrialIfNone(); }catch(e){ /* non-fatal: account page will retry */ }
+        const params = new URLSearchParams(location.search);
+        const redirect = params.get('redirect');
+        setTimeout(()=>{ location.href = redirect ? decodeURIComponent(redirect) : 'account.html'; }, 1400);
+      }
+    }catch(err){
+      errEl.textContent = t('register.error.generic', getLang()) + ' [' + (err && (err.type || err.message) ? (err.type || err.message) : err) + ']';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+    }
+  });
+  const params = new URLSearchParams(location.search);
+  const redirect = params.get('redirect');
+  if(redirect){
+    document.getElementById('toLoginLink')?.setAttribute('href', 'cabinet/');
+  }
+}
+
+/* ---------- account page ---------- */
+async function initAccountPage(){
+  const loadingEl = document.getElementById('accountLoading');
+  const loggedOutEl = document.getElementById('accountLoggedOut');
+  const loggedInEl = document.getElementById('accountLoggedIn');
+
+  if(!window.sb){
+    loadingEl.style.display = 'none';
+    loggedOutEl.style.display = 'block';
+    return;
+  }
+
+  const session = await authGetSession();
+  loadingEl.style.display = 'none';
+
+  if(!session){
+    loggedOutEl.style.display = 'block';
+    return;
+  }
+
+  loggedInEl.style.display = 'block';
+  document.getElementById('accountEmail').textContent = session.user.email;
+
+  let sub = await getSubscription();
+  if(!sub){
+    /* safety net: covers accounts created before email confirmation finished,
+       where the trial couldn't be started right after signup */
+    try{ sub = await startTrialIfNone(); }catch(e){ /* non-fatal */ }
+  }
+  const lang = getLang();
+  const planNames = {start:'plan.start.name', pro:'plan.pro.name', network:'plan.network.name'};
+  const statusEl = document.getElementById('accountStatus');
+
+  if(sub && sub.trial_ends_at && isTrialActive(sub)){
+    const msLeft = new Date(sub.trial_ends_at).getTime() - Date.now();
+    const daysLeft = Math.max(1, Math.ceil(msLeft / (24*60*60*1000)));
+    document.getElementById('accountPlan').textContent = t(planNames[sub.plan] || 'plan.pro.name', lang);
+    statusEl.textContent = t('account.status.trial', lang).replace('{days}', daysLeft);
+    statusEl.style.color = 'var(--accent-text)';
+    document.getElementById('accountInstructionsLink').style.display = 'inline-flex';
+    document.getElementById('accountPricingLink').style.display = 'none';
+  } else if(sub && isSubscriptionActive(sub)){
+    document.getElementById('accountPlan').textContent = t(planNames[sub.plan] || 'plan.pro.name', lang);
+    statusEl.textContent = t('account.status.active', lang);
+    statusEl.style.color = 'var(--accent-text)';
+    document.getElementById('accountInstructionsLink').style.display = 'inline-flex';
+    document.getElementById('accountPricingLink').style.display = 'none';
+  } else {
+    const wasTrial = sub && sub.trial_ends_at;
+    document.getElementById('accountPlan').textContent = t('account.plan.none', lang);
+    statusEl.textContent = wasTrial ? t('account.status.trialEnded', lang) : t('account.status.inactive', lang);
+    document.getElementById('accountInstructionsLink').style.display = 'none';
+    document.getElementById('accountPricingLink').style.display = 'inline-flex';
+  }
+
+  document.getElementById('logoutBtn')?.addEventListener('click', async ()=>{
+    await authSignOut();
+    location.href = 'index.html';
+  });
+}
+
+/* ---------- home: chat demo loop ---------- */
+function wait(ms){ return new Promise(r=>setTimeout(r, ms)); }
+function bubbleEl(msg){
+  const el = document.createElement('div');
+  el.className = 'bubble ' + (msg.who === 'guest' ? 'guest' : 'ai');
+  const lang = getLang();
+  const text = t(msg.textKey, lang);
+  const tag = msg.tagKey ? t(msg.tagKey, lang) : '';
+  el.innerHTML = (tag ? '<span class="tag">'+tag+'</span>' : '') + text;
+  return el;
+}
+async function runChatLoop(chatBody){
+  const script = [
+    {who:'guest', textKey:'chat.g1'},
+    {who:'ai', tagKey:'chat.a1tag', textKey:'chat.a1'},
+    {who:'guest', textKey:'chat.g2'},
+    {who:'ai', tagKey:'chat.a2tag', textKey:'chat.a2'},
+    {who:'guest', textKey:'chat.g3'},
+    {who:'ai', tagKey:'chat.a3tag', textKey:'chat.a3'},
+  ];
+  while(true){
+    chatBody.innerHTML = '';
+    for(const msg of script){
+      const typing = document.createElement('div');
+      typing.className = 'typing';
+      typing.innerHTML = '<span></span><span></span><span></span>';
+      chatBody.appendChild(typing);
+      chatBody.scrollTop = chatBody.scrollHeight;
+      await wait(650);
+      typing.remove();
+      chatBody.appendChild(bubbleEl(msg));
+      chatBody.scrollTop = chatBody.scrollHeight;
+      await wait(1150);
+    }
+    await wait(2400);
+  }
+}
+
+/* ---------- checkout page ---------- */
+async function initCheckout(){
+  const params = new URLSearchParams(location.search);
+  const plan = params.get('plan') || 'pro';
+  const plans = {
+    start:{nameKey:'plan.start.name', price:'plan.start.price'},
+    pro:{nameKey:'plan.pro.name', price:'plan.pro.price'},
+    network:{nameKey:'plan.network.name', price:'plan.network.price'}
+  };
+  const chosen = plans[plan] || plans.pro;
+
+  function updatePlanTag(){
+    const tagEl = document.getElementById('payPlanTag');
+    if(!tagEl) return;
+    const lang = getLang();
+    const name = t(chosen.nameKey, lang);
+    const price = t(chosen.price, lang);
+    const period = t('pricing.period', lang);
+    tagEl.textContent = name + ' · €' + price + ' ' + period;
+  }
+  updatePlanTag();
+  document.addEventListener('staymate:langchange', updatePlanTag);
+
+  /* require a logged-in account before subscribing, so the plan is tied to it */
+  const authGate = document.getElementById('authGate');
+  const payFormState = document.getElementById('payFormState');
+  if(window.sb){
+    const session = await authGetSession();
+    if(!session){
+      const redirect = encodeURIComponent('checkout.html?plan=' + plan);
+      document.getElementById('authGateLoginLink')?.setAttribute('href', 'cabinet/');
+      document.getElementById('authGateRegisterLink')?.setAttribute('href', 'register.html?redirect=' + redirect);
+      authGate.style.display = 'block';
+      payFormState.style.display = 'none';
+      return;
+    }
+  }
+
+  document.getElementById('cardNumber')?.addEventListener('input', function(e){
+    let v = e.target.value.replace(/\D/g,'').slice(0,16);
+    e.target.value = v.replace(/(.{4})/g,'$1 ').trim();
+  });
+  document.getElementById('cardExp')?.addEventListener('input', function(e){
+    let v = e.target.value.replace(/\D/g,'').slice(0,4);
+    if(v.length >= 3) v = v.slice(0,2) + ' / ' + v.slice(2);
+    e.target.value = v;
+  });
+
+  document.getElementById('payForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const btn = document.getElementById('paySubmitBtn');
+    const spinner = document.getElementById('paySpinner');
+    const label = document.getElementById('paySubmitLabel');
+    btn.disabled = true;
+    spinner.classList.add('on');
+    label.textContent = t('pay.submit.loading', getLang());
+
+    const priceNum = parseInt(t(chosen.price, getLang()), 10) || 0;
+    try{ if(window.sb) await saveSubscription(plan, priceNum); }catch(err){ /* non-fatal for the demo flow */ }
+    try{ localStorage.setItem('stayMateSubscribed', '1'); }catch(e){}
+
+    setTimeout(()=>{
+      document.getElementById('payFormState').style.display = 'none';
+      document.getElementById('paySuccessState').classList.add('on');
+      showToast(t('toast.paySuccess', getLang()));
+      spinner.classList.remove('on');
+      btn.disabled = false;
+      label.textContent = t('pay.submit.default', getLang());
+    }, 1600);
+  });
+
+  /* re-apply plan tag whenever language changes via the lang menu */
+  document.querySelectorAll('.lang-menu button').forEach(b=>{
+    b.addEventListener('click', ()=> setTimeout(updatePlanTag, 0));
+  });
+}
+
+/* ---------- instructions page: gate content behind a real account subscription ---------- */
+async function initInstructions(){
+  let subscribed = false;
+  if(window.sb){
+    const session = await authGetSession();
+    if(session){
+      const sub = await getSubscription();
+      subscribed = !!(sub && sub.active);
+    }
+  } else {
+    try{ subscribed = localStorage.getItem('stayMateSubscribed') === '1'; }catch(e){}
+  }
+  if(subscribed){
+    document.getElementById('lockPanel').style.display = 'none';
+    document.getElementById('stepsWrap').classList.add('on');
+  }
+}
+
+</script>
+</body>
+</html>

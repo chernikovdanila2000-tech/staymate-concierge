@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StayMate — кабінет готелю</title>
+<style>
+  :root {
+    --ink: #1c2521;
+    --paper: #f6f4ef;
+    --panel: #ffffff;
+    --line: #dcd7cb;
+    --accent: #2f5d50;
+    --accent-soft: #e4ece8;
+    --gold: #b8863d;
+    --danger: #a3352b;
+    --muted: #6b6a63;
+    --radius: 4px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    line-height: 1.5;
+  }
+  .ui, input, select, textarea, button {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 22px 32px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  header .brand {
+    font-size: 20px;
+    letter-spacing: 0.01em;
+  }
+  header .brand b { color: var(--accent); }
+  header .who {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  header .who button {
+    margin-left: 12px;
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 13px;
+    text-decoration: underline;
+    padding: 0;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 500;
+    margin: 0 0 8px;
+  }
+  .lede {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0 0 36px;
+    max-width: 46ch;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  .card h2 {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    text-transform: none;
+    margin: 0 0 4px;
+  }
+  .card .hint {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 20px;
+  }
+  label {
+    display: block;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-of-type { margin-top: 0; }
+  input, select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    background: #fff;
+    color: var(--ink);
+  }
+  input:focus, select:focus, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  button {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+  }
+  button.danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .row { display: flex; gap: 12px; }
+  .row > * { flex: 1; }
+  .actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; }
+  .msg {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+  .msg.error { color: var(--danger); }
+  .msg.ok { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  th {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    text-align: left;
+    font-weight: 600;
+    padding: 8px 8px 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  td {
+    padding: 6px 8px 6px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  td input { padding: 6px 8px; font-size: 13px; }
+  td.num-col { width: 90px; }
+  td.del-col { width: 34px; }
+  td.del-col button {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 18px;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .status-pill {
+    display: inline-block;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .status-pill.off { background: #f1ece2; color: var(--gold); }
+  .hidden { display: none !important; }
+  .center-screen {
+    min-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .auth-box { width: 100%; max-width: 380px; }
+  .switcher {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 18px;
+  }
+  .switcher button {
+    background: none; border: none; color: var(--accent);
+    text-decoration: underline; cursor: pointer; padding: 0; font-size: 13px; font-weight: 600;
+  }
+  code {
+    background: var(--accent-soft);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><b>Stay</b>Mate — кабінет готелю</div>
+  <div class="who hidden" id="whoBar"></div>
+</header>
+
+<main>
+
+  <!-- Екран автентифікації -->
+  <div class="center-screen" id="authScreen">
+    <div class="auth-box card">
+      <h2 id="authTitle">Вхід у кабінет</h2>
+      <p class="hint" id="authHint">Керуйте номерами та ШІ-ботом свого готелю.</p>
+      <label for="authEmail">Email</label>
+      <input id="authEmail" type="email" autocomplete="email" placeholder="you@hotel.com">
+      <label for="authPassword">Пароль</label>
+      <input id="authPassword" type="password" autocomplete="current-password" placeholder="Мінімум 6 символів">
+      <div class="actions">
+        <button id="authSubmit">Увійти</button>
+      </div>
+      <div class="msg" id="authMsg"></div>
+      <div class="switcher">
+        <span id="switcherText">Ще немає акаунту?</span>
+        <button id="switcherBtn">Зареєструватися</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Створення готелю (перший вхід) -->
+  <div class="hidden" id="onboardScreen">
+    <h1>Створіть профіль готелю</h1>
+    <p class="lede">Це займе хвилину. Далі можна буде все змінити.</p>
+    <div class="card">
+      <label for="obName">Назва готелю / апартаментів</label>
+      <input id="obName" type="text" placeholder="Наприклад, Panorama Apart-Hotel">
+      <label for="obAddress">Адреса</label>
+      <input id="obAddress" type="text" placeholder="Місто, вулиця, номер будинку">
+      <div class="actions">
+        <button id="obSubmit">Створити профіль</button>
+      </div>
+      <div class="msg" id="obMsg"></div>
+    </div>
+  </div>
+
+  <!-- Основний кабінет -->
+  <div class="hidden" id="dashScreen">
+    <h1 id="dashHotelName">Ваш готель</h1>
+    <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у вашому Telegram-боті.</p>
+
+    <div class="card">
+      <h2>Дані готелю</h2>
+      <p class="hint">Це ім'я ШІ-адміністратор називає гостям.</p>
+      <label for="dashName">Назва</label>
+      <input id="dashName" type="text">
+      <label for="dashAddress">Адреса</label>
+      <input id="dashAddress" type="text">
+      <div class="actions">
+        <button id="dashSaveInfo">Зберегти</button>
+        <span class="msg" id="infoMsg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Номери</h2>
+      <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Тип номера</th>
+            <th class="num-col">Ціна/ніч</th>
+            <th class="num-col">Місткість</th>
+            <th>Опис</th>
+            <th class="del-col"></th>
+          </tr>
+        </thead>
+        <tbody id="roomsBody"></tbody>
+      </table>
+      <div class="actions">
+        <button class="secondary" id="addRoomRow">+ Додати номер</button>
+        <button id="saveRooms">Зберегти номери</button>
+        <span class="msg" id="roomsMsg"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Telegram-бот</h2>
+      <p class="hint">
+        Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> у Telegram
+        (займе 2 хвилини) і вставте отриманий токен нижче.
+      </p>
+      <span class="status-pill off" id="botStatusPill">Не підключено</span>
+      <label for="botToken">Токен бота</label>
+      <input id="botToken" type="text" placeholder="123456789:AAG...">
+      <div class="actions">
+        <button id="connectBot">Підключити бота</button>
+        <span class="msg" id="botMsg"></span>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+  // ---- Конфігурація ----
+  const SUPABASE_URL = 'https://nyknlyufbwjodbpyehtv.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_JVLVW1ckRPOy2sLgYraMng_KPDMANV3';
+  // Публічний домен САМОГО СЕРВЕРА (Railway), де крутиться tools.js/server.js —
+  // сюди реєструється Telegram-webhook.
+  const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ---- Елементи ----
+  const authScreen = document.getElementById('authScreen');
+  const onboardScreen = document.getElementById('onboardScreen');
+  const dashScreen = document.getElementById('dashScreen');
+  const whoBar = document.getElementById('whoBar');
+
+  let mode = 'signin'; // 'signin' | 'signup'
+  let currentUser = null;
+  let currentProperty = null;
+  let rooms = [];
+
+  // ---- Автентифікація ----
+  document.getElementById('switcherBtn').addEventListener('click', () => {
+    mode = mode === 'signin' ? 'signup' : 'signin';
+    document.getElementById('authTitle').textContent = mode === 'signin' ? 'Вхід у кабінет' : 'Реєстрація';
+    document.getElementById('authSubmit').textContent = mode === 'signin' ? 'Увійти' : 'Зареєструватися';
+    document.getElementById('switcherText').textContent = mode === 'signin' ? 'Ще немає акаунту?' : 'Вже є акаунт?';
+    document.getElementById('switcherBtn').textContent = mode === 'signin' ? 'Зареєструватися' : 'Увійти';
+    document.getElementById('authMsg').textContent = '';
+  });
+
+  document.getElementById('authSubmit').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const msg = document.getElementById('authMsg');
+    msg.className = 'msg';
+    msg.textContent = '';
+
+    if (!email || !password) {
+      msg.className = 'msg error';
+      msg.textContent = 'Заповніть email і пароль.';
+      return;
+    }
+
+    const { data, error } = mode === 'signin'
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({ email, password });
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+
+    if (mode === 'signup' && !data.session) {
+      msg.className = 'msg ok';
+      msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
+      return;
+    }
+
+    await afterLogin();
+  });
+
+  async function afterLogin() {
+    const { data: { user } } = await supabase.auth.getUser();
+    currentUser = user;
+    if (!user) return;
+
+    whoBar.classList.remove('hidden');
+    whoBar.innerHTML = `${user.email} <button id="signOutBtn">Вийти</button>`;
+    document.getElementById('signOutBtn').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      location.reload();
+    });
+
+    const { data: property } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    authScreen.classList.add('hidden');
+
+    if (!property) {
+      onboardScreen.classList.remove('hidden');
+    } else {
+      currentProperty = property;
+      await showDashboard();
+    }
+  }
+
+  // ---- Онбординг (створення готелю) ----
+  document.getElementById('obSubmit').addEventListener('click', async () => {
+    const name = document.getElementById('obName').value.trim();
+    const address = document.getElementById('obAddress').value.trim();
+    const msg = document.getElementById('obMsg');
+    msg.className = 'msg';
+
+    if (!name) {
+      msg.className = 'msg error';
+      msg.textContent = 'Вкажіть назву готелю.';
+      return;
+    }
+
+    const slug = name.toLowerCase()
+      .replace(/[^a-z0-9а-яіїєʼ' ]/gi, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .slice(0, 40) || 'hotel';
+    const propertyId = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+    const { data, error } = await supabase
+      .from('properties')
+      .insert({ property_id: propertyId, owner_id: currentUser.id, hotel_name: name, address })
+      .select()
+      .single();
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+
+    currentProperty = data;
+    onboardScreen.classList.add('hidden');
+    await showDashboard();
+  });
+
+  // ---- Дашборд ----
+  async function showDashboard() {
+    document.getElementById('dashHotelName').textContent = currentProperty.hotel_name;
+    document.getElementById('dashName').value = currentProperty.hotel_name || '';
+    document.getElementById('dashAddress').value = currentProperty.address || '';
+    updateBotStatus();
+
+    const { data: roomRows } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('property_id', currentProperty.property_id)
+      .order('price_per_night', { ascending: true });
+
+    rooms = roomRows || [];
+    renderRooms();
+    dashScreen.classList.remove('hidden');
+  }
+
+  function updateBotStatus() {
+    const pill = document.getElementById('botStatusPill');
+    const tokenInput = document.getElementById('botToken');
+    if (currentProperty.webhook_connected) {
+      pill.textContent = 'Підключено';
+      pill.classList.remove('off');
+    } else {
+      pill.textContent = 'Не підключено';
+      pill.classList.add('off');
+    }
+    tokenInput.value = currentProperty.telegram_bot_token || '';
+  }
+
+  document.getElementById('dashSaveInfo').addEventListener('click', async () => {
+    const name = document.getElementById('dashName').value.trim();
+    const address = document.getElementById('dashAddress').value.trim();
+    const msg = document.getElementById('infoMsg');
+    msg.className = 'msg';
+
+    const { error } = await supabase
+      .from('properties')
+      .update({ hotel_name: name, address })
+      .eq('property_id', currentProperty.property_id);
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    currentProperty.hotel_name = name;
+    currentProperty.address = address;
+    document.getElementById('dashHotelName').textContent = name;
+    msg.className = 'msg ok';
+    msg.textContent = 'Збережено.';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  });
+
+  // ---- Номери ----
+  function renderRooms() {
+    const body = document.getElementById('roomsBody');
+    body.innerHTML = '';
+    rooms.forEach((room, idx) => addRoomRow(room, idx));
+  }
+
+  function addRoomRow(room = {}, idx = rooms.length) {
+    const body = document.getElementById('roomsBody');
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+      <td><input type="text" class="f-type" value="${room.room_type ?? ''}" placeholder="Стандарт"></td>
+      <td class="num-col"><input type="number" class="f-price" value="${room.price_per_night ?? ''}" placeholder="1500"></td>
+      <td class="num-col"><input type="number" class="f-capacity" value="${room.capacity ?? ''}" placeholder="2"></td>
+      <td><input type="text" class="f-desc" value="${room.description ?? ''}" placeholder="Короткий опис номера"></td>
+      <td class="del-col"><button title="Видалити">×</button></td>
+    `;
+    tr.querySelector('.del-col button').addEventListener('click', () => tr.remove());
+    body.appendChild(tr);
+  }
+
+  document.getElementById('addRoomRow').addEventListener('click', () => addRoomRow());
+
+  document.getElementById('saveRooms').addEventListener('click', async () => {
+    const msg = document.getElementById('roomsMsg');
+    msg.className = 'msg';
+    msg.textContent = 'Зберігаємо...';
+
+    const rowsEls = [...document.querySelectorAll('#roomsBody tr')];
+    const newRooms = rowsEls.map(tr => ({
+      room_type: tr.querySelector('.f-type').value.trim(),
+      price_per_night: Number(tr.querySelector('.f-price').value) || 0,
+      capacity: Number(tr.querySelector('.f-capacity').value) || 1,
+      description: tr.querySelector('.f-desc').value.trim(),
+    })).filter(r => r.room_type);
+
+    // Проста стратегія: видаляємо всі попередні номери цього готелю і вставляємо поточний список.
+    const { error: delError } = await supabase
+      .from('rooms')
+      .delete()
+      .eq('property_id', currentProperty.property_id);
+
+    if (delError) {
+      msg.className = 'msg error';
+      msg.textContent = delError.message;
+      return;
+    }
+
+    if (newRooms.length) {
+      const { error: insError } = await supabase
+        .from('rooms')
+        .insert(newRooms.map(r => ({ ...r, property_id: currentProperty.property_id })));
+      if (insError) {
+        msg.className = 'msg error';
+        msg.textContent = insError.message;
+        return;
+      }
+    }
+
+    msg.className = 'msg ok';
+    msg.textContent = 'Номери збережено.';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  });
+
+  // ---- Підключення бота ----
+  document.getElementById('connectBot').addEventListener('click', async () => {
+    const token = document.getElementById('botToken').value.trim();
+    const msg = document.getElementById('botMsg');
+    msg.className = 'msg';
+
+    if (!token) {
+      msg.className = 'msg error';
+      msg.textContent = 'Вставте токен бота від @BotFather.';
+      return;
+    }
+
+    msg.textContent = 'Підключаємо...';
+
+    const webhookUrl = `${API_BASE_URL}/webhook/telegram/${currentProperty.property_id}`;
+
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
+      const data = await res.json();
+      if (!data.ok) {
+        throw new Error(data.description || 'Telegram відхилив токен.');
+      }
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = 'Не вдалося підключити: ' + e.message;
+      return;
+    }
+
+    const { error } = await supabase
+      .from('properties')
+      .update({ telegram_bot_token: token, webhook_connected: true })
+      .eq('property_id', currentProperty.property_id);
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+
+    currentProperty.telegram_bot_token = token;
+    currentProperty.webhook_connected = true;
+    updateBotStatus();
+    msg.className = 'msg ok';
+    msg.textContent = 'Бот підключено! Напишіть йому в Telegram, щоб перевірити.';
+  });
+
+  // ---- Старт ----
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) await afterLogin();
+  })();
+</script>
+
+</body>
+</html>
