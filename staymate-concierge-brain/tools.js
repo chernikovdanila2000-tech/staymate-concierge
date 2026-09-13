@@ -36,12 +36,12 @@ function wfpSignature(fields) {
   return crypto.createHmac('md5', WFP_MERCHANT_SECRET).update(str).digest('hex');
 }
 
-async function createWayForPayInvoice({ bookingId, productName, price }) {
+async function createWayForPayInvoice({ orderReference, productName, price, serviceUrl }) {
   const orderDate = Math.floor(Date.now() / 1000);
   const signature = wfpSignature([
     WFP_MERCHANT_ACCOUNT,
     WFP_DOMAIN,
-    bookingId,
+    orderReference,
     orderDate,
     price,
     'UAH',
@@ -58,8 +58,9 @@ async function createWayForPayInvoice({ bookingId, productName, price }) {
     merchantSignature: signature,
     apiVersion: 1,
     language: 'UA',
-    serviceUrl: `${API_BASE_URL}/webhook/wayforpay`,
-    orderReference: bookingId,
+    serviceUrl: serviceUrl || `${API_BASE_URL}/webhook/wayforpay`,
+    returnUrl: process.env.CABINET_URL || 'https://staymat.netlify.app/cabinet/',
+    orderReference,
     orderDate,
     amount: price,
     currency: 'UAH',
@@ -83,29 +84,106 @@ async function createWayForPayInvoice({ bookingId, productName, price }) {
 }
 
 /**
+ * Тарифи підписки StayMate (орієнтовно в UAH — тримайте курс актуальним
+ * окремо, поки не підключено мультивалютний біллінг). Використовується
+ * для рахунку на оплату самої підписки готелю (Фаза 2 плану), а не
+ * оплати гостя за проживання (це createBooking/createWayForPayInvoice вище).
+ */
+const SUBSCRIPTION_PLANS = {
+  start: { label: 'Старт', priceUah: 4200 },
+  pro: { label: 'Профі', priceUah: 8400 },
+  network: { label: 'Мережа', priceUah: 12600 },
+};
+
+async function createSubscriptionInvoice({ orderId, plan, propertyName }) {
+  const planInfo = SUBSCRIPTION_PLANS[plan];
+  if (!planInfo) {
+    throw new Error(`Невідомий тариф: ${plan}`);
+  }
+  const invoiceUrl = await createWayForPayInvoice({
+    orderReference: orderId,
+    productName: `StayMate — тариф «${planInfo.label}» (${propertyName || ''})`.trim(),
+    price: planInfo.priceUah,
+    serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
+  });
+  return { invoiceUrl, price: planInfo.priceUah };
+}
+
+/**
  * Створює набір реалізацій інструментів, прив'язаних до конкретного property_id.
  * Схема інструментів (toolDefinitions) однакова для всіх готелів — Claude API
  * не потребує per-tenant версії схеми, тільки реалізація (виконання) різниться.
  */
 function createTools(propertyId) {
-  async function checkAvailability({ check_in, check_out, guests }) {
-    const { data, error } = await supabase
+  async function checkAvailability({ check_in, check_out, guests } = {}) {
+    let query = supabase
       .from('rooms')
-      .select('room_type, price_per_night, capacity, description')
+      .select('room_type, price_per_night, capacity, description, quantity')
       .eq('property_id', propertyId)
-      .gte('capacity', guests || 1)
       .order('price_per_night', { ascending: true });
+
+    if (guests) query = query.gte('capacity', guests);
+
+    const { data: roomTypes, error } = await query;
 
     if (error) {
       console.error('[checkAvailability] Supabase error:', error);
-      return { check_in, check_out, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
+      return { check_in: check_in || null, check_out: check_out || null, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
     }
+
+    // Гість ще не назвав дати — показуємо каталог типів номерів і цін
+    // без перевірки зайнятості (Фаза 1.2 плану).
+    if (!check_in || !check_out) {
+      return {
+        check_in: null,
+        check_out: null,
+        available_rooms: roomTypes.map(r => ({
+          room_type: r.room_type,
+          price_per_night: r.price_per_night,
+          capacity: r.capacity,
+          description: r.description,
+        })),
+        note: roomTypes.length
+          ? 'Каталог показано без перевірки дат — щоб перевірити фактичну наявність і забронювати, потрібні дати заїзду й виїзду.'
+          : 'У цього закладу поки не додано жодного номера.',
+      };
+    }
+
+    // Дати вказано — рахуємо, скільки номерів кожного типу вже зайнято
+    // бронями, що перетинаються з цим періодом, і порівнюємо з кількістю
+    // фізичних номерів цього типу (Фаза 1.1 плану).
+    const { data: overlapping, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('room_type')
+      .eq('property_id', propertyId)
+      .in('status', ['pending_payment', 'paid'])
+      .lt('check_in', check_out)
+      .gt('check_out', check_in);
+
+    if (bookingsError) {
+      console.error('[checkAvailability] Supabase error (bookings):', bookingsError);
+      return { check_in, check_out, available_rooms: [], note: 'Технічна помилка при перевірці зайнятості. Спробуйте ще раз трохи пізніше.' };
+    }
+
+    const bookedCounts = {};
+    for (const b of overlapping) {
+      bookedCounts[b.room_type] = (bookedCounts[b.room_type] || 0) + 1;
+    }
+
+    const available = roomTypes
+      .filter(r => (bookedCounts[r.room_type] || 0) < (r.quantity ?? 1))
+      .map(r => ({
+        room_type: r.room_type,
+        price_per_night: r.price_per_night,
+        capacity: r.capacity,
+        description: r.description,
+      }));
 
     return {
       check_in,
       check_out,
-      available_rooms: data,
-      note: data.length ? null : 'Немає номерів на потрібну кількість гостей.',
+      available_rooms: available,
+      note: available.length ? null : 'На ці дати вільних номерів немає — запропонуйте гостю інші дати.',
     };
   }
 
@@ -132,7 +210,7 @@ function createTools(propertyId) {
     let paymentLink;
     try {
       paymentLink = await createWayForPayInvoice({
-        bookingId,
+        orderReference: bookingId,
         productName: `${room.room_type} — ${nights} ${nights === 1 ? 'ніч' : 'ночі'} (${check_in} — ${check_out})`,
         price: totalPrice,
       });
@@ -196,15 +274,15 @@ function createTools(propertyId) {
 const toolDefinitions = [
   {
     name: 'check_availability',
-    description: 'Перевірити вільні номери на вказані дати заїзду/виїзду та кількість гостей.',
+    description: 'Показати номери готелю з цінами. Можна викликати БЕЗ дат, якщо гість просто питає "які у вас є номери" — тоді повертається каталог без перевірки зайнятості. Якщо вказано дати заїзду й виїзду — додатково перевіряється реальна зайнятість на цей період.',
     input_schema: {
       type: 'object',
       properties: {
-        check_in: { type: 'string', description: 'Дата заїзду у форматі YYYY-MM-DD' },
-        check_out: { type: 'string', description: 'Дата виїзду у форматі YYYY-MM-DD' },
-        guests: { type: 'integer', description: 'Кількість гостей' },
+        check_in: { type: 'string', description: 'Дата заїзду у форматі YYYY-MM-DD (необов\'язково для простого каталогу)' },
+        check_out: { type: 'string', description: 'Дата виїзду у форматі YYYY-MM-DD (необов\'язково для простого каталогу)' },
+        guests: { type: 'integer', description: 'Кількість гостей (необов\'язково)' },
       },
-      required: ['check_in', 'check_out', 'guests'],
+      required: [],
     },
   },
   {
@@ -236,4 +314,4 @@ const toolDefinitions = [
   },
 ];
 
-module.exports = { toolDefinitions, createTools };
+module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, SUBSCRIPTION_PLANS };

@@ -70,7 +70,7 @@
     color: var(--muted);
     font-size: 15px;
     margin: 0 0 36px;
-    max-width: 46ch;
+    max-width: 52ch;
   }
   .card {
     background: var(--panel);
@@ -91,6 +91,7 @@
     font-size: 13px;
     color: var(--muted);
     margin: 0 0 20px;
+    line-height: 1.55;
   }
   label {
     display: block;
@@ -115,6 +116,10 @@
     outline: 2px solid var(--accent);
     outline-offset: 1px;
   }
+  input.field-error {
+    border-color: var(--danger);
+    background: #fdf1ef;
+  }
   button {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 14px;
@@ -138,7 +143,7 @@
   button:disabled { opacity: 0.5; cursor: default; }
   .row { display: flex; gap: 12px; }
   .row > * { flex: 1; }
-  .actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; }
+  .actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   .msg {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 13px;
@@ -162,7 +167,7 @@
     vertical-align: middle;
   }
   td input { padding: 6px 8px; font-size: 13px; }
-  td.num-col { width: 90px; }
+  td.num-col { width: 78px; }
   td.del-col { width: 34px; }
   td.del-col button {
     background: none;
@@ -183,6 +188,7 @@
     color: var(--accent);
   }
   .status-pill.off { background: #f1ece2; color: var(--gold); }
+  .status-pill.warn { background: #f7e6e2; color: var(--danger); }
   .hidden { display: none !important; }
   .center-screen {
     min-height: 70vh;
@@ -198,16 +204,81 @@
     text-align: center;
     margin-top: 18px;
   }
-  .switcher button {
+  .switcher button, .link-btn {
     background: none; border: none; color: var(--accent);
     text-decoration: underline; cursor: pointer; padding: 0; font-size: 13px; font-weight: 600;
   }
+  .forgot-row { text-align: right; margin-top: 8px; }
+  .forgot-row button { font-weight: 500; font-size: 12.5px; }
   code {
     background: var(--accent-soft);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 13px;
   }
+
+  /* ---------- канали зв'язку ---------- */
+  .channel-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .channel-card:last-child { margin-bottom: 0; }
+  .channel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .channel-name {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+  .channel-card .hint { margin: 8px 0 14px; }
+  .key-box {
+    margin-top: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 12.5px;
+    color: var(--ink);
+    flex-wrap: wrap;
+    word-break: break-all;
+  }
+  .key-box code { background: none; padding: 0; flex: 1; min-width: 200px; }
+  .copy-btn {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    font-size: 12px;
+    color: var(--ink);
+    flex-shrink: 0;
+  }
+
+  /* ---------- тарифи / оплата підписки ---------- */
+  .plan-row { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .plan-opt {
+    flex: 1;
+    min-width: 130px;
+    border: 1.5px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .plan-opt b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .plan-opt span { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12.5px; color: var(--muted); }
+  .plan-opt.selected { border-color: var(--accent); background: var(--accent-soft); }
+
+  .gate-wrap { max-width: 560px; margin: 0 auto; }
 </style>
 </head>
 <body>
@@ -228,6 +299,9 @@
       <input id="authEmail" type="email" autocomplete="email" placeholder="you@hotel.com">
       <label for="authPassword">Пароль</label>
       <input id="authPassword" type="password" autocomplete="current-password" placeholder="Мінімум 6 символів">
+      <div class="forgot-row" id="forgotRow">
+        <button id="forgotBtn" type="button">Забули пароль?</button>
+      </div>
       <div class="actions">
         <button id="authSubmit">Увійти</button>
       </div>
@@ -239,10 +313,24 @@
     </div>
   </div>
 
+  <!-- Екран встановлення нового пароля (після листа "Забули пароль?") -->
+  <div class="hidden center-screen" id="resetScreen">
+    <div class="auth-box card">
+      <h2>Новий пароль</h2>
+      <p class="hint">Встановіть новий пароль для входу в кабінет.</p>
+      <label for="newPassword">Новий пароль</label>
+      <input id="newPassword" type="password" placeholder="Мінімум 6 символів" minlength="6">
+      <div class="actions">
+        <button id="resetSubmit">Зберегти пароль</button>
+      </div>
+      <div class="msg" id="resetMsg"></div>
+    </div>
+  </div>
+
   <!-- Створення готелю (перший вхід) -->
   <div class="hidden" id="onboardScreen">
     <h1>Створіть профіль готелю</h1>
-    <p class="lede">Це займе хвилину. Далі можна буде все змінити.</p>
+    <p class="lede">Це займе хвилину. Далі можна буде все змінити. Перші 3 дні кабінету — безкоштовно.</p>
     <div class="card">
       <label for="obName">Назва готелю / апартаментів</label>
       <input id="obName" type="text" placeholder="Наприклад, Panorama Apart-Hotel">
@@ -255,10 +343,54 @@
     </div>
   </div>
 
+  <!-- Екран "підписку призупинено" -->
+  <div class="hidden" id="gateScreen">
+    <div class="gate-wrap">
+      <h1>Підписку призупинено</h1>
+      <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
+      <div class="card">
+        <h2>Оберіть тариф</h2>
+        <p class="hint">Один тариф — на один об'єкт (готель/апартаменти).</p>
+        <div class="plan-row" id="gatePlanRow">
+          <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
+          <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
+          <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
+        </div>
+        <div class="actions">
+          <button id="gatePayBtn">Оплатити обраний тариф</button>
+          <span class="msg" id="gateMsg"></span>
+        </div>
+        <p class="hint" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
+      </div>
+      <div class="actions">
+        <button class="secondary" id="gateSignOutBtn">Вийти з акаунту</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Основний кабінет -->
   <div class="hidden" id="dashScreen">
     <h1 id="dashHotelName">Ваш готель</h1>
-    <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у вашому Telegram-боті.</p>
+    <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.</p>
+
+    <div class="card">
+      <h2>Тариф і підписка</h2>
+      <p class="hint" id="subHint">Завантаження…</p>
+      <div class="actions">
+        <button class="secondary" id="manageSubBtn">Змінити тариф / оплатити</button>
+      </div>
+      <div class="hidden" id="subPlanPicker" style="margin-top:18px;">
+        <div class="plan-row" id="subPlanRow">
+          <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
+          <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
+          <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
+        </div>
+        <div class="actions">
+          <button id="subPayBtn">Оплатити обраний тариф</button>
+          <span class="msg" id="subMsg"></span>
+        </div>
+      </div>
+    </div>
 
     <div class="card">
       <h2>Дані готелю</h2>
@@ -275,13 +407,14 @@
 
     <div class="card">
       <h2>Номери</h2>
-      <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни.</p>
+      <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
       <table>
         <thead>
           <tr>
             <th>Тип номера</th>
             <th class="num-col">Ціна/ніч</th>
             <th class="num-col">Місткість</th>
+            <th class="num-col">Кількість</th>
             <th>Опис</th>
             <th class="del-col"></th>
           </tr>
@@ -296,17 +429,79 @@
     </div>
 
     <div class="card">
-      <h2>Telegram-бот</h2>
-      <p class="hint">
-        Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> у Telegram
-        (займе 2 хвилини) і вставте отриманий токен нижче.
-      </p>
-      <span class="status-pill off" id="botStatusPill">Не підключено</span>
-      <label for="botToken">Токен бота</label>
-      <input id="botToken" type="text" placeholder="123456789:AAG...">
-      <div class="actions">
-        <button id="connectBot">Підключити бота</button>
-        <span class="msg" id="botMsg"></span>
+      <h2>Канали зв'язку</h2>
+      <p class="hint">Підключіть один або кілька каналів — ШІ-адміністратор відповідає однаково скрізь, використовуючи одні й ті самі дані про номери й ціни.</p>
+
+      <div class="channel-card" data-channel="telegram">
+        <div class="channel-head">
+          <span class="channel-name">Telegram</span>
+          <span class="status-pill off" id="pill-telegram">Не підключено</span>
+        </div>
+        <p class="hint">Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.</p>
+        <label for="tokenTelegram">Токен бота</label>
+        <input id="tokenTelegram" type="text" placeholder="123456789:AAG...">
+        <div class="actions">
+          <button id="connectTelegram">Підключити</button>
+          <span class="msg" id="msgTelegram"></span>
+        </div>
+      </div>
+
+      <div class="channel-card" data-channel="viber">
+        <div class="channel-head">
+          <span class="channel-name">Viber</span>
+          <span class="status-pill off" id="pill-viber">Не підключено</span>
+        </div>
+        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener">partners.viber.com</a> і вставте токен API нижче. Повноцінна робота бота залежить від комерційного схвалення заявки з боку Viber.</p>
+        <label for="tokenViber">Токен API (auth token)</label>
+        <input id="tokenViber" type="text" placeholder="45f679as...">
+        <div class="actions">
+          <button id="connectViber">Підключити</button>
+          <span class="msg" id="msgViber"></span>
+        </div>
+      </div>
+
+      <div class="channel-card" data-channel="website">
+        <div class="channel-head">
+          <span class="channel-name">Сайт готелю</span>
+          <span class="status-pill" id="pill-website">Готово до використання</span>
+        </div>
+        <p class="hint">Не потребує окремого підключення. Вставте цей код перед <code>&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.</p>
+        <div class="key-box">
+          <code id="widgetSnippet"></code>
+          <button class="copy-btn" id="copyWidget" type="button">Копіювати</button>
+        </div>
+      </div>
+
+      <div class="channel-card" data-channel="whatsapp">
+        <div class="channel-head">
+          <span class="channel-name">WhatsApp</span>
+          <span class="status-pill off">Очікує верифікації Meta</span>
+        </div>
+        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayMate (див. інструкцію). Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
+        <label for="waPhoneId">Phone Number ID</label>
+        <input id="waPhoneId" type="text" placeholder="1029384756...">
+        <label for="waToken">Access Token</label>
+        <input id="waToken" type="password" placeholder="EAAG...">
+        <div class="actions">
+          <button class="secondary" id="saveWhatsapp">Зберегти на потім</button>
+          <span class="msg" id="msgWhatsapp"></span>
+        </div>
+      </div>
+
+      <div class="channel-card" data-channel="instagram">
+        <div class="channel-head">
+          <span class="channel-name">Instagram</span>
+          <span class="status-pill off">Очікує верифікації Meta</span>
+        </div>
+        <p class="hint">Директ Instagram підключається через той самий Meta Business Platform, що й WhatsApp. Поля нижче можна заповнити заздалегідь.</p>
+        <label for="igAccountId">Instagram Business Account ID</label>
+        <input id="igAccountId" type="text" placeholder="1789...">
+        <label for="igToken">Access Token</label>
+        <input id="igToken" type="password" placeholder="EAAG...">
+        <div class="actions">
+          <button class="secondary" id="saveInstagram">Зберегти на потім</button>
+          <span class="msg" id="msgInstagram"></span>
+        </div>
       </div>
     </div>
 
@@ -321,14 +516,20 @@
   const SUPABASE_URL = 'https://nyknlyufbwjodbpyehtv.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_JVLVW1ckRPOy2sLgYraMng_KPDMANV3';
   // Публічний домен САМОГО СЕРВЕРА (Railway), де крутиться tools.js/server.js —
-  // сюди реєструється Telegram-webhook.
+  // сюди реєструється webhook месенджерів і сюди звертається кабінет за API.
   const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
+  // Домен, де лежить widget.js (маркетинговий сайт на Netlify).
+  const SITE_ORIGIN = 'https://staymat.netlify.app';
+
+  const PLAN_LABELS = { start: 'Старт (€100/міс)', pro: 'Профі (€200/міс)', network: 'Мережа (€300/міс)' };
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ---- Елементи ----
   const authScreen = document.getElementById('authScreen');
+  const resetScreen = document.getElementById('resetScreen');
   const onboardScreen = document.getElementById('onboardScreen');
+  const gateScreen = document.getElementById('gateScreen');
   const dashScreen = document.getElementById('dashScreen');
   const whoBar = document.getElementById('whoBar');
 
@@ -336,6 +537,15 @@
   let currentUser = null;
   let currentProperty = null;
   let rooms = [];
+  let channelsByType = {};
+
+  function hideAllScreens() {
+    authScreen.classList.add('hidden');
+    resetScreen.classList.add('hidden');
+    onboardScreen.classList.add('hidden');
+    gateScreen.classList.add('hidden');
+    dashScreen.classList.add('hidden');
+  }
 
   // ---- Автентифікація ----
   document.getElementById('switcherBtn').addEventListener('click', () => {
@@ -344,7 +554,28 @@
     document.getElementById('authSubmit').textContent = mode === 'signin' ? 'Увійти' : 'Зареєструватися';
     document.getElementById('switcherText').textContent = mode === 'signin' ? 'Ще немає акаунту?' : 'Вже є акаунт?';
     document.getElementById('switcherBtn').textContent = mode === 'signin' ? 'Зареєструватися' : 'Увійти';
+    document.getElementById('forgotRow').classList.toggle('hidden', mode !== 'signin');
     document.getElementById('authMsg').textContent = '';
+  });
+
+  document.getElementById('forgotBtn').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value.trim();
+    const msg = document.getElementById('authMsg');
+    if (!email) {
+      msg.className = 'msg error';
+      msg.textContent = 'Спершу введіть email у полі вище.';
+      return;
+    }
+    msg.className = 'msg';
+    msg.textContent = 'Надсилаємо лист...';
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = 'Якщо такий акаунт існує — на пошту надіслано лист зі скиданням пароля.';
   });
 
   document.getElementById('authSubmit').addEventListener('click', async () => {
@@ -362,7 +593,7 @@
 
     const { data, error } = mode === 'signin'
       ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password });
+      : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href } });
 
     if (error) {
       msg.className = 'msg error';
@@ -370,13 +601,55 @@
       return;
     }
 
-    if (mode === 'signup' && !data.session) {
-      msg.className = 'msg ok';
-      msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
-      return;
+    if (mode === 'signup') {
+      // Supabase, з міркувань безпеки (щоб не розкривати список зареєстрованих
+      // email), повертає "успіх" без помилки навіть якщо цей email вже
+      // зареєстровано й підтверджено — просто identities буде порожнім масивом
+      // і лист повторно НЕ надсилається. Без цієї перевірки людина, що вже
+      // має акаунт, безкінечно бачитиме "перевірте пошту" і не зможе зрозуміти,
+      // чому реєстрація "не працює".
+      const identities = data && data.user && data.user.identities;
+      if (Array.isArray(identities) && identities.length === 0) {
+        msg.className = 'msg error';
+        msg.textContent = 'Цей email вже зареєстровано. Спробуйте увійти або натисніть "Забули пароль?" (перемкніться на вхід, поле з\'явиться під паролем).';
+        return;
+      }
+      if (!data.session) {
+        msg.className = 'msg ok';
+        msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
+        return;
+      }
     }
 
     await afterLogin();
+  });
+
+  // ---- Скидання пароля (перехід за посиланням з листа) ----
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      hideAllScreens();
+      resetScreen.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('resetSubmit').addEventListener('click', async () => {
+    const newPassword = document.getElementById('newPassword').value;
+    const msg = document.getElementById('resetMsg');
+    msg.className = 'msg';
+    if (!newPassword || newPassword.length < 6) {
+      msg.className = 'msg error';
+      msg.textContent = 'Пароль має містити щонайменше 6 символів.';
+      return;
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = 'Пароль оновлено. Заходимо в кабінет...';
+    setTimeout(afterLogin, 800);
   });
 
   async function afterLogin() {
@@ -397,12 +670,18 @@
       .eq('owner_id', user.id)
       .maybeSingle();
 
-    authScreen.classList.add('hidden');
+    hideAllScreens();
 
     if (!property) {
       onboardScreen.classList.remove('hidden');
+      return;
+    }
+
+    currentProperty = property;
+    const access = computeAccess(currentProperty);
+    if (!access.allowed) {
+      showGate(access.reason);
     } else {
-      currentProperty = property;
       await showDashboard();
     }
   }
@@ -444,12 +723,105 @@
     await showDashboard();
   });
 
+  // ---- Гейтинг доступу за статусом підписки (Фаза 2.3) ----
+  function computeAccess(property) {
+    const now = new Date();
+    if (property.subscription_status === 'active') {
+      if (!property.subscription_active_until || new Date(property.subscription_active_until) > now) {
+        return { allowed: true };
+      }
+      return { allowed: false, reason: 'active_expired' };
+    }
+    if (property.trial_ends_at && new Date(property.trial_ends_at) > now) {
+      const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - now) / 86400000));
+      return { allowed: true, trialDaysLeft: daysLeft };
+    }
+    return { allowed: false, reason: 'trial_ended' };
+  }
+
+  function showGate(reason) {
+    document.getElementById('gateLede').textContent = reason === 'active_expired'
+      ? 'Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.'
+      : 'Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.';
+    setupPlanPicker(document.getElementById('gatePlanRow'));
+    gateScreen.classList.remove('hidden');
+  }
+
+  document.getElementById('gateSignOutBtn').addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    location.reload();
+  });
+
+  let selectedGatePlan = null;
+  let selectedSubPlan = null;
+
+  function setupPlanPicker(rowEl) {
+    const isGate = rowEl.id === 'gatePlanRow';
+    [...rowEl.querySelectorAll('.plan-opt')].forEach(opt => {
+      opt.addEventListener('click', () => {
+        [...rowEl.querySelectorAll('.plan-opt')].forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        if (isGate) selectedGatePlan = opt.dataset.plan;
+        else selectedSubPlan = opt.dataset.plan;
+      });
+    });
+  }
+
+  async function createInvoiceAndRedirect(plan, msgEl) {
+    if (!plan) {
+      msgEl.className = 'msg error';
+      msgEl.textContent = 'Спершу оберіть тариф.';
+      return;
+    }
+    msgEl.className = 'msg';
+    msgEl.textContent = 'Створюємо рахунок на оплату...';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/create-subscription-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: currentProperty.property_id, plan }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося створити рахунок.');
+      window.location.href = data.invoiceUrl;
+    } catch (e) {
+      msgEl.className = 'msg error';
+      msgEl.textContent = e.message;
+    }
+  }
+
+  document.getElementById('gatePayBtn').addEventListener('click', () => {
+    createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'));
+  });
+  document.getElementById('subPayBtn').addEventListener('click', () => {
+    createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'));
+  });
+  document.getElementById('manageSubBtn').addEventListener('click', () => {
+    const picker = document.getElementById('subPlanPicker');
+    picker.classList.toggle('hidden');
+    if (!picker.classList.contains('hidden')) setupPlanPicker(document.getElementById('subPlanRow'));
+  });
+
+  function renderSubscriptionCard() {
+    const hint = document.getElementById('subHint');
+    const p = currentProperty;
+    if (p.subscription_status === 'active') {
+      const until = p.subscription_active_until ? new Date(p.subscription_active_until).toLocaleDateString('uk-UA') : '—';
+      hint.textContent = `Активна підписка: ${PLAN_LABELS[p.subscription_plan] || p.subscription_plan || '—'}. Діє до ${until}.`;
+    } else if (p.trial_ends_at && new Date(p.trial_ends_at) > new Date()) {
+      const daysLeft = Math.max(1, Math.ceil((new Date(p.trial_ends_at) - new Date()) / 86400000));
+      hint.textContent = `Пробний період — залишилось ${daysLeft} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.`;
+    } else {
+      hint.textContent = 'Підписка не активна.';
+    }
+  }
+
   // ---- Дашборд ----
   async function showDashboard() {
     document.getElementById('dashHotelName').textContent = currentProperty.hotel_name;
     document.getElementById('dashName').value = currentProperty.hotel_name || '';
     document.getElementById('dashAddress').value = currentProperty.address || '';
-    updateBotStatus();
+    renderSubscriptionCard();
 
     const { data: roomRows } = await supabase
       .from('rooms')
@@ -459,21 +831,133 @@
 
     rooms = roomRows || [];
     renderRooms();
+    await loadChannels();
     dashScreen.classList.remove('hidden');
   }
 
-  function updateBotStatus() {
-    const pill = document.getElementById('botStatusPill');
-    const tokenInput = document.getElementById('botToken');
-    if (currentProperty.webhook_connected) {
-      pill.textContent = 'Підключено';
+  // ---- Канали зв'язку ----
+  function buildWidgetSnippet() {
+    const title = (currentProperty.hotel_name || 'Готель').replace(/"/g, '');
+    return `<script src="${SITE_ORIGIN}/widget/widget.js" data-property="${currentProperty.property_id}" data-api="${API_BASE_URL}" data-title="${title}" async><\/script>`;
+  }
+
+  function setPill(channel, connected, connectedLabel, offLabel) {
+    const pill = document.getElementById('pill-' + channel);
+    if (!pill) return;
+    if (connected) {
+      pill.textContent = connectedLabel || 'Підключено';
       pill.classList.remove('off');
     } else {
-      pill.textContent = 'Не підключено';
+      pill.textContent = offLabel || 'Не підключено';
       pill.classList.add('off');
     }
-    tokenInput.value = currentProperty.telegram_bot_token || '';
   }
+
+  async function loadChannels() {
+    const { data } = await supabase
+      .from('channels')
+      .select('*')
+      .eq('property_id', currentProperty.property_id);
+
+    channelsByType = {};
+    (data || []).forEach(c => { channelsByType[c.channel_type] = c; });
+
+    const tg = channelsByType.telegram;
+    const tgConnected = (tg && tg.connected) || !!currentProperty.webhook_connected;
+    setPill('telegram', tgConnected);
+    document.getElementById('tokenTelegram').value = (tg && tg.credentials && tg.credentials.bot_token) || currentProperty.telegram_bot_token || '';
+
+    const vb = channelsByType.viber;
+    setPill('viber', vb && vb.connected);
+    document.getElementById('tokenViber').value = (vb && vb.credentials && vb.credentials.bot_token) || '';
+
+    const wa = channelsByType.whatsapp;
+    document.getElementById('waPhoneId').value = (wa && wa.credentials && wa.credentials.phone_number_id) || '';
+    document.getElementById('waToken').value = (wa && wa.credentials && wa.credentials.access_token) || '';
+
+    const ig = channelsByType.instagram;
+    document.getElementById('igAccountId').value = (ig && ig.credentials && ig.credentials.ig_account_id) || '';
+    document.getElementById('igToken').value = (ig && ig.credentials && ig.credentials.access_token) || '';
+
+    document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
+  }
+
+  async function connectChannel(channelType, credentials, msgId) {
+    const msg = document.getElementById(msgId);
+    msg.className = 'msg';
+    if (!credentials.bot_token) {
+      msg.className = 'msg error';
+      msg.textContent = 'Вставте токен.';
+      return;
+    }
+    msg.textContent = 'Підключаємо...';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/connect-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: currentProperty.property_id, channelType, credentials }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося підключити.');
+      msg.className = 'msg ok';
+      msg.textContent = 'Підключено! Напишіть боту, щоб перевірити.';
+      await loadChannels();
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
+  }
+
+  document.getElementById('connectTelegram').addEventListener('click', () => {
+    connectChannel('telegram', { bot_token: document.getElementById('tokenTelegram').value.trim() }, 'msgTelegram');
+  });
+  document.getElementById('connectViber').addEventListener('click', () => {
+    connectChannel('viber', { bot_token: document.getElementById('tokenViber').value.trim() }, 'msgViber');
+  });
+
+  document.getElementById('copyWidget').addEventListener('click', () => {
+    const text = document.getElementById('widgetSnippet').textContent;
+    const btn = document.getElementById('copyWidget');
+    navigator.clipboard.writeText(text).then(() => {
+      const old = btn.textContent;
+      btn.textContent = 'Скопійовано!';
+      setTimeout(() => { btn.textContent = old; }, 1500);
+    }).catch(() => {
+      btn.textContent = 'Виділіть і скопіюйте вручну';
+    });
+  });
+
+  async function saveChannelCredentials(channelType, credentials, msgId) {
+    const msg = document.getElementById(msgId);
+    msg.className = 'msg';
+    const { error } = await supabase
+      .from('channels')
+      .upsert(
+        { property_id: currentProperty.property_id, channel_type: channelType, credentials, connected: false },
+        { onConflict: 'property_id,channel_type' }
+      );
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = 'Збережено. Активується автоматично після верифікації Meta Business (Фаза 4 плану).';
+    await loadChannels();
+  }
+
+  document.getElementById('saveWhatsapp').addEventListener('click', () => {
+    saveChannelCredentials('whatsapp', {
+      phone_number_id: document.getElementById('waPhoneId').value.trim(),
+      access_token: document.getElementById('waToken').value.trim(),
+    }, 'msgWhatsapp');
+  });
+  document.getElementById('saveInstagram').addEventListener('click', () => {
+    saveChannelCredentials('instagram', {
+      ig_account_id: document.getElementById('igAccountId').value.trim(),
+      access_token: document.getElementById('igToken').value.trim(),
+    }, 'msgInstagram');
+  });
 
   document.getElementById('dashSaveInfo').addEventListener('click', async () => {
     const name = document.getElementById('dashName').value.trim();
@@ -494,6 +978,7 @@
     currentProperty.hotel_name = name;
     currentProperty.address = address;
     document.getElementById('dashHotelName').textContent = name;
+    document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
     msg.className = 'msg ok';
     msg.textContent = 'Збережено.';
     setTimeout(() => { msg.textContent = ''; }, 2500);
@@ -512,10 +997,11 @@
     tr.dataset.idx = idx;
     tr.innerHTML = `
       <td><input type="text" class="f-type" value="${room.room_type ?? ''}" placeholder="Стандарт"></td>
-      <td class="num-col"><input type="number" class="f-price" value="${room.price_per_night ?? ''}" placeholder="1500"></td>
-      <td class="num-col"><input type="number" class="f-capacity" value="${room.capacity ?? ''}" placeholder="2"></td>
+      <td class="num-col"><input type="number" class="f-price" min="0" step="1" value="${room.price_per_night ?? ''}" placeholder="1500"></td>
+      <td class="num-col"><input type="number" class="f-capacity" min="1" step="1" value="${room.capacity ?? ''}" placeholder="2"></td>
+      <td class="num-col"><input type="number" class="f-qty" min="1" step="1" value="${room.quantity ?? 1}" placeholder="1"></td>
       <td><input type="text" class="f-desc" value="${room.description ?? ''}" placeholder="Короткий опис номера"></td>
-      <td class="del-col"><button title="Видалити">×</button></td>
+      <td class="del-col"><button type="button" title="Видалити">×</button></td>
     `;
     tr.querySelector('.del-col button').addEventListener('click', () => tr.remove());
     body.appendChild(tr);
@@ -529,12 +1015,42 @@
     msg.textContent = 'Зберігаємо...';
 
     const rowsEls = [...document.querySelectorAll('#roomsBody tr')];
-    const newRooms = rowsEls.map(tr => ({
-      room_type: tr.querySelector('.f-type').value.trim(),
-      price_per_night: Number(tr.querySelector('.f-price').value) || 0,
-      capacity: Number(tr.querySelector('.f-capacity').value) || 1,
-      description: tr.querySelector('.f-desc').value.trim(),
-    })).filter(r => r.room_type);
+    let valid = true;
+    const newRooms = [];
+
+    rowsEls.forEach(tr => {
+      const typeEl = tr.querySelector('.f-type');
+      const priceEl = tr.querySelector('.f-price');
+      const capEl = tr.querySelector('.f-capacity');
+      const qtyEl = tr.querySelector('.f-qty');
+      const descEl = tr.querySelector('.f-desc');
+      [typeEl, priceEl, capEl, qtyEl].forEach(el => el.classList.remove('field-error'));
+
+      const roomType = typeEl.value.trim();
+      if (!roomType) return; // порожній рядок — пропускаємо, як і раніше
+
+      const price = Number(priceEl.value);
+      const capacity = Number(capEl.value);
+      const quantity = Number(qtyEl.value || 1);
+
+      if (!(price > 0)) { priceEl.classList.add('field-error'); valid = false; }
+      if (!(capacity > 0) || !Number.isInteger(capacity)) { capEl.classList.add('field-error'); valid = false; }
+      if (!(quantity > 0) || !Number.isInteger(quantity)) { qtyEl.classList.add('field-error'); valid = false; }
+
+      newRooms.push({
+        room_type: roomType,
+        price_per_night: price,
+        capacity,
+        quantity,
+        description: descEl.value.trim(),
+      });
+    });
+
+    if (!valid) {
+      msg.className = 'msg error';
+      msg.textContent = 'Перевірте виділені поля: ціна, місткість і кількість номерів мають бути додатними числами.';
+      return;
+    }
 
     // Проста стратегія: видаляємо всі попередні номери цього готелю і вставляємо поточний список.
     const { error: delError } = await supabase
@@ -562,52 +1078,6 @@
     msg.className = 'msg ok';
     msg.textContent = 'Номери збережено.';
     setTimeout(() => { msg.textContent = ''; }, 2500);
-  });
-
-  // ---- Підключення бота ----
-  document.getElementById('connectBot').addEventListener('click', async () => {
-    const token = document.getElementById('botToken').value.trim();
-    const msg = document.getElementById('botMsg');
-    msg.className = 'msg';
-
-    if (!token) {
-      msg.className = 'msg error';
-      msg.textContent = 'Вставте токен бота від @BotFather.';
-      return;
-    }
-
-    msg.textContent = 'Підключаємо...';
-
-    const webhookUrl = `${API_BASE_URL}/webhook/telegram/${currentProperty.property_id}`;
-
-    try {
-      const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook?url=${encodeURIComponent(webhookUrl)}`);
-      const data = await res.json();
-      if (!data.ok) {
-        throw new Error(data.description || 'Telegram відхилив токен.');
-      }
-    } catch (e) {
-      msg.className = 'msg error';
-      msg.textContent = 'Не вдалося підключити: ' + e.message;
-      return;
-    }
-
-    const { error } = await supabase
-      .from('properties')
-      .update({ telegram_bot_token: token, webhook_connected: true })
-      .eq('property_id', currentProperty.property_id);
-
-    if (error) {
-      msg.className = 'msg error';
-      msg.textContent = error.message;
-      return;
-    }
-
-    currentProperty.telegram_bot_token = token;
-    currentProperty.webhook_connected = true;
-    updateBotStatus();
-    msg.className = 'msg ok';
-    msg.textContent = 'Бот підключено! Напишіть йому в Telegram, щоб перевірити.';
   });
 
   // ---- Старт ----

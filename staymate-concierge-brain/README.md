@@ -1,67 +1,94 @@
-# StayMate — "мозок" ШІ-адміністратора (демо-каркас)
+# StayMate — "мозок" ШІ-адміністратора (бекенд)
 
-Це перший робочий шар реального ШІ-адміністратора: логіка діалогу на базі Claude API,
-яка вміє відповідати гостям, перевіряти наявність номерів, оформлювати бронювання і
-передавати складні випадки живій людині. Поки що це **не підключено** до жодного
-месенджера і працює на демо-даних номерів — це наступні кроки.
+Мультитенантний Node.js-сервер: один процес обслуговує багато готелів одночасно,
+кожен зі своїми номерами, цінами і підключеними каналами зв'язку (Telegram, Viber,
+чат-віджет на сайті готелю; WhatsApp/Instagram — коли пройде верифікація Meta).
 
-## Що тут реальне, а що заглушка
+Деплой: Railway, root directory цієї папки (`staymate-concierge-brain`). Публічний
+домен зараз — `staymate-concierge-production.up.railway.app`.
+
+## Що реальне, а що очікує зовнішнього кроку
 
 | Частина | Статус |
 |---|---|
-| Системний промпт (`system-prompt.js`) | ✅ Реальний, готовий до використання |
-| Логіка діалогу і виклику інструментів (`claude-client.js`) | ✅ Реальна, працює з живим Claude API |
-| HTTP-сервер (`server.js`) | ✅ Реальний, приймає запити і повертає відповіді |
-| Дані про номери й ціни (`tools.js` → `DEMO_ROOMS`) | ⚠️ Заглушка — 3 демо-номери в пам'яті |
-| Створення бронювання (`tools.js` → `createBooking`) | ⚠️ Зберігається лише в пам'яті процесу, зникає при перезапуску |
-| Посилання на оплату | ⚠️ Фейкове (`pay.example.com`) — реальний платіжний провайдер ще не підключено |
-| Ескалація на живу людину | ⚠️ Просто виводиться в консоль сервера |
-| Telegram / WhatsApp | ❌ Ще не підключено — це наступний крок |
+| Системний промпт, tool-calling, Claude API | ✅ Реальне |
+| Telegram | ✅ Реальне, self-service підключення з кабінету |
+| Чат-віджет на сайті готелю | ✅ Реальне, підключення не потребує зовнішньої верифікації |
+| Viber | ✅ Код готовий (webhook + REST-виклики), але не протестовано на живому акаунті — очікує комерційного схвалення заявки Viber |
+| WhatsApp / Instagram | ⚠️ Тільки збереження реквізитів у кабінеті — сама інтеграція потребує верифікації бізнесу в Meta (Фаза 4 плану) |
+| Реальний облік зайнятості номерів по датах | ✅ Реальне (`quantity` на номері + перетин із таблицею bookings) |
+| Історія переписки | ✅ Зберігається в Supabase (`conversations`), не губиться при перезапуску |
+| Оплата гостя за бронювання | ⚠️ Робоче на тестовому мерчант-акаунті WayForPay (`test_merch_n1`) — власного мерчант-акаунту ще нема |
+| Оплата підписки готелю | ⚠️ Те саме — робочий код на тестовому WayForPay, з реальним мерчантом запрацює без змін коду |
 
-## Як запустити і перевірити локально
+## Запуск локально
 
-1. Потрібен Node.js версії 18 або новіше (для вбудованого `fetch`).
-2. Скопіюйте `.env.example` у `.env` і вставте свій реальний ключ Anthropic API
-   (отримати можна в консолі Anthropic — console.anthropic.com → API Keys).
-3. Встановіть залежності не потрібно — весь код на вбудованих модулях Node.js,
-   без npm install.
-4. Запустіть сервер:
-   ```
-   ANTHROPIC_API_KEY=sk-ant-ваш-ключ node server.js
-   ```
-5. У новому терміналі перевірте:
-   ```
-   curl -X POST http://localhost:3000/chat \
-     -H "Content-Type: application/json" \
-     -d '{"userId":"guest1","message":"Привіт! Чи є вільний номер на 2 дорослих з 10 по 12 вересня?"}'
-   ```
-   ШІ має відповісти, викликавши інструмент перевірки наявності, і показати реальні
-   демо-варіанти номерів з цінами.
+```
+ANTHROPIC_API_KEY=sk-ant-... \
+SUPABASE_URL=https://xxxxx.supabase.co \
+SUPABASE_KEY=service_role_ключ \
+node server.js
+```
 
-## Наступні кроки (у порядку, який має найбільше сенсу)
+`SUPABASE_KEY` — обов'язково `service_role` (секретний), НЕ `anon`/`publishable`,
+інакше сервер не зможе писати в базу.
 
-1. **Telegram-бот** — найшвидший канал для тестування з реальними гостями.
-   Потрібно: створити бота через @BotFather (5 хвилин), додати webhook-роут у
-   `server.js`, який перекладає формат Telegram у `{ userId, message }` і назад.
-2. **Реальна база номерів** — замінити `DEMO_ROOMS` у `tools.js` на запити до вашої
-   таблиці `rooms` у Supabase (структуру таблиці треба буде додати в
-   `supabase-schema.sql` окремо від таблиці підписок сайту).
-3. **Реальна оплата** — підключити Stripe або українського провайдера (LiqPay/Fondy)
-   замість фейкового посилання в `createBooking`.
-4. **Постійне сховище розмов** — перенести `conversationsByUser` з пам'яті процесу
-   в таблицю Supabase, інакше історія розмов губиться при перезапуску сервера.
-5. **Хостинг сервера** — це вже не статичний сайт (як staymate-site.zip), йому
-   потрібен постійно працюючий бекенд-сервер: наприклад, Supabase Edge Functions,
-   Railway, Render або звичайний VPS.
+## SQL-міграції (виконати один раз у Supabase → SQL Editor, у цьому порядку)
+
+1. `properties-setup.sql` — таблиця готелів (якщо ще не виконано раніше)
+2. `supabase-setup.sql` — таблиці rooms / bookings / escalations
+3. `channels-setup.sql` — таблиця channels (Telegram/Viber/WhatsApp/Instagram в одному місці)
+4. `conversations-setup.sql` — постійна історія переписки
+5. `phase1-2-migrations.sql` — `quantity` на номерах, тріал/тариф підписки на properties, `subscription_orders`
+
+Усі файли безпечно виконувати повторно (`if not exists` / `add column if not exists`).
+
+## Змінні середовища на Railway
+
+```
+ANTHROPIC_API_KEY
+SUPABASE_URL
+SUPABASE_KEY                  (service_role!)
+WAYFORPAY_MERCHANT_ACCOUNT
+WAYFORPAY_MERCHANT_SECRET
+WAYFORPAY_DOMAIN
+API_BASE_URL                  = https://staymate-concierge-production.up.railway.app
+CABINET_URL                   = https://staymat.netlify.app/cabinet/  (необов'язково, є дефолт)
+PORT
+```
+
+## Роути
+
+| Роут | Призначення |
+|---|---|
+| `POST /chat` | тестовий роут без месенджера (потрібен `propertyId` в тілі) |
+| `POST /webhook/telegram/<property_id>` | вебхук Telegram-бота готелю |
+| `POST /webhook/viber/<property_id>` | вебхук Viber-бота готелю |
+| `POST /webhook/website/<property_id>` | чат-віджет на сайті готелю (`widget.js`) |
+| `POST /webhook/wayforpay` | підтвердження оплати гостя за бронювання |
+| `POST /webhook/wayforpay-subscription` | підтвердження оплати підписки готелю |
+| `POST /api/connect-channel` | кабінет підключає Telegram/Viber (сервер сам реєструє вебхук) |
+| `POST /api/create-subscription-invoice` | кабінет запитує рахунок на оплату підписки |
+| `GET /health` | перевірка живості |
 
 ## Структура файлів
 
 ```
-concierge/
-├── system-prompt.js    — особистість і правила ШІ (редагувати тут тон/межі)
-├── tools.js             — інструменти ШІ: перевірка номерів, бронювання, ескалація
-├── claude-client.js     — виклик Claude API + обробка tool-calling циклу
-├── server.js             — HTTP-сервер, точка входу
-├── .env.example          — шаблон змінних середовища
-└── README.md              — цей файл
+staymate-concierge-brain/
+├── system-prompt.js         — особистість і правила ШІ
+├── tools.js                  — інструменти ШІ (наявність/бронювання/ескалація) + рахунки WayForPay
+├── claude-client.js          — виклик Claude API + цикл tool-calling
+├── telegram.js                — Telegram Bot API
+├── viber.js                    — Viber Bot API (код готовий, очікує схвалення Viber)
+├── channels.js                  — довідник підключених каналів (з кешем)
+├── conversations.js               — постійна історія переписки (Supabase замість Map)
+├── server.js                        — HTTP-сервер, усі роути
+├── properties-setup.sql              — таблиця properties
+├── supabase-setup.sql                 — таблиці rooms/bookings/escalations
+├── channels-setup.sql                  — таблиця channels
+├── conversations-setup.sql              — таблиця conversations
+├── phase1-2-migrations.sql               — точкові доповнення (quantity, тріал, subscription_orders)
+└── README.md                              — цей файл
 ```
+
+Детальний план подальшого розвитку — `StayMate-Project-3/docs/staymate-completion-plan.md`.
