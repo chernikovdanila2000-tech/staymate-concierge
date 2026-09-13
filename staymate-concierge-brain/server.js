@@ -401,26 +401,29 @@ const server = http.createServer((req, res) => {
       }
 
       const orderId = 'SUB' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+      let invoiceUrl, priceUah, priceEur, rate;
+      try {
+        ({ invoiceUrl, priceUah, priceEur, rate } = await createSubscriptionInvoice({
+          orderId,
+          plan,
+          propertyName: property.hotel_name,
+        }));
+      } catch (e) {
+        console.error('[create-subscription-invoice] WayForPay error:', e.message);
+        return sendJson(res, 500, { error: 'Не вдалося створити рахунок на оплату: ' + e.message }, corsHeaders);
+      }
+
       const { error: insertError } = await supabase
         .from('subscription_orders')
-        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending' });
+        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_uah: priceUah });
 
       if (insertError) {
         console.error('[create-subscription-invoice] Supabase error:', insertError);
         return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
       }
 
-      try {
-        const { invoiceUrl, price } = await createSubscriptionInvoice({
-          orderId,
-          plan,
-          propertyName: property.hotel_name,
-        });
-        return sendJson(res, 200, { invoiceUrl, orderId, price }, corsHeaders);
-      } catch (e) {
-        console.error('[create-subscription-invoice] WayForPay error:', e.message);
-        return sendJson(res, 500, { error: 'Не вдалося створити рахунок на оплату: ' + e.message }, corsHeaders);
-      }
+      return sendJson(res, 200, { invoiceUrl, orderId, priceUah, priceEur, rate }, corsHeaders);
     });
     return;
   }

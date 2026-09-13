@@ -28,6 +28,11 @@ create table if not exists subscription_orders (
   created_at timestamptz default now()
 );
 
+-- Фактична сума в гривнях, порахована за курсом НБУ на момент виставлення
+-- рахунку (щоб потім було видно, скільки саме гривень відповідало заявленим
+-- євро на конкретну дату — курс щодня змінюється).
+alter table subscription_orders add column if not exists amount_uah numeric;
+
 alter table subscription_orders enable row level security;
 
 drop policy if exists "Owners can view their own subscription orders" on subscription_orders;

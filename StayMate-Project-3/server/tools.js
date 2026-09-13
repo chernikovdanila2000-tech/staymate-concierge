@@ -84,29 +84,51 @@ async function createWayForPayInvoice({ orderReference, productName, price, serv
 }
 
 /**
- * Тарифи підписки StayMate (орієнтовно в UAH — тримайте курс актуальним
- * окремо, поки не підключено мультивалютний біллінг). Використовується
- * для рахунку на оплату самої підписки готелю (Фаза 2 плану), а не
- * оплати гостя за проживання (це createBooking/createWayForPayInvoice вище).
+ * Тарифи підписки StayMate — офіційна ціна в EUR (як на сайті). Гривневу суму
+ * для WayForPay (тестовий мерчант зараз працює тільки з UAH) рахуємо в момент
+ * виставлення рахунку за живим курсом НБУ, а не за захардкодженим числом —
+ * інакше сума в гривнях розходиться з реальним курсом і клієнт платить не
+ * стільки, скільки заявлено на сайті.
  */
 const SUBSCRIPTION_PLANS = {
-  start: { label: 'Старт', priceUah: 4200 },
-  pro: { label: 'Профі', priceUah: 8400 },
-  network: { label: 'Мережа', priceUah: 12600 },
+  start: { label: 'Старт', priceEur: 100 },
+  pro: { label: 'Профі', priceEur: 200 },
+  network: { label: 'Мережа', priceEur: 300 },
 };
+
+const NBU_EXCHANGE_URL = 'https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?valcode=EUR&json';
+// Резервний курс — використовується ЛИШЕ якщо НБУ раптом недоступний.
+// Тримайте це число орієнтовно актуальним вручну (перевіряти раз на кілька місяців
+// достатньо — це тільки страховка на випадок збою запиту, не основне джерело курсу).
+const FALLBACK_EUR_UAH_RATE = 48;
+
+async function getEurToUahRate() {
+  try {
+    const res = await fetch(NBU_EXCHANGE_URL);
+    const data = await res.json();
+    const rate = data && data[0] && Number(data[0].rate);
+    if (rate > 0) return rate;
+  } catch (e) {
+    console.error('[getEurToUahRate] НБУ недоступний, використано резервний курс:', e.message);
+  }
+  return FALLBACK_EUR_UAH_RATE;
+}
 
 async function createSubscriptionInvoice({ orderId, plan, propertyName }) {
   const planInfo = SUBSCRIPTION_PLANS[plan];
   if (!planInfo) {
     throw new Error(`Невідомий тариф: ${plan}`);
   }
+  const rate = await getEurToUahRate();
+  const priceUah = Math.round(planInfo.priceEur * rate);
+
   const invoiceUrl = await createWayForPayInvoice({
     orderReference: orderId,
-    productName: `StayMate — тариф «${planInfo.label}» (${propertyName || ''})`.trim(),
-    price: planInfo.priceUah,
+    productName: `StayMate — тариф «${planInfo.label}» €${planInfo.priceEur} (курс НБУ ${rate.toFixed(2)}) ${propertyName || ''}`.trim(),
+    price: priceUah,
     serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
   });
-  return { invoiceUrl, price: planInfo.priceUah };
+  return { invoiceUrl, priceUah, priceEur: planInfo.priceEur, rate };
 }
 
 /**
