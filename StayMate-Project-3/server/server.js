@@ -50,6 +50,8 @@ const PORT = process.env.PORT || 3000;
 const propertyCache = new Map(); // property_id -> { data, expiresAt }
 const PROPERTY_CACHE_TTL_MS = 60 * 1000;
 let fallbackPropertyId;
+const invalidPropertyCache = new Map(); // property_id -> number (until timestamp)
+const MESSENGER_INVALID_PROPERTY_TTL_MS = 5 * 60 * 1000;
 
 let parsedMetaPagePropertyMap = {};
 try {
@@ -66,20 +68,70 @@ try {
 }
 
 async function resolveMessengerPropertyId(entryPageId) {
-  if (META_MESSENGER_PROPERTY_ID) return String(META_MESSENGER_PROPERTY_ID);
+  const candidates = [];
+  const addCandidate = (source, propertyId) => {
+    if (!propertyId) return;
+    const id = String(propertyId).trim();
+    if (!id) return;
+    if (!candidates.some(item => item.propertyId === id)) {
+      candidates.push({ source, propertyId: id });
+    }
+  };
+
   if (entryPageId && parsedMetaPagePropertyMap[String(entryPageId)]) {
-    return parsedMetaPagePropertyMap[String(entryPageId)];
+    addCandidate(`page:${entryPageId}`, parsedMetaPagePropertyMap[String(entryPageId)]);
   }
-  if (PROPERTY_ID) return String(PROPERTY_ID);
+  if (META_MESSENGER_PROPERTY_ID) {
+    addCandidate('env META_MESSENGER_PROPERTY_ID', META_MESSENGER_PROPERTY_ID);
+  }
+  if (PROPERTY_ID) {
+    addCandidate('env PROPERTY_ID', PROPERTY_ID);
+  }
+  if (candidates.length === 0 && parsedMetaPagePropertyMap && Object.keys(parsedMetaPagePropertyMap).length > 0 && !entryPageId) {
+    for (const [mappedPageId, mappedPropertyId] of Object.entries(parsedMetaPagePropertyMap)) {
+      addCandidate(`map:${mappedPageId}`, mappedPropertyId);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const { propertyId, source } = candidate;
+    const cacheEntry = invalidPropertyCache.get(propertyId);
+    if (cacheEntry && cacheEntry > Date.now()) {
+      continue;
+    }
+
+    const exists = await getProperty(propertyId);
+    if (exists) return propertyId;
+
+    invalidPropertyCache.set(propertyId, Date.now() + MESSENGER_INVALID_PROPERTY_TTL_MS);
+    console.error(
+      `[messenger] Configured property not found for candidate="${propertyId}" from ${source}. `
+      + `It will be retried after cache expiry.`
+    );
+  }
+
+  if (fallbackPropertyId && !(await getProperty(fallbackPropertyId))) {
+    invalidPropertyCache.set(fallbackPropertyId, Date.now() + MESSENGER_INVALID_PROPERTY_TTL_MS);
+    fallbackPropertyId = '';
+  }
   if (fallbackPropertyId) return fallbackPropertyId;
-  const fallback = await supabase
+
+  const fallbackAll = await supabase
     .from('properties')
     .select('property_id')
-    .limit(1);
-  if (!fallback.error && fallback.data && fallback.data[0]?.property_id) {
-    fallbackPropertyId = String(fallback.data[0].property_id);
-    return fallbackPropertyId;
+    .limit(2);
+  if (!fallbackAll.error && Array.isArray(fallbackAll.data) && fallbackAll.data.length === 1) {
+    fallbackPropertyId = String(fallbackAll.data[0].propertyId || fallbackAll.data[0].property_id);
+    if (fallbackPropertyId) {
+      console.log('[messenger] Auto-chosen single property from DB fallback:', fallbackPropertyId);
+      return fallbackPropertyId;
+    }
   }
+  if (!fallbackAll.error && Array.isArray(fallbackAll.data)) {
+    const listed = fallbackAll.data.map((row) => row.property_id).filter(Boolean);
+    console.error(`[messenger] Missing property resolution. Configured candidates were invalid. Available properties=${JSON.stringify(listed)}.`);
+  }
+
   return '';
 }
 
