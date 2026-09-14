@@ -103,7 +103,7 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 
 @media (max-width:920px){
   .nav-links a.nav-link{display:none;}
-  .nav-cta, .nav-account-link{display:none;}
+  .nav-cta, .nav-account-link{display:none !important;}
   .burger{display:flex;}
   .wrap{padding:0 20px;}
   .nav-tools{gap:8px;}
@@ -355,6 +355,7 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
       <a href="pricing.html" class="nav-link" data-i18n="nav.pricing">Тарифи</a>
       <a href="instructions.html" class="nav-link" data-i18n="nav.instructions">Інструкція</a>
       <a href="contacts.html" class="nav-link" data-i18n="nav.contacts">Контакти</a>
+      <a href="cabinet/" class="nav-link" data-i18n="nav.cabinet">Особистий кабінет</a>
     </div>
     <div class="nav-tools">
       <div class="lang-switch">
@@ -372,20 +373,22 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
       <a href="cabinet/" class="nav-account-link" id="navAccountLink" data-i18n="nav.login">Увійти</a>
-      <a href="cabinet/" class="nav-cta" data-i18n="nav.cta">Підключити</a>
+      <a href="cabinet/" class="nav-cta nav-connect-btn" data-i18n="nav.cta">Підключити</a>
       <button class="burger" id="burgerBtn" type="button" data-i18n-aria="burger.label" aria-label="Меню"><span></span></button>
     </div>
   </nav>
-  <div class="mobile-panel" id="mobilePanel">
+</header>
+<div class="mobile-panel" id="mobilePanel">
     <a href="index.html" data-i18n="nav.home">Головна</a>
     <a href="features.html" data-i18n="nav.features">Можливості</a>
     <a href="how-it-works.html" data-i18n="nav.how">Як це працює</a>
     <a href="pricing.html" data-i18n="nav.pricing">Тарифи</a>
-    <a href="cabinet/" data-i18n="nav.connect">Підключити</a>
+    <a href="cabinet/" class="nav-connect-btn" data-i18n="nav.connect">Підключити</a>
     <a href="instructions.html" data-i18n="nav.instructions">Інструкція</a>
+    <a href="contacts.html" data-i18n="nav.contacts">Контакти</a>
+    <a href="cabinet/" data-i18n="nav.cabinet">Особистий кабінет</a>
     <a href="cabinet/" class="nav-account-link" data-i18n="nav.login">Увійти</a>
-  </div>
-</header>
+</div>
 
 <section class="page-hero">
   <div class="grid-floor" aria-hidden="true"><div class="grid-floor-plane"></div></div>
@@ -441,7 +444,7 @@ const I18N = {
 uk: {
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити",
-  "nav.login":"Увійти","nav.account":"Кабінет",
+  "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
   "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
   "footer.rights":"© 2026 StayMate",
   "toast.contactSent":"Повідомлення надіслано — відповімо протягом дня",
@@ -571,7 +574,7 @@ uk: {
 ru: {
   "nav.home":"Главная","nav.features":"Возможности","nav.how":"Как это работает","nav.pricing":"Тарифы",
   "nav.connect":"Подключить","nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cta":"Подключить",
-  "nav.login":"Войти","nav.account":"Кабинет",
+  "nav.login":"Войти","nav.account":"Кабинет","nav.cabinet":"Личный кабинет","nav.logout":"Выйти",
   "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
   "footer.rights":"© 2026 StayMate",
   "toast.contactSent":"Сообщение отправлено — ответим в течение дня",
@@ -701,7 +704,7 @@ ru: {
 en: {
   "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected",
-  "nav.login":"Log in","nav.account":"Account",
+  "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
   "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
   "footer.rights":"© 2026 StayMate",
   "toast.contactSent":"Message sent — we'll reply within a day",
@@ -956,7 +959,8 @@ function isSubscriptionActive(sub){
 /* ---------- nav: swap "Увійти" ↔ account email once session is known ---------- */
 async function initAccountNav(){
   const links = document.querySelectorAll('.nav-account-link');
-  if(!links.length) return;
+  const connectBtns = document.querySelectorAll('.nav-connect-btn');
+  if(!links.length && !connectBtns.length) return;
   if(typeof SUPABASE_CONFIGURED !== 'undefined' && !SUPABASE_CONFIGURED){
     links.forEach(a=>{ a.textContent = t('nav.login', getLang()); a.setAttribute('href','cabinet/'); });
     return;
@@ -964,12 +968,32 @@ async function initAccountNav(){
   const session = await authGetSession();
   links.forEach(a=>{
     if(session){
+      // Email тут лише статус, не посилання — вхід у кабінет тепер через
+      // окрему вкладку "Особистий кабінет" у навігації.
       a.textContent = session.user.email;
-      a.setAttribute('href','cabinet/');
+      a.removeAttribute('href');
+      a.style.cursor = 'default';
       a.title = 'Увійшли як ' + session.user.email;
     } else {
       a.textContent = t('nav.login', getLang());
       a.setAttribute('href','cabinet/');
+      a.style.cursor = '';
+      a.removeAttribute('title');
+    }
+  });
+  connectBtns.forEach(a=>{
+    if(session){
+      a.textContent = t('nav.logout', getLang());
+      a.setAttribute('href','#');
+      a.onclick = async (e)=>{
+        e.preventDefault();
+        if(window.sb) await window.sb.auth.signOut();
+        location.reload();
+      };
+    } else {
+      a.textContent = t('nav.cta', getLang());
+      a.setAttribute('href','cabinet/');
+      a.onclick = null;
     }
   });
 }

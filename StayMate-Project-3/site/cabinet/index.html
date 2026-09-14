@@ -64,18 +64,22 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 html[data-theme="dark"] .icon-moon{display:none;}
 html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 .account-status{font-size:13.5px; color:var(--ink-soft); display:flex; align-items:center; gap:10px; white-space:nowrap;}
-.account-status .who-email{max-width:180px; overflow:hidden; text-overflow:ellipsis;}
+.account-status .who-email{max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
 .account-status button{background:none; border:none; color:var(--accent-text); font-size:13px; text-decoration:underline; padding:0;}
 .burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-direction:column; gap:3px; flex-shrink:0;}
 .burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); border-radius:1px;}
 .mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
 .mobile-panel.open{display:block;}
 .mobile-panel a{display:block; padding:16px 4px; font-size:16px; border-bottom:1px solid var(--line); color:var(--ink-soft);}
+.mobile-panel .account-status{display:flex; flex-direction:column; align-items:flex-start; gap:10px; white-space:normal; padding:20px 4px 4px; font-size:15px;}
+.mobile-panel .account-status .who-email{max-width:none; overflow:visible; text-overflow:clip; white-space:normal; word-break:break-all;}
+.mobile-panel .account-status button{font-size:15px;}
 @media (max-width:920px){
   .nav-links{display:none;}
   .burger{display:flex;}
   .wrap{padding:0 20px;}
   .wrap-cab{padding:0 20px;}
+  header .nav-tools > .account-status{display:none !important;}
 }
 
 /* ---------- buttons / inputs (те саме, що на решті сайту) ---------- */
@@ -178,14 +182,15 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <button class="burger" id="burgerBtn" type="button" aria-label="Меню"><span></span></button>
     </div>
   </nav>
-  <div class="mobile-panel" id="mobilePanel">
-    <a href="../index.html">Головна</a>
-    <a href="../features.html">Можливості</a>
-    <a href="../pricing.html">Тарифи</a>
-    <a href="../instructions.html">Інструкція</a>
-    <a href="../contacts.html">Контакти</a>
-  </div>
 </header>
+<div class="mobile-panel" id="mobilePanel">
+  <a href="../index.html">Головна</a>
+  <a href="../features.html">Можливості</a>
+  <a href="../pricing.html">Тарифи</a>
+  <a href="../instructions.html">Інструкція</a>
+  <a href="../contacts.html">Контакти</a>
+  <div class="account-status hidden" id="accountStatusMobile"></div>
+</div>
 
 <main>
 
@@ -455,6 +460,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   const gateScreen = document.getElementById('gateScreen');
   const dashScreen = document.getElementById('dashScreen');
   const accountStatus = document.getElementById('accountStatus');
+  const accountStatusMobile = document.getElementById('accountStatusMobile');
 
   let mode = 'signin'; // 'signin' | 'signup'
   let currentUser = null;
@@ -474,13 +480,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (!currentUser) {
       accountStatus.classList.add('hidden');
       accountStatus.innerHTML = '';
+      accountStatusMobile.classList.add('hidden');
+      accountStatusMobile.innerHTML = '';
       return;
     }
+    const html = `<span class="who-email" title="${currentUser.email}">${currentUser.email}</span><button type="button" class="sign-out-btn">Вийти</button>`;
     accountStatus.classList.remove('hidden');
-    accountStatus.innerHTML = `<span class="who-email" title="${currentUser.email}">${currentUser.email}</span><button id="signOutBtn" type="button">Вийти</button>`;
-    document.getElementById('signOutBtn').addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      location.reload();
+    accountStatus.innerHTML = html;
+    accountStatusMobile.classList.remove('hidden');
+    accountStatusMobile.innerHTML = html;
+    document.querySelectorAll('.sign-out-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        location.reload();
+      });
     });
   }
 
