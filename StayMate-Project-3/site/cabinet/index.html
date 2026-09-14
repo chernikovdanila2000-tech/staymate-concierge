@@ -63,17 +63,30 @@ nav.wrap{display:flex; align-items:center; justify-content:space-between; height
 .icon-sun{display:none;}
 html[data-theme="dark"] .icon-moon{display:none;}
 html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
-.account-status{font-size:13.5px; color:var(--ink-soft); display:flex; align-items:center; gap:10px; white-space:nowrap;}
-.account-status .who-email{max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:inline-block; vertical-align:middle;}
-.account-status button{background:none; border:none; color:var(--accent-text); font-size:13px; text-decoration:underline; padding:0;}
+.account-status{position:relative; display:flex; align-items:center; flex-shrink:0;}
+.account-icon-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:border-color .2s ease;}
+.account-icon-btn:hover{border-color:var(--ink);}
+.account-icon-btn svg{width:17px; height:17px; color:var(--ink-soft);}
+.account-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:290px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:0 24px 50px -12px rgba(0,0,0,.45); padding:18px; z-index:70;}
+.acct-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
+.acct-row:last-of-type{border-bottom:none;}
+.acct-label{color:var(--muted); flex-shrink:0;}
+.acct-value{font-weight:600; text-align:right; word-break:break-word;}
+.acct-pw{margin-top:6px; padding-top:14px; border-top:1px solid var(--line);}
+.acct-pw-note{font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 10px;}
+.acct-pw-row{display:flex; gap:8px;}
+.acct-pw-row input{flex:1; padding:9px 11px; font-size:13.5px;}
+.acct-pw-toggle{width:38px; height:38px; flex-shrink:0; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-s); display:flex; align-items:center; justify-content:center; color:var(--ink-soft);}
+.acct-pw-toggle:hover{border-color:var(--ink);}
+.acct-pw-save{width:100%; margin-top:10px; justify-content:center; padding:10px;}
+.acct-logout{width:100%; margin-top:14px; justify-content:center; padding:10px;}
 .burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-direction:column; gap:3px; flex-shrink:0;}
 .burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); border-radius:1px;}
 .mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
 .mobile-panel.open{display:block;}
 .mobile-panel a{display:block; padding:16px 4px; font-size:16px; border-bottom:1px solid var(--line); color:var(--ink-soft);}
-.mobile-panel .account-status{display:flex; flex-direction:column; align-items:flex-start; gap:10px; white-space:normal; padding:20px 4px 4px; font-size:15px;}
-.mobile-panel .account-status .who-email{max-width:none; overflow:visible; text-overflow:clip; white-space:normal; word-break:break-all;}
-.mobile-panel .account-status button{font-size:15px;}
+.mobile-panel .account-status{display:block; padding:20px 4px 4px;}
+.mobile-panel .acct-row{font-size:14.5px;}
 @media (max-width:920px){
   .nav-links{display:none;}
   .burger{display:flex;}
@@ -450,6 +463,25 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // Перекладає технічні повідомлення Supabase на зрозумілі — найчастіша
+  // причина плутанини: вбудований поштовий сервіс Supabase (без свого SMTP)
+  // дозволяє надсилати лише кілька листів на годину на весь проєкт, тому
+  // після 1-2 реєстрацій поспіль наступні впираються саме в цей ліміт,
+  // а не в реальну проблему з акаунтом.
+  function translateAuthError(message) {
+    const m = String(message || '');
+    if (/rate limit/i.test(m)) {
+      return 'Забагато листів підряд — вбудована пошта Supabase дозволяє лише кілька листів на годину на весь сайт. Це не помилка вашого акаунта: зачекайте 10-15 хв і спробуйте ще раз, або попросіть розробника підключити власний SMTP чи вимкнути підтвердження email у Supabase.';
+    }
+    if (/email not confirmed/i.test(m)) {
+      return 'Цей email ще не підтверджено. Перевірте пошту (і "Спам") за листом від Supabase, або зверніться до розробника, щоб вимкнути обов\'язкове підтвердження email.';
+    }
+    if (/invalid login credentials/i.test(m)) {
+      return 'Невірний email або пароль.';
+    }
+    return m;
+  }
+
   // Тариф, з яким прийшли з pricing.html → checkout.html?plan=... → cabinet/?plan=...
   const requestedPlan = new URLSearchParams(window.location.search).get('plan');
 
@@ -476,6 +508,86 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     dashScreen.classList.add('hidden');
   }
 
+  // Supabase, з міркувань безпеки, ніколи не повертає і не зберігає пароль у
+  // відкритому вигляді — його неможливо "показати" в жодній системі, тільки
+  // встановити новий. Тому замість "показати пароль" тут — зміна пароля.
+  function formatDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function subscriptionStatusText(property) {
+    if (!property) return '—';
+    if (property.subscription_status === 'active') {
+      const until = property.subscription_active_until ? formatDate(property.subscription_active_until) : '—';
+      return `${PLAN_LABELS[property.subscription_plan] || property.subscription_plan || 'Активна'} · до ${until}`;
+    }
+    if (property.trial_ends_at && new Date(property.trial_ends_at) > new Date()) {
+      const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
+      return `Пробний період · ${daysLeft} дн.`;
+    }
+    return 'Не активна';
+  }
+
+  const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>';
+
+  function buildAccountInfoHTML(suffix) {
+    const pwId = 'acctNewPassword' + suffix;
+    const msgId = 'acctPwMsg' + suffix;
+    return `
+      <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value">${currentUser.email}</span></div>
+      <div class="acct-row"><span class="acct-label">Дата реєстрації</span><span class="acct-value">${formatDate(currentUser.created_at)}</span></div>
+      <div class="acct-row"><span class="acct-label">Підписка</span><span class="acct-value">${subscriptionStatusText(currentProperty)}</span></div>
+      <div class="acct-pw">
+        <p class="acct-pw-note">Поточний пароль не можна показати — жодна безпечна система його не зберігає у відкритому вигляді, навіть StayMate. Можна тільки встановити новий.</p>
+        <div class="acct-pw-row">
+          <input type="password" id="${pwId}" placeholder="Новий пароль">
+          <button type="button" class="acct-pw-toggle" data-target="${pwId}" aria-label="Показати введений пароль">${EYE_SVG}</button>
+        </div>
+        <button type="button" class="btn-secondary acct-pw-save" data-target="${pwId}" data-msg="${msgId}">Зберегти новий пароль</button>
+        <span class="msg" id="${msgId}"></span>
+      </div>
+      <button type="button" class="btn-secondary acct-logout">Вийти з акаунту</button>
+    `;
+  }
+
+  function wireAccountInfoEvents(container) {
+    container.querySelectorAll('.acct-pw-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    });
+    container.querySelectorAll('.acct-pw-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const input = document.getElementById(btn.dataset.target);
+        const msg = document.getElementById(btn.dataset.msg);
+        const newPassword = input.value;
+        msg.className = 'msg';
+        if (!newPassword || newPassword.length < 6) {
+          msg.className = 'msg error';
+          msg.textContent = 'Пароль має містити щонайменше 6 символів.';
+          return;
+        }
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) {
+          msg.className = 'msg error';
+          msg.textContent = translateAuthError(error.message);
+          return;
+        }
+        msg.className = 'msg ok';
+        msg.textContent = 'Пароль змінено.';
+        input.value = '';
+      });
+    });
+    container.querySelectorAll('.acct-logout').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await supabase.auth.signOut();
+        location.reload();
+      });
+    });
+  }
+
   function renderAccountStatus() {
     if (!currentUser) {
       accountStatus.classList.add('hidden');
@@ -484,18 +596,32 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       accountStatusMobile.innerHTML = '';
       return;
     }
-    const html = `<span class="who-email" title="${currentUser.email}">${currentUser.email}</span><button type="button" class="sign-out-btn">Вийти</button>`;
+
     accountStatus.classList.remove('hidden');
-    accountStatus.innerHTML = html;
-    accountStatusMobile.classList.remove('hidden');
-    accountStatusMobile.innerHTML = html;
-    document.querySelectorAll('.sign-out-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        location.reload();
-      });
+    accountStatus.innerHTML = `
+      <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="Акаунт" title="${currentUser.email}">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <div class="account-dropdown hidden" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
+    `;
+    wireAccountInfoEvents(accountStatus);
+    document.getElementById('accountMenuBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('accountDropdown').classList.toggle('hidden');
     });
+
+    accountStatusMobile.classList.remove('hidden');
+    accountStatusMobile.innerHTML = buildAccountInfoHTML('Mobile');
+    wireAccountInfoEvents(accountStatusMobile);
   }
+
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('accountDropdown');
+    const btn = document.getElementById('accountMenuBtn');
+    if (dropdown && !dropdown.classList.contains('hidden') && e.target !== btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+      dropdown.classList.add('hidden');
+    }
+  });
 
   // ---- Автентифікація ----
   document.getElementById('switcherBtn').addEventListener('click', () => {
@@ -521,7 +647,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
     msg.className = 'msg ok';
@@ -547,7 +673,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
 
@@ -594,7 +720,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
     msg.className = 'msg ok';
@@ -659,7 +785,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
 
@@ -893,7 +1019,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       );
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
     msg.className = 'msg ok';
@@ -927,7 +1053,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = error.message;
+      msg.textContent = translateAuthError(error.message);
       return;
     }
     currentProperty.hotel_name = name;
