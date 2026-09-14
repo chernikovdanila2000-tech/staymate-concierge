@@ -119,6 +119,7 @@ async function resolveMessengerPropertyId(entryPageId) {
   const fallbackAll = await supabase
     .from('properties')
     .select('property_id')
+    .order('created_at', { ascending: true })
     .limit(2);
   if (!fallbackAll.error && Array.isArray(fallbackAll.data) && fallbackAll.data.length === 1) {
     fallbackPropertyId = String(fallbackAll.data[0].propertyId || fallbackAll.data[0].property_id);
@@ -129,6 +130,13 @@ async function resolveMessengerPropertyId(entryPageId) {
   }
   if (!fallbackAll.error && Array.isArray(fallbackAll.data)) {
     const listed = fallbackAll.data.map((row) => row.property_id).filter(Boolean);
+    if (listed.length > 0 && !fallbackPropertyId) {
+      const candidate = listed[0];
+      fallbackPropertyId = candidate;
+      console.warn('[messenger] Configured property candidates are invalid. ' +
+        `Auto-selected first available property for runtime fallback: ${candidate}`);
+      return candidate;
+    }
     console.error(`[messenger] Missing property resolution. Configured candidates were invalid. Available properties=${JSON.stringify(listed)}.`);
   }
 
