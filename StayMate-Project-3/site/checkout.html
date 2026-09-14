@@ -96,8 +96,8 @@ html[data-theme="dark"] .nav-cta{color:var(--accent-ink); background:var(--accen
 html[data-theme="dark"] .icon-moon{display:none;}
 html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 
-.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center;}
-.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); position:relative;}
+.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-direction:column; gap:3px;}
+.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); border-radius:1px;}
 
 .mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
 .mobile-panel.open{display:block;}

@@ -66,8 +66,8 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 .account-status{font-size:13.5px; color:var(--ink-soft); display:flex; align-items:center; gap:10px; white-space:nowrap;}
 .account-status .who-email{max-width:180px; overflow:hidden; text-overflow:ellipsis;}
 .account-status button{background:none; border:none; color:var(--accent-text); font-size:13px; text-decoration:underline; padding:0;}
-.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-shrink:0;}
-.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); position:relative;}
+.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-direction:column; gap:3px; flex-shrink:0;}
+.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); border-radius:1px;}
 .mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
 .mobile-panel.open{display:block;}
 .mobile-panel a{display:block; padding:16px 4px; font-size:16px; border-bottom:1px solid var(--line); color:var(--ink-soft);}
