@@ -67,6 +67,8 @@ PORT
 | `POST /webhook/website/<property_id>` | чат-віджет на сайті готелю (`widget.js`) |
 | `POST /webhook/wayforpay` | підтвердження оплати гостя за бронювання |
 | `POST /webhook/wayforpay-subscription` | підтвердження оплати підписки готелю |
+| `GET /webhook/messenger` | перевірка Meta Messenger webhook |
+| `POST /webhook/messenger` | підписані вхідні події Meta Messenger |
 | `POST /api/connect-channel` | кабінет підключає Telegram/Viber (сервер сам реєструє вебхук) |
 | `POST /api/create-subscription-invoice` | кабінет запитує рахунок на оплату підписки |
 | `GET /health` | перевірка живості |

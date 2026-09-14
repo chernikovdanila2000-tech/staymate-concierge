@@ -24,6 +24,7 @@ const crypto = require('crypto');
 const { runConciergeTurn } = require('./claude-client');
 const { parseTelegramUpdate, sendTelegramMessage, setWebhook: setTelegramWebhook } = require('./telegram');
 const { parseViberUpdate, sendViberMessage, setViberWebhook } = require('./viber');
+const { safeEqual, verifyMessengerSignature, parseMessengerEvents, sendMessengerMessage } = require('./messenger');
 const { getTelegramToken, getViberToken, invalidateChannel } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
 const { createSubscriptionInvoice } = require('./tools');
@@ -32,6 +33,12 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const WFP_MERCHANT_SECRET = process.env.WAYFORPAY_MERCHANT_SECRET || 'flk3409refn54t54t*FNJRET';
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+const META_MESSENGER_PAGE_ACCESS_TOKEN = process.env.META_MESSENGER_PAGE_ACCESS_TOKEN || '';
+const META_MESSENGER_APP_SECRET = process.env.META_MESSENGER_APP_SECRET || '';
+const META_MESSENGER_VERIFY_TOKEN = process.env.META_MESSENGER_VERIFY_TOKEN || '';
+const META_MESSENGER_PAGE_ID = process.env.META_MESSENGER_PAGE_ID || '';
+const META_MESSENGER_PROPERTY_ID = process.env.META_MESSENGER_PROPERTY_ID || '';
+const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v24.0';
 
 const PORT = process.env.PORT || 3000;
 
@@ -86,6 +93,63 @@ function wfpAcceptResponse(orderReference) {
 }
 
 const server = http.createServer((req, res) => {
+  const requestUrl = new URL(req.url, 'http://localhost');
+
+  // GET/POST /webhook/messenger — Meta Messenger webhook.
+  if (requestUrl.pathname === '/webhook/messenger' && req.method === 'GET') {
+    const mode = requestUrl.searchParams.get('hub.mode');
+    const token = requestUrl.searchParams.get('hub.verify_token');
+    const challenge = requestUrl.searchParams.get('hub.challenge');
+    if (mode === 'subscribe' && challenge && safeEqual(token, META_MESSENGER_VERIFY_TOKEN)) {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end(challenge);
+    }
+    return sendJson(res, 403, { error: 'Webhook verification failed.' });
+  }
+
+  if (requestUrl.pathname === '/webhook/messenger' && req.method === 'POST') {
+    readBody(req).then(rawBody => {
+      if (!verifyMessengerSignature(rawBody, req.headers['x-hub-signature-256'], META_MESSENGER_APP_SECRET)) {
+        return sendJson(res, 401, { error: 'Invalid webhook signature.' });
+      }
+      let payload;
+      try {
+        payload = JSON.parse(rawBody || '{}');
+      } catch (error) {
+        return sendJson(res, 400, { error: 'Invalid JSON.' });
+      }
+      const events = parseMessengerEvents(payload, META_MESSENGER_PAGE_ID);
+      sendJson(res, 200, { ok: true });
+
+      setImmediate(async () => {
+        if (!META_MESSENGER_PROPERTY_ID || !META_MESSENGER_PAGE_ACCESS_TOKEN) {
+          console.error('[messenger] META_MESSENGER_PROPERTY_ID or Page token is not configured.');
+          return;
+        }
+        const property = await getProperty(META_MESSENGER_PROPERTY_ID);
+        if (!property) {
+          console.error('[messenger] Configured property was not found.');
+          return;
+        }
+        for (const event of events) {
+          try {
+            const history = await getHistory(META_MESSENGER_PROPERTY_ID, 'messenger', event.senderId);
+            history.push({ role: 'user', content: event.text });
+            const { replyText, updatedHistory } = await runConciergeTurn(history, {
+              propertyId: META_MESSENGER_PROPERTY_ID,
+              propertyName: property.hotel_name,
+            });
+            await saveHistory(META_MESSENGER_PROPERTY_ID, 'messenger', event.senderId, updatedHistory);
+            await sendMessengerMessage(META_MESSENGER_PAGE_ACCESS_TOKEN, event.senderId, replyText, META_GRAPH_VERSION);
+          } catch (error) {
+            console.error('[messenger] Failed to process event:', error.message);
+          }
+        }
+      });
+    }).catch(error => sendJson(res, 500, { error: error.message }));
+    return;
+  }
+
   // CORS preflight для віджета сайту (він може викликатись з домену готелю).
   if (req.method === 'OPTIONS' && req.url.startsWith('/webhook/website/')) {
     res.writeHead(204, {
