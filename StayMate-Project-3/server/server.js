@@ -25,6 +25,7 @@ const { runConciergeTurn } = require('./claude-client');
 const { parseTelegramUpdate, sendTelegramMessage, setWebhook: setTelegramWebhook } = require('./telegram');
 const { parseViberUpdate, sendViberMessage, setViberWebhook } = require('./viber');
 const { safeEqual, verifyMessengerSignature, parseMessengerEvents, sendMessengerMessage } = require('./messenger');
+const { serveLegalPage } = require('./legal-pages');
 const { getTelegramToken, getViberToken, invalidateChannel } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
 const { createSubscriptionInvoice } = require('./tools');
@@ -94,6 +95,9 @@ function wfpAcceptResponse(orderReference) {
 
 const server = http.createServer((req, res) => {
   const requestUrl = new URL(req.url, 'http://localhost');
+
+  // Public policy pages required by Meta App Review.
+  if (req.method === 'GET' && serveLegalPage(requestUrl.pathname, res)) return;
 
   // GET/POST /webhook/messenger — Meta Messenger webhook.
   if (requestUrl.pathname === '/webhook/messenger' && req.method === 'GET') {
