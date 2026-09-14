@@ -39,6 +39,8 @@ const META_MESSENGER_APP_SECRET = process.env.META_MESSENGER_APP_SECRET || '';
 const META_MESSENGER_VERIFY_TOKEN = process.env.META_MESSENGER_VERIFY_TOKEN || '';
 const META_MESSENGER_PAGE_ID = process.env.META_MESSENGER_PAGE_ID || '';
 const META_MESSENGER_PROPERTY_ID = process.env.META_MESSENGER_PROPERTY_ID || '';
+const PROPERTY_ID = process.env.PROPERTY_ID || '';
+const META_MESSENGER_PAGE_TO_PROPERTY_MAP = process.env.META_MESSENGER_PAGE_TO_PROPERTY_MAP || '';
 const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v24.0';
 
 const PORT = process.env.PORT || 3000;
@@ -47,6 +49,39 @@ const PORT = process.env.PORT || 3000;
 // на кожне повідомлення від активного гостя.
 const propertyCache = new Map(); // property_id -> { data, expiresAt }
 const PROPERTY_CACHE_TTL_MS = 60 * 1000;
+let fallbackPropertyId;
+
+let parsedMetaPagePropertyMap = {};
+try {
+  if (META_MESSENGER_PAGE_TO_PROPERTY_MAP) {
+    const parsedMap = JSON.parse(META_MESSENGER_PAGE_TO_PROPERTY_MAP);
+    if (parsedMap && typeof parsedMap === 'object' && !Array.isArray(parsedMap)) {
+      parsedMetaPagePropertyMap = Object.fromEntries(
+        Object.entries(parsedMap).map(([pageId, propertyId]) => [String(pageId), String(propertyId)])
+      );
+    }
+  }
+} catch (error) {
+  console.error('[messenger] Failed to parse META_MESSENGER_PAGE_TO_PROPERTY_MAP JSON:', error.message);
+}
+
+async function resolveMessengerPropertyId(entryPageId) {
+  if (META_MESSENGER_PROPERTY_ID) return String(META_MESSENGER_PROPERTY_ID);
+  if (entryPageId && parsedMetaPagePropertyMap[String(entryPageId)]) {
+    return parsedMetaPagePropertyMap[String(entryPageId)];
+  }
+  if (PROPERTY_ID) return String(PROPERTY_ID);
+  if (fallbackPropertyId) return fallbackPropertyId;
+  const fallback = await supabase
+    .from('properties')
+    .select('property_id')
+    .limit(1);
+  if (!fallback.error && fallback.data && fallback.data[0]?.property_id) {
+    fallbackPropertyId = String(fallback.data[0].property_id);
+    return fallbackPropertyId;
+  }
+  return '';
+}
 
 async function getProperty(propertyId) {
   const cached = propertyCache.get(propertyId);
@@ -126,24 +161,36 @@ const server = http.createServer((req, res) => {
       sendJson(res, 200, { ok: true });
 
       setImmediate(async () => {
-        if (!META_MESSENGER_PROPERTY_ID || !META_MESSENGER_PAGE_ACCESS_TOKEN) {
-          console.error('[messenger] META_MESSENGER_PROPERTY_ID or Page token is not configured.');
+        if (!META_MESSENGER_PAGE_ACCESS_TOKEN) {
+          console.error('[messenger] META_MESSENGER_PAGE_ACCESS_TOKEN is not configured.');
           return;
         }
-        const property = await getProperty(META_MESSENGER_PROPERTY_ID);
+        const entryPageId = Array.isArray(payload.entry) && payload.entry[0] ? payload.entry[0].id : '';
+        const propertyId = await resolveMessengerPropertyId(entryPageId);
+        if (!propertyId) {
+          console.error(
+            `[messenger] Missing property id mapping for page_id=${entryPageId || 'unknown'}. ` +
+            'Set META_MESSENGER_PROPERTY_ID or META_MESSENGER_PAGE_TO_PROPERTY_MAP[page_id].'
+          );
+          return;
+        }
+        const property = await getProperty(propertyId);
         if (!property) {
-          console.error('[messenger] Configured property was not found.');
+          console.error(
+            `[messenger] Configured property was not found. ` +
+              `Query=properties where property_id="${propertyId}" (page_id=${entryPageId || 'unknown'}).`
+          );
           return;
         }
         for (const event of events) {
           try {
-            const history = await getHistory(META_MESSENGER_PROPERTY_ID, 'messenger', event.senderId);
+            const history = await getHistory(propertyId, 'messenger', event.senderId);
             history.push({ role: 'user', content: event.text });
             const { replyText, updatedHistory } = await runConciergeTurn(history, {
-              propertyId: META_MESSENGER_PROPERTY_ID,
+              propertyId,
               propertyName: property.hotel_name,
             });
-            await saveHistory(META_MESSENGER_PROPERTY_ID, 'messenger', event.senderId, updatedHistory);
+            await saveHistory(propertyId, 'messenger', event.senderId, updatedHistory);
             await sendMessengerMessage(META_MESSENGER_PAGE_ACCESS_TOKEN, event.senderId, replyText, META_GRAPH_VERSION);
           } catch (error) {
             console.error('[messenger] Failed to process event:', error.message);
@@ -567,4 +614,11 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`StayAI concierge server running on http://localhost:${PORT}`);
+  const mapKeys = Object.keys(parsedMetaPagePropertyMap || {});
+  console.log('[messenger] Configured:', {
+    pageId: META_MESSENGER_PAGE_ID || 'not_set',
+    propertyId: META_MESSENGER_PROPERTY_ID || 'not_set',
+    hasDirectMap: mapKeys.length > 0,
+    mapCount: mapKeys.length,
+  });
 });
