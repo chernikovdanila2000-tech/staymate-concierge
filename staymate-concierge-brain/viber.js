@@ -1,5 +1,5 @@
 /* ============================================================
-   StayMate — інтеграція з Viber Bot API (REST, аналогічно telegram.js)
+   StayAI — інтеграція з Viber Bot API (REST, аналогічно telegram.js)
 
    ВАЖЛИВО: цей модуль написано за офіційною документацією Viber REST
    API (chatapi.viber.com), але не протестовано на живому акаунті —
@@ -34,7 +34,7 @@ function parseViberUpdate(update) {
  * Надсилає текстове повідомлення конкретному користувачу Viber
  * через бота конкретного готелю.
  */
-async function sendViberMessage(botToken, receiverId, text, senderName = 'StayMate') {
+async function sendViberMessage(botToken, receiverId, text, senderName = 'StayAI') {
   const res = await fetch(`${VIBER_API_BASE}/send_message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Viber-Auth-Token': botToken },

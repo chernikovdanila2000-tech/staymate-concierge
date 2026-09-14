@@ -1,4 +1,4 @@
-# StayMate — "мозок" ШІ-адміністратора (бекенд)
+# StayAI — "мозок" ШІ-адміністратора (бекенд)
 
 Мультитенантний Node.js-сервер: один процес обслуговує багато готелів одночасно,
 кожен зі своїми номерами, цінами і підключеними каналами зв'язку (Telegram, Viber,
@@ -53,7 +53,7 @@ WAYFORPAY_MERCHANT_ACCOUNT
 WAYFORPAY_MERCHANT_SECRET
 WAYFORPAY_DOMAIN
 API_BASE_URL                  = https://staymate-concierge-production.up.railway.app
-CABINET_URL                   = https://staymat.netlify.app/cabinet/  (необов'язково, є дефолт)
+CABINET_URL                   = https://stayai.online/cabinet/  (необов'язково, є дефолт)
 PORT
 ```
 

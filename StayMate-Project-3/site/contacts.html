@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StayMate — Контакти</title>
+<title>StayAI — Контакти</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="supabase-config.js"></script>
 <style>
-/* ============ StayMate — shared styles ============ */
+/* ============ StayAI — shared styles ============ */
 :root{
   --radius-s:6px; --radius-m:14px; --radius-l:28px; --maxw:1180px;
 }
@@ -346,7 +346,7 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 
 <header>
   <nav class="wrap">
-    <a href="index.html" class="logo"><span class="logo-mark"></span>StayMate</a>
+    <a href="index.html" class="logo"><span class="logo-mark"></span>StayAI</a>
     <div class="nav-links">
       <a href="index.html" class="nav-link" data-i18n="nav.home">Головна</a>
       <a href="features.html" class="nav-link" data-i18n="nav.features">Можливості</a>
@@ -448,26 +448,26 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 </section>
 <footer>
   <div class="wrap footer-row">
-    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayMate</div>
+    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayAI</div>
     <div class="footer-links">
       <a href="features.html" data-i18n="nav.features">Можливості</a>
       <a href="pricing.html" data-i18n="nav.pricing">Тарифи</a>
       <a href="contacts.html" data-i18n="nav.contacts">Контакти</a>
     </div>
-    <span class="footer-mono" data-i18n="footer.rights">© 2026 StayMate</span>
+    <span class="footer-mono" data-i18n="footer.rights">© 2026 StayAI</span>
   </div>
 </footer>
 
 <div class="toast" id="toast"></div>
 <script>
-/* ============ StayMate — i18n ============ */
+/* ============ StayAI — i18n ============ */
 const I18N = {
 uk: {
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити",
   "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
   "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
-  "footer.rights":"© 2026 StayMate",
+  "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Повідомлення надіслано — відповімо протягом дня",
   "toast.paySuccess":"Оплата пройшла успішно","toast.keyCopied":"Ключ скопійовано",
   "config.notSetup":"Supabase ще не налаштовано розробником сайту. Відкрийте файл supabase-config.js і вставте свої ключі проєкту.",
@@ -478,7 +478,7 @@ uk: {
   "login.noAccount":"Ще немає акаунта?","login.toRegister":"Зареєструватися",
   "login.error.generic":"Не вдалося увійти. Перевірте email і пароль (або підтвердіть email після реєстрації).",
 
-  "register.hero.kicker":"Реєстрація","register.hero.title":"Створити акаунт StayMate",
+  "register.hero.kicker":"Реєстрація","register.hero.title":"Створити акаунт StayAI",
   "register.hero.desc":"Знадобиться, щоб оформити підписку і зберігати доступ до кабінету з будь-якого пристрою. Перші 3 дні — безкоштовно, без прив\u2019язки картки.",
   "register.name.label":"Ім'я","register.email.label":"Email","register.password.label":"Пароль","register.submit":"Зареєструватися",
   "register.haveAccount":"Вже є акаунт?","register.toLogin":"Увійти",
@@ -492,10 +492,10 @@ uk: {
   "account.plan.none":"Немає активної підписки","account.status.active":"Активна","account.status.inactive":"Не активна","account.status.trial":"Пробний період — залишилось {days} дн.","account.status.trialEnded":"Пробний період завершився",
   "account.cta.pricing":"Обрати тариф","account.cta.instructions":"Перейти до інструкції","account.logout":"Вийти",
 
-  "checkout.authgate.title":"Спочатку увійдіть в акаунт","checkout.authgate.desc":"Підписка прив'язується до вашого акаунта StayMate, щоб залишатися доступною з будь-якого пристрою.",
+  "checkout.authgate.title":"Спочатку увійдіть в акаунт","checkout.authgate.desc":"Підписка прив'язується до вашого акаунта StayAI, щоб залишатися доступною з будь-якого пристрою.",
 
-  "home.eyebrow":"StayMate вже відповідає 214 гостям прямо зараз",
-  "home.h1pre":"Гості пишуть вночі.","home.h1em":"Відповідає StayMate.",
+  "home.eyebrow":"StayAI вже відповідає 214 гостям прямо зараз",
+  "home.h1pre":"Гості пишуть вночі.","home.h1em":"Відповідає StayAI.",
   "home.sub":"ІІ-адміністратор підключається до ваших каналів, перевіряє вільні номери, приймає оплату і бронює — поки ви спите або зайняті заїздом.",
   "home.cta1":"Обрати тариф","home.cta2":"Як це працює",
   "home.proof1val":"24/7","home.proof1label":"без вихідних і обіду",
@@ -510,7 +510,7 @@ uk: {
   "chat.g3":"Оплатила ✅",
   "chat.a3tag":"бронь створена","chat.a3":"Дякую! Студію №3 заброньовано за вами. Інструкція із заїзду прийде за день до прибуття.",
   "home.process.kicker":"Сценарій","home.process.title":"Один діалог — чотири дії",
-  "home.process.desc":"StayMate проходить весь шлях гостя сам: від першого повідомлення до підтвердженої броні, без перемикання на менеджера.",
+  "home.process.desc":"StayAI проходить весь шлях гостя сам: від першого повідомлення до підтвердженої броні, без перемикання на менеджера.",
   "home.process.more":"Детальніше про сценарій →",
   "process.step1.tag":"01 · повідомлення","process.step1.title":"Відповідає гостю",
   "process.step1.desc":"Розуміє питання будь-якою мовою, відповідає за правилами об'єкта — заїзд, депозит, паркування, тварини.",
@@ -520,28 +520,28 @@ uk: {
   "process.step3.desc":"Виставляє посилання на оплату через захищений платіжний шлюз, підтверджує надходження.",
   "process.step4.tag":"04 · бронь","process.step4.title":"Створює бронювання",
   "process.step4.desc":"Фіксує бронь у системі та надсилає гостю підтвердження з деталями заїзду.",
-  "home.feat.kicker":"Можливості","home.feat.title":"Що вміє StayMate",
+  "home.feat.kicker":"Можливості","home.feat.title":"Що вміє StayAI",
   "home.feat.desc":"Не просто чат-бот із заготовленими відповідями — агент, який розуміє контекст і знає, коли передати діалог людині.",
   "home.feat.more":"Усі можливості →",
   "cap.card1.title":"Працює у ваших каналах","cap.card1.desc":"WhatsApp, Telegram, Instagram і чат на сайті — гість пише туди, де йому зручно.",
   "cap.card2.title":"Підключається до вашої PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator та інші — синхронізація наявності в реальному часі.",
-  "cap.card3.title":"Знає правила об'єкта","cap.card3.desc":"Завантажте умови проживання один раз — StayMate відповідатиме строго за ними.",
+  "cap.card3.title":"Знає правила об'єкта","cap.card3.desc":"Завантажте умови проживання один раз — StayAI відповідатиме строго за ними.",
   "cap.card4.title":"Передає складні випадки","cap.card4.desc":"Якщо ситуація нестандартна — скарга, спір, форс-мажор — діалог іде до менеджера.",
   "cap.card5.title":"Приймає оплату","cap.card5.desc":"Депозит, повна оплата чи передоплата — гість платить за захищеним посиланням, ви бачите статус.",
   "cap.card6.title":"Росте разом з об'єктом","cap.card6.desc":"Один апартамент чи мережа з тридцяти — логіка підключається на кожен об'єкт окремо.",
-  "home.cta.title":"Готові підключити StayMate?","home.cta.desc":"Оберіть тариф і активуйте підписку за кілька хвилин.","home.cta.button":"Обрати тариф",
+  "home.cta.title":"Готові підключити StayAI?","home.cta.desc":"Оберіть тариф і активуйте підписку за кілька хвилин.","home.cta.button":"Обрати тариф",
 
-  "features.hero.kicker":"Можливості","features.hero.title":"Що вміє StayMate",
+  "features.hero.kicker":"Можливості","features.hero.title":"Що вміє StayAI",
   "features.hero.desc":"Повний перелік того, що агент робить самостійно — від першого повідомлення гостя до підтвердженої броні.",
-  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayMate говорить від імені вашого об'єкта",
+  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayAI говорить від імені вашого об'єкта",
   "features.photo.desc":"Ім'я, тон спілкування і фото можна налаштувати під конкретні апартаменти — гість не відчує різниці зі звичайним листуванням з адміністратором.",
 
   "how.hero.kicker":"Сценарій","how.hero.title":"Як це працює",
-  "how.hero.desc":"Один діалог гостя проходить чотири кроки — StayMate не передає його далі, поки все не підтверджено.",
+  "how.hero.desc":"Один діалог гостя проходить чотири кроки — StayAI не передає його далі, поки все не підтверджено.",
   "how.extra.kicker":"Нестандартні ситуації","how.extra.title":"Коли підключається людина",
-  "how.extra.desc":"StayMate добре знає межі своєї компетенції і не намагається вирішити все сам.",
+  "how.extra.desc":"StayAI добре знає межі своєї компетенції і не намагається вирішити все сам.",
   "how.card1.title":"Складний або спірний запит","how.card1.desc":"Скарга, конфлікт, нетипове прохання — діалог одразу передається менеджеру разом з історією листування.",
-  "how.card2.title":"Немає вільних номерів","how.card2.desc":"StayMate пропонує найближчі вільні дати або записує гостя в лист очікування, якщо це налаштовано.",
+  "how.card2.title":"Немає вільних номерів","how.card2.desc":"StayAI пропонує найближчі вільні дати або записує гостя в лист очікування, якщо це налаштовано.",
 
   "pricing.hero.kicker":"Тарифи","pricing.hero.title":"Одна підписка на об'єкт",
   "pricing.hero.desc":"Без прихованих відсотків із бронювань. Оплата щомісячна, скасувати можна в будь-який момент.",
@@ -559,7 +559,7 @@ uk: {
   "plan.auto.note":"Автобронювання і перевірка номерів у реальному часі розкриваються повною мірою, коли ваш об'єкт підключено до PMS або Channel Manager.",
 
   "checkout.hero.kicker":"Оформлення","checkout.hero.title":"Обрати тариф",
-  "checkout.hero.desc":"Заповніть дані, щоб активувати підписку StayMate. Це демонстраційна форма оплати.",
+  "checkout.hero.desc":"Заповніть дані, щоб активувати підписку StayAI. Це демонстраційна форма оплати.",
   "pay.head.title":"Оформлення підписки",
   "pay.email.label":"Email для доступу","pay.card.label":"Номер картки","pay.exp.label":"Термін дії","pay.cvc.label":"CVC",
   "pay.submit.default":"Оплатити підписку","pay.submit.loading":"Обробляємо оплату…",
@@ -567,11 +567,11 @@ uk: {
   "pay.success.title":"Підписку активовано","pay.success.desc":"Кабінет та інструкція з підключення вже доступні нижче.",
   "pay.success.cta":"Перейти до інструкції",
 
-  "connect.hero.kicker":"Початок роботи","connect.hero.title":"Підключити StayMate до вашого профілю",
+  "connect.hero.kicker":"Початок роботи","connect.hero.title":"Підключити StayAI до вашого профілю",
   "connect.hero.desc":"Три кроки від оплати до першого діалогу з гостем.",
   "connect.step1.title":"Оберіть тариф","connect.step1.desc":"Підпишіться на план, що відповідає розміру вашого об'єкта.",
   "connect.step2.title":"Отримайте ключ доступу","connect.step2.desc":"Одразу після оплати відкриється особистий ключ і покрокова інструкція.",
-  "connect.step3.title":"Підключіть канали та правила","connect.step3.desc":"Додайте месенджери, PMS і умови проживання — і запускайте StayMate на реальних гостях.",
+  "connect.step3.title":"Підключіть канали та правила","connect.step3.desc":"Додайте месенджери, PMS і умови проживання — і запускайте StayAI на реальних гостях.",
   "connect.cta.primary":"Обрати тариф","connect.cta.secondary":"Вже оплатили? Перейти до інструкції",
 
   "instr.hero.kicker":"Підключення","instr.hero.title":"Інструкція з налаштування",
@@ -580,8 +580,8 @@ uk: {
   "key.copy":"Скопіювати",
   "step.s1.title":"Отримайте ключ доступу","step.s1.desc":"Ключ уже створено для вашого кабінету — він показаний вище. Він знадобиться на наступному кроці.",
   "step.s2.title":"Підключіть канал спілкування","step.s2.desc":"У особистому кабінеті відкрийте розділ «Канали» → оберіть WhatsApp, Telegram або чат для сайту → вставте ключ доступу.",
-  "step.s3.title":"Зв'яжіть систему бронювання","step.s3.desc":"Вкажіть вашу PMS (Cloudbeds, Beds24 тощо) або завантажте таблицю номерів вручну — StayMate звірятиметься з нею.",
-  "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayMate дотримуватиметься.",
+  "step.s3.title":"Зв'яжіть систему бронювання","step.s3.desc":"Вкажіть вашу PMS (Cloudbeds, Beds24 тощо) або завантажте таблицю номерів вручну — StayAI звірятиметься з нею.",
+  "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayAI дотримуватиметься.",
   "step.s5.title":"Перевірте й запустіть","step.s5.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність — і увімкніть канал для реальних гостей.",
 
   "contacts.hero.kicker":"Контакти","contacts.hero.title":"Залишились питання?",
@@ -597,7 +597,7 @@ ru: {
   "nav.connect":"Подключить","nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cta":"Подключить",
   "nav.login":"Войти","nav.account":"Кабинет","nav.cabinet":"Личный кабинет","nav.logout":"Выйти",
   "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
-  "footer.rights":"© 2026 StayMate",
+  "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Сообщение отправлено — ответим в течение дня",
   "toast.paySuccess":"Оплата прошла успешно","toast.keyCopied":"Ключ скопирован",
   "config.notSetup":"Supabase ещё не настроен разработчиком сайта. Откройте файл supabase-config.js и вставьте свои ключи проекта.",
@@ -608,7 +608,7 @@ ru: {
   "login.noAccount":"Ещё нет аккаунта?","login.toRegister":"Зарегистрироваться",
   "login.error.generic":"Не удалось войти. Проверьте email и пароль (или подтвердите email после регистрации).",
 
-  "register.hero.kicker":"Регистрация","register.hero.title":"Создать аккаунт StayMate",
+  "register.hero.kicker":"Регистрация","register.hero.title":"Создать аккаунт StayAI",
   "register.hero.desc":"Понадобится, чтобы оформить подписку и сохранять доступ к кабинету с любого устройства. Первые 3 дня — бесплатно, без привязки карты.",
   "register.name.label":"Имя","register.email.label":"Email","register.password.label":"Пароль","register.submit":"Зарегистрироваться",
   "register.haveAccount":"Уже есть аккаунт?","register.toLogin":"Войти",
@@ -622,10 +622,10 @@ ru: {
   "account.plan.none":"Нет активной подписки","account.status.active":"Активна","account.status.inactive":"Не активна","account.status.trial":"Пробный период — осталось {days} дн.","account.status.trialEnded":"Пробный период завершился",
   "account.cta.pricing":"Выбрать тариф","account.cta.instructions":"Перейти к инструкции","account.logout":"Выйти",
 
-  "checkout.authgate.title":"Сначала войдите в аккаунт","checkout.authgate.desc":"Подписка привязывается к вашему аккаунту StayMate, чтобы оставаться доступной с любого устройства.",
+  "checkout.authgate.title":"Сначала войдите в аккаунт","checkout.authgate.desc":"Подписка привязывается к вашему аккаунту StayAI, чтобы оставаться доступной с любого устройства.",
 
-  "home.eyebrow":"StayMate уже отвечает 214 гостям прямо сейчас",
-  "home.h1pre":"Гости пишут ночью.","home.h1em":"Отвечает StayMate.",
+  "home.eyebrow":"StayAI уже отвечает 214 гостям прямо сейчас",
+  "home.h1pre":"Гости пишут ночью.","home.h1em":"Отвечает StayAI.",
   "home.sub":"ИИ-администратор подключается к вашим каналам, проверяет свободные номера, принимает оплату и бронирует — пока вы спите или заняты заездом.",
   "home.cta1":"Выбрать тариф","home.cta2":"Как это работает",
   "home.proof1val":"24/7","home.proof1label":"без выходных и обеда",
@@ -640,7 +640,7 @@ ru: {
   "chat.g3":"Оплатила ✅",
   "chat.a3tag":"бронь создана","chat.a3":"Спасибо! Студия №3 забронирована за вами. Инструкция по заезду придёт за день до прибытия.",
   "home.process.kicker":"Сценарий","home.process.title":"Один диалог — четыре действия",
-  "home.process.desc":"StayMate проходит весь путь гостя сам: от первого сообщения до подтверждённой брони, без переключения на менеджера.",
+  "home.process.desc":"StayAI проходит весь путь гостя сам: от первого сообщения до подтверждённой брони, без переключения на менеджера.",
   "home.process.more":"Подробнее о сценарии →",
   "process.step1.tag":"01 · сообщение","process.step1.title":"Отвечает гостю",
   "process.step1.desc":"Понимает вопрос на любом языке, отвечает по правилам объекта — заезд, депозит, парковка, животные.",
@@ -650,28 +650,28 @@ ru: {
   "process.step3.desc":"Выставляет ссылку на оплату через защищённый платёжный шлюз, подтверждает поступление.",
   "process.step4.tag":"04 · бронь","process.step4.title":"Создаёт бронирование",
   "process.step4.desc":"Фиксирует бронь в системе и присылает гостю подтверждение с деталями заезда.",
-  "home.feat.kicker":"Возможности","home.feat.title":"Что умеет StayMate",
+  "home.feat.kicker":"Возможности","home.feat.title":"Что умеет StayAI",
   "home.feat.desc":"Не просто чат-бот с заготовленными ответами — агент, который понимает контекст и знает, когда передать диалог человеку.",
   "home.feat.more":"Все возможности →",
   "cap.card1.title":"Работает в ваших каналах","cap.card1.desc":"WhatsApp, Telegram, Instagram и чат на сайте — гость пишет туда, где ему удобно.",
   "cap.card2.title":"Подключается к вашей PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator и другие — синхронизация наличия в реальном времени.",
-  "cap.card3.title":"Знает правила объекта","cap.card3.desc":"Загрузите условия проживания один раз — StayMate будет отвечать строго по ним.",
+  "cap.card3.title":"Знает правила объекта","cap.card3.desc":"Загрузите условия проживания один раз — StayAI будет отвечать строго по ним.",
   "cap.card4.title":"Передаёт сложные случаи","cap.card4.desc":"Если ситуация нестандартная — жалоба, спор, форс-мажор — диалог уходит менеджеру.",
   "cap.card5.title":"Принимает оплату","cap.card5.desc":"Депозит, полная оплата или предоплата — гость платит по защищённой ссылке, вы видите статус.",
   "cap.card6.title":"Растёт вместе с объектом","cap.card6.desc":"Один апартамент или сеть из тридцати — логика подключается на каждый объект отдельно.",
-  "home.cta.title":"Готовы подключить StayMate?","home.cta.desc":"Выберите тариф и активируйте подписку за несколько минут.","home.cta.button":"Выбрать тариф",
+  "home.cta.title":"Готовы подключить StayAI?","home.cta.desc":"Выберите тариф и активируйте подписку за несколько минут.","home.cta.button":"Выбрать тариф",
 
-  "features.hero.kicker":"Возможности","features.hero.title":"Что умеет StayMate",
+  "features.hero.kicker":"Возможности","features.hero.title":"Что умеет StayAI",
   "features.hero.desc":"Полный перечень того, что агент делает самостоятельно — от первого сообщения гостя до подтверждённой брони.",
-  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayMate говорит от лица вашего объекта",
+  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayAI говорит от лица вашего объекта",
   "features.photo.desc":"Имя, тон общения и фото можно настроить под конкретные апартаменты — гость не почувствует разницы с обычной перепиской с администратором.",
 
   "how.hero.kicker":"Сценарий","how.hero.title":"Как это работает",
-  "how.hero.desc":"Один диалог гостя проходит четыре шага — StayMate не передаёт его дальше, пока всё не подтверждено.",
+  "how.hero.desc":"Один диалог гостя проходит четыре шага — StayAI не передаёт его дальше, пока всё не подтверждено.",
   "how.extra.kicker":"Нестандартные ситуации","how.extra.title":"Когда подключается человек",
-  "how.extra.desc":"StayMate хорошо знает границы своей компетенции и не пытается решить всё сам.",
+  "how.extra.desc":"StayAI хорошо знает границы своей компетенции и не пытается решить всё сам.",
   "how.card1.title":"Сложный или спорный запрос","how.card1.desc":"Жалоба, конфликт, нетипичная просьба — диалог сразу передаётся менеджеру вместе с историей переписки.",
-  "how.card2.title":"Нет свободных номеров","how.card2.desc":"StayMate предлагает ближайшие свободные даты или записывает гостя в лист ожидания, если это настроено.",
+  "how.card2.title":"Нет свободных номеров","how.card2.desc":"StayAI предлагает ближайшие свободные даты или записывает гостя в лист ожидания, если это настроено.",
 
   "pricing.hero.kicker":"Тарифы","pricing.hero.title":"Одна подписка на объект",
   "pricing.hero.desc":"Без скрытых процентов с бронирований. Оплата ежемесячная, отменить можно в любой момент.",
@@ -689,7 +689,7 @@ ru: {
   "plan.auto.note":"Автобронирование и проверка номеров в реальном времени раскрываются в полной мере, когда ваш объект подключён к PMS или Channel Manager.",
 
   "checkout.hero.kicker":"Оформление","checkout.hero.title":"Выбрать тариф",
-  "checkout.hero.desc":"Заполните данные, чтобы активировать подписку StayMate. Это демонстрационная форма оплаты.",
+  "checkout.hero.desc":"Заполните данные, чтобы активировать подписку StayAI. Это демонстрационная форма оплаты.",
   "pay.head.title":"Оформление подписки",
   "pay.email.label":"Email для доступа","pay.card.label":"Номер карты","pay.exp.label":"Срок действия","pay.cvc.label":"CVC",
   "pay.submit.default":"Оплатить подписку","pay.submit.loading":"Обрабатываем оплату…",
@@ -697,11 +697,11 @@ ru: {
   "pay.success.title":"Подписка активна","pay.success.desc":"Кабинет и инструкция по подключению уже доступны ниже.",
   "pay.success.cta":"Перейти к инструкции",
 
-  "connect.hero.kicker":"Начало работы","connect.hero.title":"Подключить StayMate к вашему профилю",
+  "connect.hero.kicker":"Начало работы","connect.hero.title":"Подключить StayAI к вашему профилю",
   "connect.hero.desc":"Три шага от оплаты до первого диалога с гостем.",
   "connect.step1.title":"Выберите тариф","connect.step1.desc":"Подпишитесь на план, соответствующий размеру вашего объекта.",
   "connect.step2.title":"Получите ключ доступа","connect.step2.desc":"Сразу после оплаты откроется личный ключ и пошаговая инструкция.",
-  "connect.step3.title":"Подключите каналы и правила","connect.step3.desc":"Добавьте мессенджеры, PMS и условия проживания — и запускайте StayMate на реальных гостях.",
+  "connect.step3.title":"Подключите каналы и правила","connect.step3.desc":"Добавьте мессенджеры, PMS и условия проживания — и запускайте StayAI на реальных гостях.",
   "connect.cta.primary":"Выбрать тариф","connect.cta.secondary":"Уже оплатили? Перейти к инструкции",
 
   "instr.hero.kicker":"Подключение","instr.hero.title":"Инструкция по настройке",
@@ -710,8 +710,8 @@ ru: {
   "key.copy":"Скопировать",
   "step.s1.title":"Получите ключ доступа","step.s1.desc":"Ключ уже создан для вашего кабинета — он показан выше. Он понадобится на следующем шаге.",
   "step.s2.title":"Подключите канал общения","step.s2.desc":"В личном кабинете откройте раздел «Каналы» → выберите WhatsApp, Telegram или чат для сайта → вставьте ключ доступа.",
-  "step.s3.title":"Свяжите систему бронирования","step.s3.desc":"Укажите вашу PMS (Cloudbeds, Beds24 и т.п.) или загрузите таблицу номеров вручную — StayMate будет сверяться с ней.",
-  "step.s4.title":"Загрузите правила объекта","step.s4.desc":"Заезд/выезд, депозит, животные, парковка — короткий текстовый файл с условиями, которых StayMate будет придерживаться.",
+  "step.s3.title":"Свяжите систему бронирования","step.s3.desc":"Укажите вашу PMS (Cloudbeds, Beds24 и т.п.) или загрузите таблицу номеров вручную — StayAI будет сверяться с ней.",
+  "step.s4.title":"Загрузите правила объекта","step.s4.desc":"Заезд/выезд, депозит, животные, парковка — короткий текстовый файл с условиями, которых StayAI будет придерживаться.",
   "step.s5.title":"Протестируйте и запустите","step.s5.desc":"Напишите тестовое сообщение от лица гостя, проверьте ответ и наличие — и включите канал для реальных гостей.",
 
   "contacts.hero.kicker":"Контакты","contacts.hero.title":"Остались вопросы?",
@@ -727,7 +727,7 @@ en: {
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected",
   "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
   "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
-  "footer.rights":"© 2026 StayMate",
+  "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Message sent — we'll reply within a day",
   "toast.paySuccess":"Payment successful","toast.keyCopied":"Key copied",
   "config.notSetup":"Supabase hasn't been configured by the site owner yet. Open supabase-config.js and paste your project keys.",
@@ -738,7 +738,7 @@ en: {
   "login.noAccount":"Don't have an account yet?","login.toRegister":"Sign up",
   "login.error.generic":"Couldn't log in. Check your email and password (or confirm your email after signing up).",
 
-  "register.hero.kicker":"Sign up","register.hero.title":"Create a StayMate account",
+  "register.hero.kicker":"Sign up","register.hero.title":"Create a StayAI account",
   "register.hero.desc":"You'll need this to subscribe and keep access to your dashboard from any device. First 3 days are free, no card required.",
   "register.name.label":"Name","register.email.label":"Email","register.password.label":"Password","register.submit":"Sign up",
   "register.haveAccount":"Already have an account?","register.toLogin":"Log in",
@@ -752,10 +752,10 @@ en: {
   "account.plan.none":"No active subscription","account.status.active":"Active","account.status.inactive":"Inactive","account.status.trial":"Trial — {days} day(s) left","account.status.trialEnded":"Trial ended",
   "account.cta.pricing":"Choose a plan","account.cta.instructions":"Go to setup guide","account.logout":"Log out",
 
-  "checkout.authgate.title":"Log in first","checkout.authgate.desc":"Your subscription is tied to your StayMate account, so it stays available on any device.",
+  "checkout.authgate.title":"Log in first","checkout.authgate.desc":"Your subscription is tied to your StayAI account, so it stays available on any device.",
 
-  "home.eyebrow":"StayMate is answering 214 guests right now",
-  "home.h1pre":"Guests message at night.","home.h1em":"StayMate replies.",
+  "home.eyebrow":"StayAI is answering 214 guests right now",
+  "home.h1pre":"Guests message at night.","home.h1em":"StayAI replies.",
   "home.sub":"An AI front-desk agent connects to your channels, checks room availability, takes payment and books the stay — while you sleep or handle a check-in.",
   "home.cta1":"Choose a plan","home.cta2":"How it works",
   "home.proof1val":"24/7","home.proof1label":"no days off, no lunch break",
@@ -770,7 +770,7 @@ en: {
   "chat.g3":"Paid ✅",
   "chat.a3tag":"booking created","chat.a3":"Thank you! Studio #3 is booked for you. Check-in instructions arrive the day before arrival.",
   "home.process.kicker":"Scenario","home.process.title":"One conversation, four actions",
-  "home.process.desc":"StayMate handles the whole guest journey itself: from the first message to a confirmed booking, no hand-off to a manager.",
+  "home.process.desc":"StayAI handles the whole guest journey itself: from the first message to a confirmed booking, no hand-off to a manager.",
   "home.process.more":"More about the scenario →",
   "process.step1.tag":"01 · message","process.step1.title":"Replies to the guest",
   "process.step1.desc":"Understands the question in any language, answers per your house rules — check-in, deposit, parking, pets.",
@@ -780,28 +780,28 @@ en: {
   "process.step3.desc":"Issues a payment link through a secure gateway and confirms once funds arrive.",
   "process.step4.tag":"04 · booking","process.step4.title":"Creates the booking",
   "process.step4.desc":"Records the booking in your system and sends the guest a confirmation with arrival details.",
-  "home.feat.kicker":"Features","home.feat.title":"What StayMate can do",
+  "home.feat.kicker":"Features","home.feat.title":"What StayAI can do",
   "home.feat.desc":"Not just a scripted chatbot — an agent that understands context and knows when to hand off to a human.",
   "home.feat.more":"All features →",
   "cap.card1.title":"Works in your channels","cap.card1.desc":"WhatsApp, Telegram, Instagram and your website chat — guests write wherever suits them.",
   "cap.card2.title":"Connects to your PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator and others — availability stays in sync in real time.",
-  "cap.card3.title":"Knows your house rules","cap.card3.desc":"Upload your policies once — StayMate will answer strictly by them.",
+  "cap.card3.title":"Knows your house rules","cap.card3.desc":"Upload your policies once — StayAI will answer strictly by them.",
   "cap.card4.title":"Escalates tricky cases","cap.card4.desc":"When something's non-standard — a complaint, a dispute, force majeure — the chat goes to a manager.",
   "cap.card5.title":"Takes payment","cap.card5.desc":"Deposit, full payment or prepayment — guests pay via a secure link and you see the status.",
   "cap.card6.title":"Grows with your property","cap.card6.desc":"One apartment or a network of thirty — logic is configured per property.",
-  "home.cta.title":"Ready to connect StayMate?","home.cta.desc":"Pick a plan and activate your subscription in minutes.","home.cta.button":"Choose a plan",
+  "home.cta.title":"Ready to connect StayAI?","home.cta.desc":"Pick a plan and activate your subscription in minutes.","home.cta.button":"Choose a plan",
 
-  "features.hero.kicker":"Features","features.hero.title":"What StayMate can do",
+  "features.hero.kicker":"Features","features.hero.title":"What StayAI can do",
   "features.hero.desc":"The full list of what the agent handles on its own — from a guest's first message to a confirmed booking.",
-  "features.photo.kicker":"Your brand, not ours","features.photo.title":"StayMate speaks as your property",
+  "features.photo.kicker":"Your brand, not ours","features.photo.title":"StayAI speaks as your property",
   "features.photo.desc":"Name, tone of voice and photos can be tailored to your specific apartments — guests won't feel a difference from chatting with a regular front-desk manager.",
 
   "how.hero.kicker":"Scenario","how.hero.title":"How it works",
-  "how.hero.desc":"A single guest conversation goes through four steps — StayMate doesn't hand it off until everything is confirmed.",
+  "how.hero.desc":"A single guest conversation goes through four steps — StayAI doesn't hand it off until everything is confirmed.",
   "how.extra.kicker":"Edge cases","how.extra.title":"When a human steps in",
-  "how.extra.desc":"StayMate knows the limits of its own judgement and doesn't try to resolve everything itself.",
+  "how.extra.desc":"StayAI knows the limits of its own judgement and doesn't try to resolve everything itself.",
   "how.card1.title":"A complex or disputed request","how.card1.desc":"A complaint, a conflict, an unusual ask — the chat is handed to a manager immediately, with the full history.",
-  "how.card2.title":"No rooms available","how.card2.desc":"StayMate offers the nearest free dates or adds the guest to a waitlist, if that's configured.",
+  "how.card2.title":"No rooms available","how.card2.desc":"StayAI offers the nearest free dates or adds the guest to a waitlist, if that's configured.",
 
   "pricing.hero.kicker":"Pricing","pricing.hero.title":"One subscription per property",
   "pricing.hero.desc":"No hidden booking commissions. Billed monthly, cancel anytime.",
@@ -819,7 +819,7 @@ en: {
   "plan.auto.note":"Real-time availability checks and auto-booking unfold to their full extent once your property is connected to a PMS or Channel Manager.",
 
   "checkout.hero.kicker":"Checkout","checkout.hero.title":"Choose a plan",
-  "checkout.hero.desc":"Fill in your details to activate a StayMate subscription. This is a demo payment form.",
+  "checkout.hero.desc":"Fill in your details to activate a StayAI subscription. This is a demo payment form.",
   "pay.head.title":"Subscribe",
   "pay.email.label":"Email for access","pay.card.label":"Card number","pay.exp.label":"Expiry","pay.cvc.label":"CVC",
   "pay.submit.default":"Pay for subscription","pay.submit.loading":"Processing payment…",
@@ -827,11 +827,11 @@ en: {
   "pay.success.title":"Subscription active","pay.success.desc":"Your dashboard and setup guide are now available below.",
   "pay.success.cta":"Go to setup guide",
 
-  "connect.hero.kicker":"Getting started","connect.hero.title":"Connect StayMate to your profile",
+  "connect.hero.kicker":"Getting started","connect.hero.title":"Connect StayAI to your profile",
   "connect.hero.desc":"Three steps from payment to your first guest conversation.",
   "connect.step1.title":"Choose a plan","connect.step1.desc":"Subscribe to the plan that matches the size of your property.",
   "connect.step2.title":"Get your access key","connect.step2.desc":"Right after payment, your personal key and a step-by-step guide unlock.",
-  "connect.step3.title":"Connect channels and rules","connect.step3.desc":"Add messengers, your PMS and house rules — then launch StayMate on real guests.",
+  "connect.step3.title":"Connect channels and rules","connect.step3.desc":"Add messengers, your PMS and house rules — then launch StayAI on real guests.",
   "connect.cta.primary":"Choose a plan","connect.cta.secondary":"Already paid? Go to the setup guide",
 
   "instr.hero.kicker":"Setup","instr.hero.title":"Setup guide",
@@ -840,8 +840,8 @@ en: {
   "key.copy":"Copy",
   "step.s1.title":"Get your access key","step.s1.desc":"Your key is already created for your account — shown above. You'll need it for the next step.",
   "step.s2.title":"Connect a messaging channel","step.s2.desc":"In your dashboard, open “Channels” → pick WhatsApp, Telegram or the website chat → paste your access key.",
-  "step.s3.title":"Link your booking system","step.s3.desc":"Point it to your PMS (Cloudbeds, Beds24, etc.) or upload a room sheet manually — StayMate will check against it.",
-  "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayMate will follow.",
+  "step.s3.title":"Link your booking system","step.s3.desc":"Point it to your PMS (Cloudbeds, Beds24, etc.) or upload a room sheet manually — StayAI will check against it.",
+  "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayAI will follow.",
   "step.s5.title":"Test and launch","step.s5.desc":"Send a test message as a guest, check the reply and availability — then switch the channel on for real guests.",
 
   "contacts.hero.kicker":"Contact","contacts.hero.title":"Still have questions?",
@@ -887,7 +887,7 @@ function getLang(){
 
 </script>
 <script>
-/* ============ StayMate — app.js (shared by every page) ============ */
+/* ============ StayAI — app.js (shared by every page) ============ */
 
 /* ---------- theme: dark by default, manual override remembered ---------- */
 function getThemeMode(){
@@ -1148,7 +1148,7 @@ function initMisc(){
       /* configured correctly: force-hide (in case markup/CSS ever defaults to visible),
          and log the diag quietly for devtools users */
       notice.style.display = 'none';
-      console.log('StayMate Supabase diag:', diag);
+      console.log('StayAI Supabase diag:', diag);
     }
   }
 }

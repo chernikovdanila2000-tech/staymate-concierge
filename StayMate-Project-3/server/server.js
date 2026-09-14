@@ -1,5 +1,5 @@
 /* ============================================================
-   StayMate — сервер ШІ-адміністратора (мультитенантна, мультиканальна версія)
+   StayAI — сервер ШІ-адміністратора (мультитенантна, мультиканальна версія)
 
    Один сервер обслуговує БАГАТО готелів одночасно, кожен — з кількома
    каналами зв'язку (Telegram, Viber, віджет на сайті готелю; WhatsApp
@@ -498,5 +498,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`StayMate concierge server running on http://localhost:${PORT}`);
+  console.log(`StayAI concierge server running on http://localhost:${PORT}`);
 });

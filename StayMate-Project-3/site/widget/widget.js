@@ -1,9 +1,9 @@
 /* ============================================================
-   StayMate — вбудований чат-віджет для сайту готелю
+   StayAI — вбудований чат-віджет для сайту готелю
    Підключення на сайті готелю (Фаза 3.2 плану, канал "сайт готелю"):
 
    <script
-     src="https://staymat.netlify.app/widget/widget.js"
+     src="https://stayai.online/widget/widget.js"
      data-property="ваш-property-id"
      data-api="https://staymate-concierge-production.up.railway.app"
      data-title="Готель «Назва»"
@@ -24,7 +24,7 @@
   var accent = scriptTag.getAttribute('data-accent') || '#2f5d50';
 
   if (!propertyId || !apiBase) {
-    console.error('[StayMate widget] Не вказано data-property або data-api у тезі <script>.');
+    console.error('[StayAI widget] Не вказано data-property або data-api у тезі <script>.');
     return;
   }
 

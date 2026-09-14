@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StayMate — кабінет готелю</title>
+<title>StayAI — кабінет готелю</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ============ StayMate — токени й основа спільні з рештою сайту ============ */
+/* ============ StayAI — токени й основа спільні з рештою сайту ============ */
 :root{
   --radius-s:6px; --radius-m:14px; --radius-l:28px; --maxw:1180px; --maxw-cab:820px;
 }
@@ -178,7 +178,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
 
 <header>
   <nav class="wrap">
-    <a href="../index.html" class="logo"><span class="logo-mark"></span>StayMate</a>
+    <a href="../index.html" class="logo"><span class="logo-mark"></span>StayAI</a>
     <div class="nav-links">
       <a href="../index.html">Головна</a>
       <a href="../features.html">Можливості</a>
@@ -393,7 +393,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="channel-name">WhatsApp</span>
           <span class="status-pill off">Очікує верифікації Meta</span>
         </div>
-        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayMate. Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
+        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayAI. Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
         <label for="waPhoneId">Phone Number ID</label>
         <input id="waPhoneId" type="text" placeholder="1029384756...">
         <label for="waToken">Access Token</label>
@@ -427,8 +427,8 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
 
 <footer>
   <div class="wrap footer-row">
-    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayMate</div>
-    <span class="footer-mono">© 2026 StayMate</span>
+    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayAI</div>
+    <span class="footer-mono">© 2026 StayAI</span>
   </div>
 </footer>
 
@@ -457,7 +457,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // сюди реєструється webhook месенджерів і сюди звертається кабінет за API.
   const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
   // Домен, де лежить widget.js (маркетинговий сайт на Netlify).
-  const SITE_ORIGIN = 'https://staymat.netlify.app';
+  const SITE_ORIGIN = 'https://stayai.online';
 
   const PLAN_LABELS = { start: 'Старт (€100/міс)', pro: 'Профі (€200/міс)', network: 'Мережа (€300/міс)' };
 
@@ -539,7 +539,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       <div class="acct-row"><span class="acct-label">Дата реєстрації</span><span class="acct-value">${formatDate(currentUser.created_at)}</span></div>
       <div class="acct-row"><span class="acct-label">Підписка</span><span class="acct-value">${subscriptionStatusText(currentProperty)}</span></div>
       <div class="acct-pw">
-        <p class="acct-pw-note">Поточний пароль не можна показати — жодна безпечна система його не зберігає у відкритому вигляді, навіть StayMate. Можна тільки встановити новий.</p>
+        <p class="acct-pw-note">Поточний пароль не можна показати — жодна безпечна система його не зберігає у відкритому вигляді, навіть StayAI. Можна тільки встановити новий.</p>
         <div class="acct-pw-row">
           <input type="password" id="${pwId}" placeholder="Новий пароль">
           <button type="button" class="acct-pw-toggle" data-target="${pwId}" aria-label="Показати введений пароль">${EYE_SVG}</button>

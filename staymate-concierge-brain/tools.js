@@ -1,5 +1,5 @@
 /* ============================================================
-   StayMate — інструменти (tools) для ШІ-адміністратора
+   StayAI — інструменти (tools) для ШІ-адміністратора
    Мультитенантна версія: createTools(propertyId) повертає набір
    інструментів, прив'язаних до конкретного готелю. Кожен виклик
    check_availability / create_booking / escalate_to_human працює
@@ -18,7 +18,7 @@ const supabase = createClient(
 
 const WFP_MERCHANT_ACCOUNT = process.env.WAYFORPAY_MERCHANT_ACCOUNT || 'test_merch_n1';
 const WFP_MERCHANT_SECRET = process.env.WAYFORPAY_MERCHANT_SECRET || 'flk3409refn54t54t*FNJRET';
-const WFP_DOMAIN = process.env.WAYFORPAY_DOMAIN || 'staymat.netlify.app';
+const WFP_DOMAIN = process.env.WAYFORPAY_DOMAIN || 'stayai.online';
 const WFP_API_URL = 'https://api.wayforpay.com/api';
 
 // Публічний домен САМОГО СЕРВЕРА (Railway) — сюди WayForPay надсилає webhook
@@ -59,7 +59,7 @@ async function createWayForPayInvoice({ orderReference, productName, price, serv
     apiVersion: 1,
     language: 'UA',
     serviceUrl: serviceUrl || `${API_BASE_URL}/webhook/wayforpay`,
-    returnUrl: process.env.CABINET_URL || 'https://staymat.netlify.app/cabinet/',
+    returnUrl: process.env.CABINET_URL || 'https://stayai.online/cabinet/',
     orderReference,
     orderDate,
     amount: price,
@@ -84,10 +84,10 @@ async function createWayForPayInvoice({ orderReference, productName, price, serv
 }
 
 /**
- * Тарифи підписки StayMate — ціна в EUR, як заявлено на сайті. Рахунок
+ * Тарифи підписки StayAI — ціна в EUR, як заявлено на сайті. Рахунок
  * виставляється одразу в EUR (WayForPay підтримує мультивалютність) —
  * конвертацію в гривні на картці клієнта робить сам банк-емітент за своїм
- * курсом, StayMate курс валют не рахує і не відстежує.
+ * курсом, StayAI курс валют не рахує і не відстежує.
  */
 const SUBSCRIPTION_PLANS = {
   start: { label: 'Старт', priceEur: 100 },
@@ -103,7 +103,7 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName }) {
 
   const invoiceUrl = await createWayForPayInvoice({
     orderReference: orderId,
-    productName: `StayMate — тариф «${planInfo.label}» ${propertyName || ''}`.trim(),
+    productName: `StayAI — тариф «${planInfo.label}» ${propertyName || ''}`.trim(),
     price: planInfo.priceEur,
     currency: 'EUR',
     serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
