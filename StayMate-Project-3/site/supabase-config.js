@@ -45,8 +45,11 @@
    стару версію коду.
 ============================================================ */
 
-const SUPABASE_URL_RAW = "PASTE_YOUR_SUPABASE_URL_HERE";
-const SUPABASE_ANON_KEY_RAW = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+// Той самий проєкт і публічний (publishable/anon) ключ, що вже вшиті в
+// cabinet/index.html — це не секрет: доступ до даних обмежує Row Level
+// Security в Supabase, а не приховування цього ключа.
+const SUPABASE_URL_RAW = "https://nyknlyufbwjodbpyehtv.supabase.co";
+const SUPABASE_ANON_KEY_RAW = "sb_publishable_JVLVW1ckRPOy2sLgYraMng_KPDMANV3";
 
 /* --- захист від типових помилок копіювання, нічого тут міняти не треба --- */
 function cleanSupabaseUrl(url) {

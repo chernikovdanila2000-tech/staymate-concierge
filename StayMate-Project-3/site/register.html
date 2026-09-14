@@ -167,7 +167,7 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 .account-row:last-child{border-bottom:none;}
 .account-row .a-label{font-size:12.5px; color:var(--muted);}
 .account-row .a-value{font-size:15.5px; font-weight:600;}
-.nav-account-link{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap;}
+.nav-account-link{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle;}
 .nav-account-link:hover{color:var(--ink);}
 
 /* ---------- hero (home) ---------- */
@@ -979,8 +979,9 @@ async function initAccountNav(){
   const session = await authGetSession();
   links.forEach(a=>{
     if(session){
-      a.textContent = session.user.email.split('@')[0];
-      a.setAttribute('href','account.html');
+      a.textContent = session.user.email;
+      a.setAttribute('href','cabinet/');
+      a.title = 'Увійшли як ' + session.user.email;
     } else {
       a.textContent = t('nav.login', getLang());
       a.setAttribute('href','cabinet/');

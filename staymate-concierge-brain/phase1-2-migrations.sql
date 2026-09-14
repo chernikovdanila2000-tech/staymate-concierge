@@ -28,10 +28,9 @@ create table if not exists subscription_orders (
   created_at timestamptz default now()
 );
 
--- Фактична сума в гривнях, порахована за курсом НБУ на момент виставлення
--- рахунку (щоб потім було видно, скільки саме гривень відповідало заявленим
--- євро на конкретну дату — курс щодня змінюється).
-alter table subscription_orders add column if not exists amount_uah numeric;
+-- Сума рахунку в EUR (WayForPay виставляє рахунок одразу в EUR — конвертацію
+-- в гривні на картці клієнта робить банк-емітент, StayMate курс не рахує).
+alter table subscription_orders add column if not exists amount_eur numeric;
 
 alter table subscription_orders enable row level security;
 

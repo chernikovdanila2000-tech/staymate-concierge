@@ -4,297 +4,197 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StayMate — кабінет готелю</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --ink: #1c2521;
-    --paper: #f6f4ef;
-    --panel: #ffffff;
-    --line: #dcd7cb;
-    --accent: #2f5d50;
-    --accent-soft: #e4ece8;
-    --gold: #b8863d;
-    --danger: #a3352b;
-    --muted: #6b6a63;
-    --radius: 4px;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--paper);
-    color: var(--ink);
-    font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-    line-height: 1.5;
-  }
-  .ui, input, select, textarea, button {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  }
-  header {
-    border-bottom: 1px solid var(--line);
-    padding: 22px 32px;
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-  }
-  header .brand {
-    font-size: 20px;
-    letter-spacing: 0.01em;
-  }
-  header .brand b { color: var(--accent); }
-  header .who {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    color: var(--muted);
-  }
-  header .who button {
-    margin-left: 12px;
-    background: none;
-    border: none;
-    color: var(--accent);
-    cursor: pointer;
-    font-size: 13px;
-    text-decoration: underline;
-    padding: 0;
-  }
-  main {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 48px 24px 96px;
-  }
-  h1 {
-    font-size: 28px;
-    font-weight: 500;
-    margin: 0 0 8px;
-  }
-  .lede {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: var(--muted);
-    font-size: 15px;
-    margin: 0 0 36px;
-    max-width: 52ch;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 28px;
-    margin-bottom: 24px;
-  }
-  .card h2 {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 15px;
-    font-weight: 600;
-    text-transform: none;
-    margin: 0 0 4px;
-  }
-  .card .hint {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    color: var(--muted);
-    margin: 0 0 20px;
-    line-height: 1.55;
-  }
-  label {
-    display: block;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    margin-top: 16px;
-  }
-  label:first-of-type { margin-top: 0; }
-  input, select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 14px;
-    background: #fff;
-    color: var(--ink);
-  }
-  input:focus, select:focus, button:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 1px;
-  }
-  input.field-error {
-    border-color: var(--danger);
-    background: #fdf1ef;
-  }
-  button {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    padding: 10px 18px;
-    border-radius: var(--radius);
-    border: 1px solid var(--accent);
-    background: var(--accent);
-    color: #fff;
-    cursor: pointer;
-  }
-  button.secondary {
-    background: transparent;
-    color: var(--accent);
-  }
-  button.danger {
-    background: transparent;
-    border-color: var(--danger);
-    color: var(--danger);
-  }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .row { display: flex; gap: 12px; }
-  .row > * { flex: 1; }
-  .actions { margin-top: 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .msg {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    margin-top: 12px;
-  }
-  .msg.error { color: var(--danger); }
-  .msg.ok { color: var(--accent); }
-  table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 12px;
-    color: var(--muted);
-    text-align: left;
-    font-weight: 600;
-    padding: 8px 8px 8px 0;
-    border-bottom: 1px solid var(--line);
-  }
-  td {
-    padding: 6px 8px 6px 0;
-    border-bottom: 1px solid var(--line);
-    vertical-align: middle;
-  }
-  td input { padding: 6px 8px; font-size: 13px; }
-  td.num-col { width: 78px; }
-  td.del-col { width: 34px; }
-  td.del-col button {
-    background: none;
-    border: none;
-    color: var(--danger);
-    font-size: 18px;
-    padding: 0 4px;
-    line-height: 1;
-  }
-  .status-pill {
-    display: inline-block;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .status-pill.off { background: #f1ece2; color: var(--gold); }
-  .status-pill.warn { background: #f7e6e2; color: var(--danger); }
-  .hidden { display: none !important; }
-  .center-screen {
-    min-height: 70vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .auth-box { width: 100%; max-width: 380px; }
-  .switcher {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    color: var(--muted);
-    text-align: center;
-    margin-top: 18px;
-  }
-  .switcher button, .link-btn {
-    background: none; border: none; color: var(--accent);
-    text-decoration: underline; cursor: pointer; padding: 0; font-size: 13px; font-weight: 600;
-  }
-  .forgot-row { text-align: right; margin-top: 8px; }
-  .forgot-row button { font-weight: 500; font-size: 12.5px; }
-  code {
-    background: var(--accent-soft);
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 13px;
-  }
+/* ============ StayMate — токени й основа спільні з рештою сайту ============ */
+:root{
+  --radius-s:6px; --radius-m:14px; --radius-l:28px; --maxw:1180px; --maxw-cab:820px;
+}
+html[data-theme="light"]{
+  --bg:#F6F6F3; --surface:#FFFFFF;
+  --ink:#17181B; --ink-soft:#4B4D53; --muted:#84868D;
+  --line:#E4E4E0; --line-strong:#CFD0CB;
+  --accent:#33513F; --accent-text:#33513F; --accent-ink:#EAF0EC; --accent-soft:#E7ECE8;
+  --warn:#8C4A34; --warn-soft:#F3E7E2;
+  --gold:#8A6423; --gold-soft:#F3EAD9;
+  --input-bg:#F6F6F3;
+}
+html[data-theme="dark"]{
+  --bg:#111214; --surface:#18191C;
+  --ink:#F2F2F0; --ink-soft:#C2C3C8; --muted:#8A8C93;
+  --line:#28292D; --line-strong:#37383D;
+  --accent:#7CE0A8; --accent-text:#7CE0A8; --accent-ink:#0F1A14; --accent-soft:#1B2621;
+  --warn:#E29372; --warn-soft:#2C1E1A;
+  --gold:#D9B876; --gold-soft:#2A2418;
+  --input-bg:#1D1E22;
+}
 
-  /* ---------- канали зв'язку ---------- */
-  .channel-card {
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 18px;
-    margin-bottom: 14px;
-  }
-  .channel-card:last-child { margin-bottom: 0; }
-  .channel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .channel-name {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 14.5px;
-    font-weight: 600;
-  }
-  .channel-card .hint { margin: 8px 0 14px; }
-  .key-box {
-    margin-top: 6px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 12px 14px;
-    font-size: 12.5px;
-    color: var(--ink);
-    flex-wrap: wrap;
-    word-break: break-all;
-  }
-  .key-box code { background: none; padding: 0; flex: 1; min-width: 200px; }
-  .copy-btn {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 6px 12px;
-    font-size: 12px;
-    color: var(--ink);
-    flex-shrink: 0;
-  }
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
+  font-size:16px; line-height:1.5;
+}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif; font-weight:600; letter-spacing:-0.02em; margin:0;}
+.mono{font-family:'IBM Plex Mono',monospace; letter-spacing:0.02em;}
+p{margin:0;}
+a{color:inherit; text-decoration:none;}
+button{font-family:inherit; cursor:pointer;}
+::selection{background:var(--accent); color:var(--accent-ink);}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 32px;}
+.wrap-cab{max-width:var(--maxw-cab); margin:0 auto; padding:0 32px;}
 
-  /* ---------- тарифи / оплата підписки ---------- */
-  .plan-row { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
-  .plan-opt {
-    flex: 1;
-    min-width: 130px;
-    border: 1.5px solid var(--line);
-    border-radius: var(--radius);
-    padding: 14px;
-    text-align: center;
-    cursor: pointer;
-  }
-  .plan-opt b { display: block; font-size: 15px; margin-bottom: 4px; }
-  .plan-opt span { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 12.5px; color: var(--muted); }
-  .plan-opt.selected { border-color: var(--accent); background: var(--accent-soft); }
+/* ---------- header / nav (те саме, що на решті сайту) ---------- */
+header{position:sticky; top:0; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+nav.wrap{display:flex; align-items:center; justify-content:space-between; height:76px; gap:20px;}
+.logo{display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; flex-shrink:0;}
+.logo-mark{width:26px; height:26px; border-radius:7px; background:var(--ink); position:relative; flex-shrink:0;}
+.logo-mark::after{content:""; position:absolute; left:7px; top:7px; width:8px; height:8px; border-radius:50%; background:var(--accent);}
+.nav-links{display:flex; gap:28px; align-items:center;}
+.nav-links a{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap;}
+.nav-links a:hover{color:var(--ink);}
+.nav-tools{display:flex; align-items:center; gap:12px; margin-left:6px;}
+.theme-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; transition:border-color .2s ease; flex-shrink:0;}
+.theme-btn:hover{border-color:var(--ink);}
+.theme-btn svg{width:16px; height:16px;}
+.icon-sun{display:none;}
+html[data-theme="dark"] .icon-moon{display:none;}
+html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
+.account-status{font-size:13.5px; color:var(--ink-soft); display:flex; align-items:center; gap:10px; white-space:nowrap;}
+.account-status .who-email{max-width:180px; overflow:hidden; text-overflow:ellipsis;}
+.account-status button{background:none; border:none; color:var(--accent-text); font-size:13px; text-decoration:underline; padding:0;}
+.burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-shrink:0;}
+.burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); position:relative;}
+.mobile-panel{display:none; position:fixed; inset:76px 0 0 0; background:var(--bg); z-index:55; padding:24px 20px; overflow-y:auto;}
+.mobile-panel.open{display:block;}
+.mobile-panel a{display:block; padding:16px 4px; font-size:16px; border-bottom:1px solid var(--line); color:var(--ink-soft);}
+@media (max-width:920px){
+  .nav-links{display:none;}
+  .burger{display:flex;}
+  .wrap{padding:0 20px;}
+  .wrap-cab{padding:0 20px;}
+}
 
-  .gate-wrap { max-width: 560px; margin: 0 auto; }
+/* ---------- buttons / inputs (те саме, що на решті сайту) ---------- */
+.btn-primary{background:var(--ink); color:var(--bg); padding:13px 22px; border-radius:100px; font-size:14.5px; font-weight:500; border:none; transition:transform .25s cubic-bezier(.16,.8,.24,1), opacity .25s ease; display:inline-flex; align-items:center; gap:8px;}
+html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accent-ink);}
+.btn-primary:hover{opacity:.88; transform:translateY(-1px);}
+.btn-primary:disabled{opacity:.5; cursor:default; transform:none;}
+.btn-secondary{background:transparent; color:var(--ink); padding:12px 20px; border-radius:100px; font-size:14.5px; font-weight:500; border:1px solid var(--line-strong); transition:border-color .25s ease, background .25s ease; display:inline-flex; align-items:center; gap:8px;}
+.btn-secondary:hover{border-color:var(--ink); background:var(--surface);}
+.btn-danger{background:transparent; color:var(--warn); padding:12px 20px; border-radius:100px; font-size:14.5px; font-weight:500; border:1px solid var(--warn);}
+button:disabled{opacity:.5; cursor:default;}
+
+label{display:block; font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:7px; margin-top:16px;}
+label:first-of-type{margin-top:0;}
+input, select{width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'Inter',sans-serif; background:var(--input-bg); color:var(--ink); transition:border-color .2s ease;}
+input:focus, select:focus, button:focus-visible{outline:none; border-color:var(--accent);}
+button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+input.field-error{border-color:var(--warn); background:color-mix(in srgb, var(--warn) 8%, var(--input-bg));}
+
+/* ---------- layout ---------- */
+main{padding:48px 0 96px;}
+h1.page-title{font-size:clamp(26px,4vw,32px); line-height:1.15; margin-bottom:8px;}
+.lede{color:var(--muted); font-size:15px; margin:0 0 32px; max-width:56ch; line-height:1.6;}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:28px; margin-bottom:20px;}
+.card h2{font-size:16px; font-weight:600; margin:0 0 4px;}
+.card .hint{font-size:13.5px; color:var(--muted); margin:0 0 20px; line-height:1.55;}
+.row{display:flex; gap:12px;}
+.row > *{flex:1;}
+.actions{margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+.msg{font-size:13px; margin-top:12px;}
+.msg.error{color:var(--warn);}
+.msg.ok{color:var(--accent-text);}
+.center-screen{min-height:60vh; display:flex; align-items:center; justify-content:center;}
+.hidden{display:none !important;}
+
+/* ---------- auth ---------- */
+.auth-card{width:100%; max-width:400px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:36px;}
+.auth-error{display:none; background:color-mix(in srgb, var(--warn) 14%, transparent); border:1px solid var(--warn); color:var(--warn); font-size:13px; padding:10px 14px; border-radius:var(--radius-s); margin-bottom:18px; line-height:1.5;}
+.forgot-row{text-align:right; margin-top:8px;}
+.forgot-row button{background:none; border:none; color:var(--muted); font-size:12.5px; padding:0; text-decoration:underline;}
+.switcher{font-size:13px; color:var(--muted); text-align:center; margin-top:22px;}
+.switcher button{background:none; border:none; color:var(--accent-text); text-decoration:underline; cursor:pointer; padding:0; font-size:13px; font-weight:600;}
+
+/* ---------- table (номери) ---------- */
+table{width:100%; border-collapse:collapse; margin-top:6px;}
+th{font-size:12px; color:var(--muted); text-align:left; font-weight:600; padding:8px 8px 8px 0; border-bottom:1px solid var(--line);}
+td{padding:6px 8px 6px 0; border-bottom:1px solid var(--line); vertical-align:middle;}
+td input{padding:8px 10px; font-size:13px;}
+td.num-col{width:80px;}
+td.del-col{width:32px;}
+td.del-col button{background:none; border:none; color:var(--warn); font-size:18px; padding:0 4px; line-height:1;}
+
+/* ---------- pills / status ---------- */
+.status-pill{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:500; padding:4px 11px; border-radius:100px; background:var(--accent-soft); color:var(--accent-text);}
+.status-pill.off{background:var(--gold-soft); color:var(--gold);}
+
+/* ---------- канали зв'язку ---------- */
+.channel-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:20px; margin-bottom:14px;}
+.channel-card:last-child{margin-bottom:0;}
+.channel-head{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+.channel-name{font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600;}
+.channel-card .hint{margin:8px 0 16px;}
+.key-box{margin-top:6px; display:flex; align-items:flex-start; gap:10px; background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-s); padding:12px 14px; font-size:12.5px; color:var(--ink); flex-wrap:wrap; word-break:break-all;}
+.key-box code{font-family:'IBM Plex Mono',monospace; background:none; padding:0; flex:1; min-width:200px;}
+.copy-btn{background:var(--surface); border:1px solid var(--line-strong); border-radius:6px; padding:6px 12px; font-size:12px; color:var(--ink); flex-shrink:0;}
+.copy-btn:hover{border-color:var(--ink);}
+
+/* ---------- тарифи ---------- */
+.plan-row{display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;}
+.plan-opt{flex:1; min-width:130px; border:1.5px solid var(--line-strong); border-radius:var(--radius-s); padding:16px; text-align:center; cursor:pointer; transition:border-color .2s ease, background .2s ease;}
+.plan-opt b{font-family:'Space Grotesk',sans-serif; display:block; font-size:16px; margin-bottom:4px;}
+.plan-opt span{font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--muted);}
+.plan-opt.selected{border-color:var(--accent); background:var(--accent-soft);}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--line); padding:32px 0;}
+.footer-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;}
+.footer-mono{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);}
 </style>
+<script>(function(){try{var m=localStorage.getItem('stayMateThemeMode')||'dark';document.documentElement.setAttribute('data-theme',m);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
 </head>
 <body>
 
 <header>
-  <div class="brand"><b>Stay</b>Mate — кабінет готелю</div>
-  <div class="who hidden" id="whoBar"></div>
+  <nav class="wrap">
+    <a href="../index.html" class="logo"><span class="logo-mark"></span>StayMate</a>
+    <div class="nav-links">
+      <a href="../index.html">Головна</a>
+      <a href="../features.html">Можливості</a>
+      <a href="../pricing.html">Тарифи</a>
+      <a href="../instructions.html">Інструкція</a>
+      <a href="../contacts.html">Контакти</a>
+    </div>
+    <div class="nav-tools">
+      <div class="account-status hidden" id="accountStatus"></div>
+      <button class="theme-btn" type="button" id="themeBtn" aria-label="Змінити тему">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+      <button class="burger" id="burgerBtn" type="button" aria-label="Меню"><span></span></button>
+    </div>
+  </nav>
+  <div class="mobile-panel" id="mobilePanel">
+    <a href="../index.html">Головна</a>
+    <a href="../features.html">Можливості</a>
+    <a href="../pricing.html">Тарифи</a>
+    <a href="../instructions.html">Інструкція</a>
+    <a href="../contacts.html">Контакти</a>
+  </div>
 </header>
 
 <main>
 
   <!-- Екран автентифікації -->
-  <div class="center-screen" id="authScreen">
-    <div class="auth-box card">
+  <div class="wrap-cab center-screen" id="authScreen">
+    <div class="auth-card">
       <h2 id="authTitle">Вхід у кабінет</h2>
-      <p class="hint" id="authHint">Керуйте номерами та ШІ-ботом свого готелю.</p>
+      <p class="lede" id="authHint" style="margin:6px 0 24px;">Керуйте номерами та ШІ-ботом свого готелю.</p>
+      <div class="auth-error" id="authErrorUnused"></div>
       <label for="authEmail">Email</label>
       <input id="authEmail" type="email" autocomplete="email" placeholder="you@hotel.com">
       <label for="authPassword">Пароль</label>
@@ -303,7 +203,7 @@
         <button id="forgotBtn" type="button">Забули пароль?</button>
       </div>
       <div class="actions">
-        <button id="authSubmit">Увійти</button>
+        <button class="btn-primary" id="authSubmit">Увійти</button>
       </div>
       <div class="msg" id="authMsg"></div>
       <div class="switcher">
@@ -313,23 +213,23 @@
     </div>
   </div>
 
-  <!-- Екран встановлення нового пароля (після листа "Забули пароль?") -->
-  <div class="hidden center-screen" id="resetScreen">
-    <div class="auth-box card">
+  <!-- Екран встановлення нового пароля -->
+  <div class="hidden wrap-cab center-screen" id="resetScreen">
+    <div class="auth-card">
       <h2>Новий пароль</h2>
-      <p class="hint">Встановіть новий пароль для входу в кабінет.</p>
+      <p class="lede" style="margin:6px 0 24px;">Встановіть новий пароль для входу в кабінет.</p>
       <label for="newPassword">Новий пароль</label>
       <input id="newPassword" type="password" placeholder="Мінімум 6 символів" minlength="6">
       <div class="actions">
-        <button id="resetSubmit">Зберегти пароль</button>
+        <button class="btn-primary" id="resetSubmit">Зберегти пароль</button>
       </div>
       <div class="msg" id="resetMsg"></div>
     </div>
   </div>
 
   <!-- Створення готелю (перший вхід) -->
-  <div class="hidden" id="onboardScreen">
-    <h1>Створіть профіль готелю</h1>
+  <div class="hidden wrap-cab" id="onboardScreen">
+    <h1 class="page-title">Створіть профіль готелю</h1>
     <p class="lede">Це займе хвилину. Далі можна буде все змінити. Перші 3 дні кабінету — безкоштовно.</p>
     <div class="card">
       <label for="obName">Назва готелю / апартаментів</label>
@@ -337,47 +237,45 @@
       <label for="obAddress">Адреса</label>
       <input id="obAddress" type="text" placeholder="Місто, вулиця, номер будинку">
       <div class="actions">
-        <button id="obSubmit">Створити профіль</button>
+        <button class="btn-primary" id="obSubmit">Створити профіль</button>
       </div>
       <div class="msg" id="obMsg"></div>
     </div>
   </div>
 
   <!-- Екран "підписку призупинено" -->
-  <div class="hidden" id="gateScreen">
-    <div class="gate-wrap">
-      <h1>Підписку призупинено</h1>
-      <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
-      <div class="card">
-        <h2>Оберіть тариф</h2>
-        <p class="hint">Один тариф — на один об'єкт (готель/апартаменти).</p>
-        <div class="plan-row" id="gatePlanRow">
-          <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
-          <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
-          <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
-        </div>
-        <div class="actions">
-          <button id="gatePayBtn">Оплатити обраний тариф</button>
-          <span class="msg" id="gateMsg"></span>
-        </div>
-        <p class="hint" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
+  <div class="hidden wrap-cab" id="gateScreen">
+    <h1 class="page-title">Підписку призупинено</h1>
+    <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
+    <div class="card">
+      <h2>Оберіть тариф</h2>
+      <p class="hint">Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.</p>
+      <div class="plan-row" id="gatePlanRow">
+        <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
+        <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
+        <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
       </div>
       <div class="actions">
-        <button class="secondary" id="gateSignOutBtn">Вийти з акаунту</button>
+        <button class="btn-primary" id="gatePayBtn">Оплатити обраний тариф</button>
+        <span class="msg" id="gateMsg"></span>
       </div>
+      <p class="hint" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
+    </div>
+    <div class="actions">
+      <button class="btn-secondary" id="gateSignOutBtn">Вийти з акаунту</button>
     </div>
   </div>
 
   <!-- Основний кабінет -->
-  <div class="hidden" id="dashScreen">
-    <h1 id="dashHotelName">Ваш готель</h1>
+  <div class="hidden wrap-cab" id="dashScreen">
+    <h1 class="page-title" id="dashHotelName">Ваш готель</h1>
     <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.</p>
 
     <div class="card">
       <h2>Тариф і підписка</h2>
       <p class="hint" id="subHint">Завантаження…</p>
       <div class="actions">
-        <button class="secondary" id="manageSubBtn">Змінити тариф / оплатити</button>
+        <button class="btn-secondary" id="manageSubBtn">Змінити тариф / оплатити</button>
       </div>
       <div class="hidden" id="subPlanPicker" style="margin-top:18px;">
         <div class="plan-row" id="subPlanRow">
@@ -386,7 +284,7 @@
           <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
         </div>
         <div class="actions">
-          <button id="subPayBtn">Оплатити обраний тариф</button>
+          <button class="btn-primary" id="subPayBtn">Оплатити обраний тариф</button>
           <span class="msg" id="subMsg"></span>
         </div>
       </div>
@@ -400,7 +298,7 @@
       <label for="dashAddress">Адреса</label>
       <input id="dashAddress" type="text">
       <div class="actions">
-        <button id="dashSaveInfo">Зберегти</button>
+        <button class="btn-primary" id="dashSaveInfo">Зберегти</button>
         <span class="msg" id="infoMsg"></span>
       </div>
     </div>
@@ -422,8 +320,8 @@
         <tbody id="roomsBody"></tbody>
       </table>
       <div class="actions">
-        <button class="secondary" id="addRoomRow">+ Додати номер</button>
-        <button id="saveRooms">Зберегти номери</button>
+        <button class="btn-secondary" id="addRoomRow">+ Додати номер</button>
+        <button class="btn-primary" id="saveRooms">Зберегти номери</button>
         <span class="msg" id="roomsMsg"></span>
       </div>
     </div>
@@ -437,11 +335,11 @@
           <span class="channel-name">Telegram</span>
           <span class="status-pill off" id="pill-telegram">Не підключено</span>
         </div>
-        <p class="hint">Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.</p>
+        <p class="hint">Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.</p>
         <label for="tokenTelegram">Токен бота</label>
         <input id="tokenTelegram" type="text" placeholder="123456789:AAG...">
         <div class="actions">
-          <button id="connectTelegram">Підключити</button>
+          <button class="btn-primary" id="connectTelegram">Підключити</button>
           <span class="msg" id="msgTelegram"></span>
         </div>
       </div>
@@ -451,11 +349,11 @@
           <span class="channel-name">Viber</span>
           <span class="status-pill off" id="pill-viber">Не підключено</span>
         </div>
-        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener">partners.viber.com</a> і вставте токен API нижче. Повноцінна робота бота залежить від комерційного схвалення заявки з боку Viber.</p>
+        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">partners.viber.com</a> і вставте токен API нижче. Повноцінна робота бота залежить від комерційного схвалення заявки з боку Viber.</p>
         <label for="tokenViber">Токен API (auth token)</label>
         <input id="tokenViber" type="text" placeholder="45f679as...">
         <div class="actions">
-          <button id="connectViber">Підключити</button>
+          <button class="btn-primary" id="connectViber">Підключити</button>
           <span class="msg" id="msgViber"></span>
         </div>
       </div>
@@ -465,7 +363,7 @@
           <span class="channel-name">Сайт готелю</span>
           <span class="status-pill" id="pill-website">Готово до використання</span>
         </div>
-        <p class="hint">Не потребує окремого підключення. Вставте цей код перед <code>&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.</p>
+        <p class="hint">Не потребує окремого підключення. Вставте цей код перед <code style="font-family:'IBM Plex Mono',monospace; background:var(--accent-soft); padding:2px 6px; border-radius:4px;">&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.</p>
         <div class="key-box">
           <code id="widgetSnippet"></code>
           <button class="copy-btn" id="copyWidget" type="button">Копіювати</button>
@@ -477,13 +375,13 @@
           <span class="channel-name">WhatsApp</span>
           <span class="status-pill off">Очікує верифікації Meta</span>
         </div>
-        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayMate (див. інструкцію). Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
+        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayMate. Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
         <label for="waPhoneId">Phone Number ID</label>
         <input id="waPhoneId" type="text" placeholder="1029384756...">
         <label for="waToken">Access Token</label>
         <input id="waToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="secondary" id="saveWhatsapp">Зберегти на потім</button>
+          <button class="btn-secondary" id="saveWhatsapp">Зберегти на потім</button>
           <span class="msg" id="msgWhatsapp"></span>
         </div>
       </div>
@@ -499,7 +397,7 @@
         <label for="igToken">Access Token</label>
         <input id="igToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="secondary" id="saveInstagram">Зберегти на потім</button>
+          <button class="btn-secondary" id="saveInstagram">Зберегти на потім</button>
           <span class="msg" id="msgInstagram"></span>
         </div>
       </div>
@@ -508,6 +406,28 @@
   </div>
 
 </main>
+
+<footer>
+  <div class="wrap footer-row">
+    <div class="logo" style="font-size:16px;"><span class="logo-mark" style="width:20px;height:20px;"></span>StayMate</div>
+    <span class="footer-mono">© 2026 StayMate</span>
+  </div>
+</footer>
+
+<script>
+/* ---------- тема / бургер-меню (як на решті сайту) ---------- */
+function getThemeMode(){ try{ return localStorage.getItem('stayMateThemeMode') || 'dark'; }catch(e){ return 'dark'; } }
+function applyTheme(){ document.documentElement.setAttribute('data-theme', getThemeMode()); }
+function toggleTheme(){
+  const next = getThemeMode() === 'dark' ? 'light' : 'dark';
+  try{ localStorage.setItem('stayMateThemeMode', next); }catch(e){}
+  applyTheme();
+}
+document.getElementById('themeBtn').addEventListener('click', toggleTheme);
+document.getElementById('burgerBtn').addEventListener('click', () => {
+  document.getElementById('mobilePanel').classList.toggle('open');
+});
+</script>
 
 <script type="module">
   import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -525,13 +445,16 @@
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  // Тариф, з яким прийшли з pricing.html → checkout.html?plan=... → cabinet/?plan=...
+  const requestedPlan = new URLSearchParams(window.location.search).get('plan');
+
   // ---- Елементи ----
   const authScreen = document.getElementById('authScreen');
   const resetScreen = document.getElementById('resetScreen');
   const onboardScreen = document.getElementById('onboardScreen');
   const gateScreen = document.getElementById('gateScreen');
   const dashScreen = document.getElementById('dashScreen');
-  const whoBar = document.getElementById('whoBar');
+  const accountStatus = document.getElementById('accountStatus');
 
   let mode = 'signin'; // 'signin' | 'signup'
   let currentUser = null;
@@ -545,6 +468,20 @@
     onboardScreen.classList.add('hidden');
     gateScreen.classList.add('hidden');
     dashScreen.classList.add('hidden');
+  }
+
+  function renderAccountStatus() {
+    if (!currentUser) {
+      accountStatus.classList.add('hidden');
+      accountStatus.innerHTML = '';
+      return;
+    }
+    accountStatus.classList.remove('hidden');
+    accountStatus.innerHTML = `<span class="who-email" title="${currentUser.email}">${currentUser.email}</span><button id="signOutBtn" type="button">Вийти</button>`;
+    document.getElementById('signOutBtn').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      location.reload();
+    });
   }
 
   // ---- Автентифікація ----
@@ -657,12 +594,7 @@
     currentUser = user;
     if (!user) return;
 
-    whoBar.classList.remove('hidden');
-    whoBar.innerHTML = `${user.email} <button id="signOutBtn">Вийти</button>`;
-    document.getElementById('signOutBtn').addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      location.reload();
-    });
+    renderAccountStatus();
 
     const { data: property } = await supabase
       .from('properties')
@@ -765,6 +697,11 @@
         else selectedSubPlan = opt.dataset.plan;
       });
     });
+    // Якщо прийшли з pricing.html з конкретним тарифом — попередньо вибрати його.
+    if (requestedPlan) {
+      const match = [...rowEl.querySelectorAll('.plan-opt')].find(o => o.dataset.plan === requestedPlan);
+      if (match) match.click();
+    }
   }
 
   async function createInvoiceAndRedirect(plan, msgEl) {
@@ -813,6 +750,11 @@
       hint.textContent = `Пробний період — залишилось ${daysLeft} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.`;
     } else {
       hint.textContent = 'Підписка не активна.';
+    }
+    // Прийшли з pricing.html з конкретним тарифом — одразу розгорнути вибір.
+    if (requestedPlan) {
+      document.getElementById('subPlanPicker').classList.remove('hidden');
+      setupPlanPicker(document.getElementById('subPlanRow'));
     }
   }
 

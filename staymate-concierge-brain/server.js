@@ -402,9 +402,9 @@ const server = http.createServer((req, res) => {
 
       const orderId = 'SUB' + Math.random().toString(36).slice(2, 8).toUpperCase();
 
-      let invoiceUrl, priceUah, priceEur, rate;
+      let invoiceUrl, priceEur;
       try {
-        ({ invoiceUrl, priceUah, priceEur, rate } = await createSubscriptionInvoice({
+        ({ invoiceUrl, priceEur } = await createSubscriptionInvoice({
           orderId,
           plan,
           propertyName: property.hotel_name,
@@ -416,14 +416,14 @@ const server = http.createServer((req, res) => {
 
       const { error: insertError } = await supabase
         .from('subscription_orders')
-        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_uah: priceUah });
+        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_eur: priceEur });
 
       if (insertError) {
         console.error('[create-subscription-invoice] Supabase error:', insertError);
         return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
       }
 
-      return sendJson(res, 200, { invoiceUrl, orderId, priceUah, priceEur, rate }, corsHeaders);
+      return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
     });
     return;
   }
