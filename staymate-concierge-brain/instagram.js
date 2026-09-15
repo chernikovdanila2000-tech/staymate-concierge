@@ -32,7 +32,6 @@ function parseInstagramEvents(payload) {
   const events = [];
 
   for (const entry of payload.entry) {
-    // Формат 1: entry.messaging
     for (const item of entry.messaging || []) {
       if (item.message?.is_echo || !item.sender?.id) continue;
 
@@ -48,27 +47,6 @@ function parseInstagramEvents(payload) {
         text: text.trim(),
       });
     }
-
-    // Формат 2: entry.changes[].field === "messages"
-    for (const change of entry.changes || []) {
-      if (change.field !== 'messages') continue;
-
-      const value = change.value || {};
-
-      if (!value.sender?.id) continue;
-
-      const text =
-        value.message?.text ||
-        value.postback?.title ||
-        value.postback?.payload;
-
-      if (typeof text !== 'string' || !text.trim()) continue;
-
-      events.push({
-        senderId: String(value.sender.id),
-        text: text.trim(),
-      });
-    }
   }
 
   return events;
@@ -81,30 +59,59 @@ async function sendInstagramMessage(
   text,
   graphVersion = 'v24.0'
 ) {
-  const response = await fetch(
-    `https://graph.facebook.com/${graphVersion}/${instagramAccountId}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
+  const url =
+    `https://graph.facebook.com/${graphVersion}/me/messages`;
+
+  console.log('[instagram] Sending reply:', {
+    recipientId,
+    textLength: String(text).length,
+  });
+
+  const response = await fetch(url, {
+    method: 'POST',
+
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+
+    body: JSON.stringify({
+      recipient: {
+        id: String(recipientId),
       },
-      body: JSON.stringify({
-        recipient: { id: recipientId },
-        message: { text: String(text).slice(0, 2000) },
-      }),
-    }
-  );
+
+      messaging_type: 'RESPONSE',
+
+      message: {
+        text: String(text).slice(0, 1000),
+      },
+    }),
+  });
+
+  const body = await response.text();
 
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
+    console.error(
+      '[instagram] Send API error:',
+      response.status,
+      body
+    );
 
     throw new Error(
       `Instagram send failed: ${response.status} ${body.slice(0, 500)}`
     );
   }
 
-  return response.json();
+  console.log(
+    '[instagram] Reply sent successfully:',
+    body
+  );
+
+  try {
+    return JSON.parse(body);
+  } catch {
+    return { ok: true };
+  }
 }
 
 module.exports = {
