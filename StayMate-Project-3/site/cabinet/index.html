@@ -463,6 +463,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   const PLAN_LABELS = { start: 'Старт (€100/міс)', pro: 'Профі (€200/міс)', network: 'Мережа (€300/міс)' };
 
+  // Захоплюємо це ДО createClient(), бо supabase-js сам розбирає і чистить
+  // хеш з токенами при ініціалізації — після цього location.hash вже не
+  // міститиме "type=signup".
+  const cameFromSignupConfirmation = /type=signup/.test(window.location.hash);
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Перекладає технічні повідомлення Supabase на зрозумілі — найчастіша
@@ -697,6 +702,13 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
         return;
       }
+
+      // Реєстрація одразу з активною сесією (підтвердження email вимкнено
+      // в Supabase) — не змушуємо одразу заповнювати профіль готелю, просто
+      // відправляємо на головну. Заповнити готель можна будь-коли пізніше,
+      // повернувшись у кабінет самостійно.
+      window.location.href = SITE_ORIGIN + '/';
+      return;
     }
 
     if (mode === 'signin') {
@@ -1176,7 +1188,15 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // ---- Старт ----
   (async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) await afterLogin();
+    if (!session) return;
+    if (cameFromSignupConfirmation) {
+      // Щойно перейшли за посиланням підтвердження email — так само, як і
+      // при миттєвій сесії одразу після реєстрації, не змушуємо заповнювати
+      // профіль готелю просто зараз.
+      window.location.href = SITE_ORIGIN + '/';
+      return;
+    }
+    await afterLogin();
   })();
 </script>
 
