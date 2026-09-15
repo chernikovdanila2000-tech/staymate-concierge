@@ -877,7 +877,6 @@ const server =
       }
 
       // =========================
-           // =========================
       // INSTAGRAM MESSAGE
       // =========================
 
@@ -925,7 +924,10 @@ const server =
               );
             }
 
-            console.log('[instagram] PAYLOAD:', rawBody);
+            console.log(
+              '[instagram] PAYLOAD:',
+              rawBody
+            );
 
             const events =
               parseInstagramEvents(
@@ -943,11 +945,15 @@ const server =
                   )
                 : '';
 
-            console.log('[instagram] PARSED:', {
-              accountId,
-              eventsCount: events.length,
-              events,
-            });
+            console.log(
+              '[instagram] PARSED:',
+              {
+                accountId,
+                eventsCount:
+                  events.length,
+                events,
+              }
+            );
 
             sendJson(
               res,
@@ -961,125 +967,288 @@ const server =
               !accountId ||
               events.length === 0
             ) {
-              console.error('[instagram] Nothing to process:', {
-                accountId,
-                eventsCount: events.length,
-              });
+              console.error(
+                '[instagram] Nothing to process:',
+                {
+                  accountId,
+                  eventsCount:
+                    events.length,
+                }
+              );
+
               return;
             }
 
             setImmediate(
               async () => {
-                const connection =
-                  await resolveInstagramConnection(
-                    accountId
+                try {
+                  console.log(
+                    '[instagram] BEFORE CONNECTION'
                   );
 
-                console.log('[instagram] CONNECTION:', {
-                  found: !!connection,
-                  propertyId: connection ? connection.propertyId : null,
-                  instagramAccountId: connection ? connection.instagramAccountId : null,
-                });
+                  const connection =
+                    await resolveInstagramConnection(
+                      accountId
+                    );
 
-                if (!connection) {
-                  console.error(
-                    `[instagram] No channel for ${accountId}`
+                  console.log(
+                    '[instagram] CONNECTION:',
+                    {
+                      found:
+                        !!connection,
+
+                      propertyId:
+                        connection
+                          ? connection.propertyId
+                          : null,
+
+                      instagramAccountId:
+                        connection
+                          ? connection.instagramAccountId
+                          : null,
+                    }
                   );
 
-                  return;
-                }
+                  if (!connection) {
+                    console.error(
+                      `[instagram] No channel for ${accountId}`
+                    );
 
-                const property =
-                  await getProperty(
+                    return;
+                  }
+
+                  console.log(
+                    '[instagram] BEFORE PROPERTY:',
                     connection.propertyId
                   );
 
-                if (!property) {
-                  return;
-                }
+                  const property =
+                    await getProperty(
+                      connection.propertyId
+                    );
 
-                for (
-                  const event of events
-                ) {
-                  try {
-                    if (
-                      !computeAccess(
+                  console.log(
+                    '[instagram] PROPERTY:',
+                    {
+                      found:
+                        !!property,
+
+                      hotelName:
                         property
-                      ).allowed
-                    ) {
+                          ? property.hotel_name
+                          : null,
+
+                      subscriptionStatus:
+                        property
+                          ? property.subscription_status
+                          : null,
+
+                      trialEndsAt:
+                        property
+                          ? property.trial_ends_at
+                          : null,
+
+                      subscriptionActiveUntil:
+                        property
+                          ? property.subscription_active_until
+                          : null,
+                    }
+                  );
+
+                  if (!property) {
+                    console.error(
+                      '[instagram] Property not found:',
+                      connection.propertyId
+                    );
+
+                    return;
+                  }
+
+                  const access =
+                    computeAccess(
+                      property
+                    );
+
+                  console.log(
+                    '[instagram] ACCESS:',
+                    access
+                  );
+
+                  for (
+                    const event of events
+                  ) {
+                    try {
+                      console.log(
+                        '[instagram] EVENT START:',
+                        {
+                          senderId:
+                            event.senderId,
+
+                          text:
+                            event.text,
+                        }
+                      );
+
+                      if (
+                        !access.allowed
+                      ) {
+                        console.log(
+                          '[instagram] BEFORE PAUSED SEND'
+                        );
+
+                        await sendInstagramMessage(
+                          connection.accessToken,
+                          connection.instagramAccountId,
+                          event.senderId,
+                          PAUSED_MESSAGE,
+                          META_GRAPH_VERSION
+                        );
+
+                        console.log(
+                          '[instagram] AFTER PAUSED SEND'
+                        );
+
+                        continue;
+                      }
+
+                      console.log(
+                        '[instagram] BEFORE HISTORY'
+                      );
+
+                      const history =
+                        await getHistory(
+                          connection.propertyId,
+                          'instagram',
+                          event.senderId
+                        );
+
+                      console.log(
+                        '[instagram] HISTORY LOADED:',
+                        {
+                          length:
+                            Array.isArray(
+                              history
+                            )
+                              ? history.length
+                              : null,
+                        }
+                      );
+
+                      history.push({
+                        role: 'user',
+                        content:
+                          event.text,
+                      });
+
+                      console.log(
+                        '[instagram] BEFORE AI'
+                      );
+
+                      const {
+                        replyText,
+                        updatedHistory,
+                      } =
+                        await runConciergeTurn(
+                          history,
+                          {
+                            propertyId:
+                              connection.propertyId,
+
+                            propertyName:
+                              property.hotel_name,
+                          }
+                        );
+
+                      console.log(
+                        '[instagram] AFTER AI:',
+                        {
+                          replyLength:
+                            String(
+                              replyText || ''
+                            ).length,
+
+                          historyLength:
+                            Array.isArray(
+                              updatedHistory
+                            )
+                              ? updatedHistory.length
+                              : null,
+                        }
+                      );
+
+                      console.log(
+                        '[instagram] BEFORE SAVE HISTORY'
+                      );
+
+                      await saveHistory(
+                        connection.propertyId,
+                        'instagram',
+                        event.senderId,
+                        updatedHistory
+                      );
+
+                      console.log(
+                        '[instagram] AFTER SAVE HISTORY'
+                      );
+
+                      console.log(
+                        '[instagram] BEFORE SEND'
+                      );
+
                       await sendInstagramMessage(
                         connection.accessToken,
                         connection.instagramAccountId,
                         event.senderId,
-                        PAUSED_MESSAGE,
+                        replyText,
                         META_GRAPH_VERSION
                       );
 
-                      continue;
+                      console.log(
+                        '[instagram] AFTER SEND'
+                      );
+                    } catch (
+                      error
+                    ) {
+                      console.error(
+                        '[instagram] EVENT ERROR:',
+                        error &&
+                        error.stack
+                          ? error.stack
+                          : error
+                      );
                     }
-
-                    const history =
-                      await getHistory(
-                        connection.propertyId,
-                        'instagram',
-                        event.senderId
-                      );
-
-                    history.push({
-                      role: 'user',
-                      content:
-                        event.text,
-                    });
-
-                    const {
-                      replyText,
-                      updatedHistory,
-                    } =
-                      await runConciergeTurn(
-                        history,
-                        {
-                          propertyId:
-                            connection.propertyId,
-
-                          propertyName:
-                            property.hotel_name,
-                        }
-                      );
-
-                    await saveHistory(
-                      connection.propertyId,
-                      'instagram',
-                      event.senderId,
-                      updatedHistory
-                    );
-
-                    await sendInstagramMessage(
-                      connection.accessToken,
-                      connection.instagramAccountId,
-                      event.senderId,
-                      replyText,
-                      META_GRAPH_VERSION
-                    );
-                  } catch (error) {
-                    console.error(
-                      '[instagram]',
-                      error.message
-                    );
                   }
+                } catch (error) {
+                  console.error(
+                    '[instagram] PROCESS ERROR:',
+                    error &&
+                    error.stack
+                      ? error.stack
+                      : error
+                  );
                 }
               }
             );
           })
           .catch(
-            error =>
-              sendJson(
+            error => {
+              console.error(
+                '[instagram] WEBHOOK ERROR:',
+                error &&
+                error.stack
+                  ? error.stack
+                  : error
+              );
+
+              return sendJson(
                 res,
                 500,
                 {
                   error:
                     error.message,
                 }
-              )
+              );
+            }
           );
 
         return;
