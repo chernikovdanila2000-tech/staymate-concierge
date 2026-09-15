@@ -3,11 +3,16 @@ const crypto = require('crypto');
 function safeEqual(left, right) {
   const a = Buffer.from(String(left || ''), 'utf8');
   const b = Buffer.from(String(right || ''), 'utf8');
+
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 function verifyInstagramSignature(rawBody, signatureHeader, appSecret) {
-  if (!signatureHeader || !appSecret || !signatureHeader.startsWith('sha256=')) {
+  if (
+    !signatureHeader ||
+    !appSecret ||
+    !signatureHeader.startsWith('sha256=')
+  ) {
     return false;
   }
 
