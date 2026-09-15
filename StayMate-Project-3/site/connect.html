@@ -64,7 +64,7 @@ button{font-family:inherit; cursor:pointer;}
 .reveal.is-visible{opacity:1; transform:translateY(0);}
 
 /* ---------- header / nav ---------- */
-header{position:sticky; top:0; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+header{position:relative; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
 nav.wrap{display:flex; align-items:center; justify-content:space-between; height:76px; gap:20px;}
 .logo{display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; flex-shrink:0;}
 .logo-mark{width:26px; height:26px; border-radius:7px; background:var(--ink); position:relative; flex-shrink:0;}
@@ -180,13 +180,7 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 .account-dropdown .acct-row:last-of-type{border-bottom:none; margin-bottom:0; padding-bottom:0;}
 .account-dropdown .acct-label{color:var(--muted); flex-shrink:0;}
 .account-dropdown .acct-value{font-weight:600; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:190px;}
-.account-dropdown .acct-pw-note{font-size:11.5px; color:var(--muted); line-height:1.5; margin:0 0 10px;}
-.account-dropdown .acct-pw-row{display:flex; gap:8px;}
-.account-dropdown .acct-pw-row input{flex:1; min-width:0; padding:9px 11px; font-size:13.5px; border-radius:var(--radius-s); border:1px solid var(--line-strong); background:var(--input-bg); color:var(--ink); font-family:inherit;}
-.account-dropdown .acct-pw-row input:focus{outline:none; border-color:var(--accent);}
-.account-dropdown .acct-pw-toggle{width:36px; height:36px; flex-shrink:0; background:var(--bg); border:1px solid var(--line-strong); border-radius:var(--radius-s); display:flex; align-items:center; justify-content:center; color:var(--ink-soft);}
-.account-dropdown .acct-pw-toggle:hover{border-color:var(--ink);}
-.account-dropdown .acct-pw-save{width:100%; margin-top:10px; justify-content:center; padding:9px;}
+.account-dropdown .acct-forgot-pw{width:100%; justify-content:center; padding:9px;}
 .account-dropdown .acct-pw-msg{display:block; font-size:12px; margin-top:8px; min-height:14px;}
 .account-dropdown .acct-pw-msg.error{color:var(--warn);}
 .account-dropdown .acct-pw-msg.ok{color:var(--accent-text);}
@@ -1002,8 +996,12 @@ function acctFormatDate(iso){
 function acctSubscriptionStatusText(property){
   if(!property) return '—';
   if(property.subscription_status === 'active'){
-    const until = property.subscription_active_until ? acctFormatDate(property.subscription_active_until) : '—';
-    return `${ACCT_PLAN_LABELS[property.subscription_plan] || property.subscription_plan || 'Активна'} · до ${until}`;
+    const planLabel = ACCT_PLAN_LABELS[property.subscription_plan] || property.subscription_plan || 'Активна';
+    if(property.subscription_active_until && new Date(property.subscription_active_until) > new Date()){
+      const daysLeft = Math.max(1, Math.ceil((new Date(property.subscription_active_until) - new Date()) / 86400000));
+      return `${planLabel} · ${daysLeft} дн. (до ${acctFormatDate(property.subscription_active_until)})`;
+    }
+    return planLabel;
   }
   if(property.trial_ends_at && new Date(property.trial_ends_at) > new Date()){
     const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
@@ -1011,52 +1009,32 @@ function acctSubscriptionStatusText(property){
   }
   return 'Не активна';
 }
-const ACCT_EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>';
 function buildAcctDropdownHTML(session, property){
   return `
     <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value" title="${session.user.email}">${session.user.email}</span></div>
     <div class="acct-row"><span class="acct-label">Підписка</span><span class="acct-value">${acctSubscriptionStatusText(property)}</span></div>
     <div class="acct-pw">
-      <p class="acct-pw-note">Поточний пароль не можна показати — жодна безпечна система його не зберігає у відкритому вигляді. Можна тільки встановити новий.</p>
-      <div class="acct-pw-row">
-        <input type="password" id="acctNewPasswordNav" placeholder="Новий пароль">
-        <button type="button" class="acct-pw-toggle" id="acctPwToggleNav" aria-label="Показати введений пароль">${ACCT_EYE_SVG}</button>
-      </div>
-      <button type="button" class="btn-secondary acct-pw-save" id="acctPwSaveNav">Зберегти новий пароль</button>
+      <button type="button" class="btn-secondary acct-forgot-pw" id="acctForgotPwNav" data-email="${session.user.email}">Забули пароль?</button>
       <span class="msg acct-pw-msg" id="acctPwMsgNav"></span>
     </div>
     <a href="cabinet/" class="btn-secondary acct-cabinet-link" data-i18n="nav.cabinet">Особистий кабінет</a>
   `;
 }
 function wireAcctDropdownEvents(){
-  const toggle = document.getElementById('acctPwToggleNav');
-  if(toggle){
-    toggle.addEventListener('click', () => {
-      const input = document.getElementById('acctNewPasswordNav');
-      input.type = input.type === 'password' ? 'text' : 'password';
-    });
-  }
-  const saveBtn = document.getElementById('acctPwSaveNav');
-  if(saveBtn){
-    saveBtn.addEventListener('click', async () => {
-      const input = document.getElementById('acctNewPasswordNav');
+  const forgotBtn = document.getElementById('acctForgotPwNav');
+  if(forgotBtn){
+    forgotBtn.addEventListener('click', async () => {
       const msg = document.getElementById('acctPwMsgNav');
-      const newPassword = input.value;
       msg.className = 'msg acct-pw-msg';
-      if(!newPassword || newPassword.length < 6){
-        msg.className = 'msg acct-pw-msg error';
-        msg.textContent = 'Пароль має містити щонайменше 6 символів.';
-        return;
-      }
-      const { error } = await window.sb.auth.updateUser({ password: newPassword });
+      msg.textContent = 'Надсилаємо лист...';
+      const { error } = await window.sb.auth.resetPasswordForEmail(forgotBtn.dataset.email, { redirectTo: window.location.origin + '/cabinet/' });
       if(error){
         msg.className = 'msg acct-pw-msg error';
         msg.textContent = translateAuthError(error.message);
         return;
       }
       msg.className = 'msg acct-pw-msg ok';
-      msg.textContent = 'Пароль змінено.';
-      input.value = '';
+      msg.textContent = 'Перевірте пошту — надіслали лист для скидання пароля.';
     });
   }
 }

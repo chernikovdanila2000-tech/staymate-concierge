@@ -14,6 +14,8 @@
      POST /webhook/wayforpay                 — підтвердження оплати гостя за бронювання
      POST /webhook/wayforpay-subscription    — підтвердження оплати підписки готелю
      POST /api/create-subscription-invoice   — кабінет запитує рахунок на оплату підписки
+     POST /api/create-trial-invoice          — кабінет підключає картку на старті пробного періоду (регулярний платіж)
+     POST /api/cancel-auto-renew             — кабінет скасовує автопродовження підписки
      POST /api/notify-signin                 — кабінет просить надіслати лист "новий вхід в акаунт"
      GET  /health
 
@@ -29,7 +31,7 @@ const { safeEqual, verifyMessengerSignature, parseMessengerEvents, sendMessenger
 const { serveLegalPage } = require('./legal-pages');
 const { getTelegramToken, getViberToken, invalidateChannel } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
-const { createSubscriptionInvoice } = require('./tools');
+const { createSubscriptionInvoice, cancelRegularPayment } = require('./tools');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
@@ -335,7 +337,7 @@ const server = http.createServer((req, res) => {
     });
     return res.end();
   }
-  if (req.method === 'OPTIONS' && (req.url === '/api/create-subscription-invoice' || req.url === '/api/connect-channel' || req.url === '/api/notify-signin')) {
+  if (req.method === 'OPTIONS' && (req.url === '/api/create-subscription-invoice' || req.url === '/api/connect-channel' || req.url === '/api/notify-signin' || req.url === '/api/create-trial-invoice' || req.url === '/api/cancel-auto-renew')) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -613,28 +615,58 @@ const server = http.createServer((req, res) => {
       if (orderReference && transactionStatus === 'Approved') {
         const { data: order, error: orderError } = await supabase
           .from('subscription_orders')
-          .select('property_id, plan')
+          .select('property_id, plan, is_trial_card')
           .eq('order_id', orderReference)
           .maybeSingle();
 
         if (orderError) {
           console.error('WayForPay webhook (subscription): помилка пошуку замовлення', orderError);
         } else if (order) {
-          const activeUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
           await supabase.from('subscription_orders').update({ status: 'paid' }).eq('order_id', orderReference);
-          const { error: propError } = await supabase
-            .from('properties')
-            .update({
-              subscription_status: 'active',
-              subscription_plan: order.plan,
-              subscription_active_until: activeUntil,
-            })
-            .eq('property_id', order.property_id);
-          if (propError) {
-            console.error('WayForPay webhook (subscription): не вдалося оновити properties', propError);
+
+          if (order.is_trial_card) {
+            // Це підключення картки на старті тріалу, а НЕ обов'язково сам
+            // факт списання грошей — WayForPay може підтвердити мандат ще
+            // до dateBegin. Захищаємось від передчасного "активна" статусу:
+            // якщо тріал ще триває, тільки вмикаємо auto_renew і чекаємо
+            // на dateBegin, коли прийде вже реальне списання (той самий
+            // вебхук спрацює вдруге з тим самим orderReference).
+            const { data: prop } = await supabase
+              .from('properties')
+              .select('trial_ends_at')
+              .eq('property_id', order.property_id)
+              .maybeSingle();
+            const trialStillActive = prop && prop.trial_ends_at && new Date(prop.trial_ends_at) > new Date();
+
+            const update = { auto_renew: true, last_auto_charge_failed: false };
+            if (!trialStillActive) {
+              update.subscription_status = 'active';
+              update.subscription_plan = order.plan;
+              update.subscription_active_until = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+            }
+            const { error: propError } = await supabase.from('properties').update(update).eq('property_id', order.property_id);
+            if (propError) {
+              console.error('WayForPay webhook (subscription): не вдалося оновити properties (trial card)', propError);
+            } else {
+              propertyCache.delete(order.property_id);
+              console.log(`WayForPay webhook (subscription): картку для "${order.property_id}" підключено, auto_renew=true${trialStillActive ? ' (тріал ще триває)' : ' (списання підтверджено)'}`);
+            }
           } else {
-            propertyCache.delete(order.property_id);
-            console.log(`WayForPay webhook (subscription): підписку "${order.property_id}" активовано ✅`);
+            const activeUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
+            const { error: propError } = await supabase
+              .from('properties')
+              .update({
+                subscription_status: 'active',
+                subscription_plan: order.plan,
+                subscription_active_until: activeUntil,
+              })
+              .eq('property_id', order.property_id);
+            if (propError) {
+              console.error('WayForPay webhook (subscription): не вдалося оновити properties', propError);
+            } else {
+              propertyCache.delete(order.property_id);
+              console.log(`WayForPay webhook (subscription): підписку "${order.property_id}" активовано ✅`);
+            }
           }
         }
       }
@@ -690,6 +722,127 @@ const server = http.createServer((req, res) => {
       }
 
       return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
+    });
+    return;
+  }
+
+  // POST /api/create-trial-invoice — старт пробного періоду з прив'язкою
+  // картки: перше фактичне списання призначене на дату закінчення тріалу
+  // (property.trial_ends_at), а не зараз. ВАЖЛИВО: поля регулярного платежу
+  // WayForPay (regularMode/dateBegin) зібрані з відкритих джерел і НЕ
+  // перевірені напряму проти документації WayForPay в цьому середовищі —
+  // перед реальними списаннями обов'язково протестувати в їхній пісочниці.
+  if (req.method === 'POST' && req.url === '/api/create-trial-invoice') {
+    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+    readBody(req).then(async body => {
+      let parsed;
+      try {
+        parsed = JSON.parse(body || '{}');
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
+      }
+
+      const { propertyId, plan } = parsed;
+      if (!propertyId || !plan) {
+        return sendJson(res, 400, { error: 'Потрібні поля propertyId і plan.' }, corsHeaders);
+      }
+
+      const property = await getProperty(propertyId);
+      if (!property) {
+        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
+      }
+      if (!property.trial_ends_at) {
+        return sendJson(res, 400, { error: 'У цього готелю немає активного пробного періоду.' }, corsHeaders);
+      }
+
+      const orderId = 'TRL' + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const dateBegin = Math.floor(new Date(property.trial_ends_at).getTime() / 1000);
+
+      let invoiceUrl, priceEur;
+      try {
+        ({ invoiceUrl, priceEur } = await createSubscriptionInvoice({
+          orderId,
+          plan,
+          propertyName: property.hotel_name,
+          autoRenewDateBegin: dateBegin,
+        }));
+      } catch (e) {
+        console.error('[create-trial-invoice] WayForPay error:', e.message);
+        return sendJson(res, 500, { error: 'Не вдалося підготувати підключення картки: ' + e.message }, corsHeaders);
+      }
+
+      const { error: insertError } = await supabase
+        .from('subscription_orders')
+        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_eur: priceEur, is_trial_card: true });
+
+      if (insertError) {
+        console.error('[create-trial-invoice] Supabase error:', insertError);
+        return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
+      }
+
+      const { error: propError } = await supabase
+        .from('properties')
+        .update({ regular_payment_reference: orderId })
+        .eq('property_id', propertyId);
+      if (propError) {
+        console.error('[create-trial-invoice] Не вдалося зберегти regular_payment_reference:', propError);
+      }
+      propertyCache.delete(propertyId);
+
+      return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
+    });
+    return;
+  }
+
+  // POST /api/cancel-auto-renew — власник скасовує автопродовження з кабінету.
+  // Спершу ЗАВЖДИ вимикаємо auto_renew в БД (це єдине надійне джерело
+  // правди — жоден подальший вебхук WayForPay вже не продовжить підписку,
+  // навіть якщо виклик до WayForPay нижче не вдасться), і лише потім робимо
+  // best-effort спробу скасувати сам регулярний платіж на боці WayForPay.
+  if (req.method === 'POST' && req.url === '/api/cancel-auto-renew') {
+    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+    readBody(req).then(async body => {
+      let parsed;
+      try {
+        parsed = JSON.parse(body || '{}');
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
+      }
+
+      const { propertyId } = parsed;
+      if (!propertyId) {
+        return sendJson(res, 400, { error: 'Потрібне поле propertyId.' }, corsHeaders);
+      }
+
+      const { data: property, error: fetchError } = await supabase
+        .from('properties')
+        .select('regular_payment_reference')
+        .eq('property_id', propertyId)
+        .maybeSingle();
+      if (fetchError || !property) {
+        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
+      }
+
+      const { error: updateError } = await supabase
+        .from('properties')
+        .update({ auto_renew: false, subscription_cancelled_at: new Date().toISOString() })
+        .eq('property_id', propertyId);
+      propertyCache.delete(propertyId);
+
+      if (updateError) {
+        console.error('[cancel-auto-renew] Supabase error:', updateError);
+        return sendJson(res, 500, { error: 'Не вдалося скасувати автопродовження.' }, corsHeaders);
+      }
+
+      let wfpResult = { ok: false, skipped: true };
+      if (property.regular_payment_reference) {
+        wfpResult = await cancelRegularPayment(property.regular_payment_reference);
+        if (!wfpResult.ok) {
+          console.error('[cancel-auto-renew] WayForPay-side cancel не підтверджено (auto_renew все одно вимкнено в БД):', wfpResult);
+        }
+      }
+
+      return sendJson(res, 200, { ok: true, wayforpayConfirmed: !!wfpResult.ok }, corsHeaders);
     });
     return;
   }

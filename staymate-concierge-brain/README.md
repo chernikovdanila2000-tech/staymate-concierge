@@ -20,6 +20,7 @@
 | Історія переписки | ✅ Зберігається в Supabase (`conversations`), не губиться при перезапуску |
 | Оплата гостя за бронювання | ⚠️ Робоче на тестовому мерчант-акаунті WayForPay (`test_merch_n1`) — власного мерчант-акаунту ще нема |
 | Оплата підписки готелю | ⚠️ Те саме — робочий код на тестовому WayForPay, з реальним мерчантом запрацює без змін коду |
+| Автопродовження підписки (картка при тріалі → автосписання) | 🚧 Код написаний (regularMode/dateBegin у tools.js, властивості `auto_renew`/`regular_payment_reference`), але поля регулярного платежу WayForPay зібрані з відкритих джерел і НЕ звірені напряму з їхньою документацією (в цьому середовищі заблокований мережевий доступ до wiki.wayforpay.com) — обов'язково протестувати в пісочниці WayForPay разом з їхньою підтримкою, перш ніж вмикати для реальних карток |
 
 ## Запуск локально
 
@@ -40,6 +41,7 @@ node server.js
 3. `channels-setup.sql` — таблиця channels (Telegram/Viber/WhatsApp/Instagram в одному місці)
 4. `conversations-setup.sql` — постійна історія переписки
 5. `phase1-2-migrations.sql` — `quantity` на номерах, тріал/тариф підписки на properties, `subscription_orders`
+6. `phase3-recurring-billing.sql` — `auto_renew`, `subscription_cancelled_at`, `regular_payment_reference`, `last_auto_charge_failed` на properties; `is_trial_card` на subscription_orders
 
 Усі файли безпечно виконувати повторно (`if not exists` / `add column if not exists`).
 
@@ -73,6 +75,8 @@ PORT
 | `POST /webhook/messenger` | підписані вхідні події Meta Messenger |
 | `POST /api/connect-channel` | кабінет підключає Telegram/Viber (сервер сам реєструє вебхук) |
 | `POST /api/create-subscription-invoice` | кабінет запитує рахунок на оплату підписки |
+| `POST /api/create-trial-invoice` | кабінет підключає картку на старті пробного періоду (регулярний платіж, перше списання — на дату закінчення тріалу) |
+| `POST /api/cancel-auto-renew` | кабінет скасовує автопродовження підписки |
 | `POST /api/notify-signin` | кабінет просить надіслати лист "новий вхід в акаунт" (через Resend) |
 | `GET /health` | перевірка живості |
 
@@ -93,6 +97,7 @@ staymate-concierge-brain/
 ├── channels-setup.sql                  — таблиця channels
 ├── conversations-setup.sql              — таблиця conversations
 ├── phase1-2-migrations.sql               — точкові доповнення (quantity, тріал, subscription_orders)
+├── phase3-recurring-billing.sql           — автопродовження (auto_renew, regular_payment_reference)
 └── README.md                              — цей файл
 ```
 

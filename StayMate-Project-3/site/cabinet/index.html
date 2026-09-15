@@ -48,15 +48,24 @@ button{font-family:inherit; cursor:pointer;}
 .wrap-cab{max-width:var(--maxw-cab); margin:0 auto; padding:0 32px;}
 
 /* ---------- header / nav (те саме, що на решті сайту) ---------- */
-header{position:sticky; top:0; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
+header{position:relative; z-index:60; background:color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line);}
 nav.wrap{display:flex; align-items:center; justify-content:space-between; height:76px; gap:20px;}
 .logo{display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; flex-shrink:0;}
 .logo-mark{width:26px; height:26px; border-radius:7px; background:var(--ink); position:relative; flex-shrink:0;}
 .logo-mark::after{content:""; position:absolute; left:7px; top:7px; width:8px; height:8px; border-radius:50%; background:var(--accent);}
 .nav-links{display:flex; gap:28px; align-items:center;}
 .nav-links a{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap;}
-.nav-links a:hover{color:var(--ink);}
+.nav-links a:hover, .nav-links a.active{color:var(--ink);}
+.nav-links a.active{font-weight:600;}
 .nav-tools{display:flex; align-items:center; gap:12px; margin-left:6px;}
+.lang-switch{position:relative;}
+.lang-btn{display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--line-strong); border-radius:100px; padding:8px 12px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; color:var(--ink-soft);}
+.lang-btn:hover{border-color:var(--ink);}
+.lang-menu{position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:0 24px 50px -12px rgba(0,0,0,.45); padding:6px; min-width:130px; display:none; z-index:70;}
+.lang-menu.open{display:block;}
+.lang-menu button{display:block; width:100%; text-align:left; background:none; border:none; padding:9px 12px; border-radius:6px; font-size:13.5px; color:var(--ink-soft);}
+.lang-menu button:hover{background:var(--bg); color:var(--ink);}
+.lang-menu button.active{color:var(--accent-text); font-weight:600;}
 .theme-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; transition:border-color .2s ease; flex-shrink:0;}
 .theme-btn:hover{border-color:var(--ink);}
 .theme-btn svg{width:16px; height:16px;}
@@ -75,12 +84,7 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 .acct-label{color:var(--muted); flex-shrink:0;}
 .acct-value{font-weight:600; text-align:right; word-break:break-word;}
 .acct-pw{margin-top:6px; padding-top:14px; border-top:1px solid var(--line);}
-.acct-pw-note{font-size:12px; color:var(--muted); line-height:1.5; margin:0 0 10px;}
-.acct-pw-row{display:flex; gap:8px;}
-.acct-pw-row input{flex:1; padding:9px 11px; font-size:13.5px;}
-.acct-pw-toggle{width:38px; height:38px; flex-shrink:0; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-s); display:flex; align-items:center; justify-content:center; color:var(--ink-soft);}
-.acct-pw-toggle:hover{border-color:var(--ink);}
-.acct-pw-save{width:100%; margin-top:10px; justify-content:center; padding:10px;}
+.acct-forgot-pw{width:100%; justify-content:center; padding:10px;}
 .acct-logout{width:100%; margin-top:14px; justify-content:center; padding:10px;}
 .burger{display:none; width:36px; height:36px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); align-items:center; justify-content:center; flex-direction:column; gap:3px; flex-shrink:0;}
 .burger span, .burger::before, .burger::after{content:""; display:block; width:15px; height:1.6px; background:var(--ink); border-radius:1px;}
@@ -182,28 +186,42 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
   <nav class="wrap">
     <a href="../index.html" class="logo"><span class="logo-mark"></span>StayAI</a>
     <div class="nav-links">
-      <a href="../index.html">Головна</a>
-      <a href="../features.html">Можливості</a>
-      <a href="../pricing.html">Тарифи</a>
-      <a href="../instructions.html">Інструкція</a>
-      <a href="../contacts.html">Контакти</a>
+      <a href="../index.html" data-i18n="nav.home">Головна</a>
+      <a href="../features.html" data-i18n="nav.features">Можливості</a>
+      <a href="../how-it-works.html" data-i18n="nav.how">Як це працює</a>
+      <a href="../pricing.html" data-i18n="nav.pricing">Тарифи</a>
+      <a href="../instructions.html" data-i18n="nav.instructions">Інструкція</a>
+      <a href="../contacts.html" data-i18n="nav.contacts">Контакти</a>
+      <a href="./" class="active" data-i18n="nav.cabinet">Особистий кабінет</a>
     </div>
     <div class="nav-tools">
+      <div class="lang-switch">
+        <button class="lang-btn" id="langBtn" type="button"><span id="langBtnLabel">UK</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2"/></svg>
+        </button>
+        <div class="lang-menu" id="langMenu">
+          <button data-lang="uk" type="button">Українська</button>
+          <button data-lang="ru" type="button">Русский</button>
+          <button data-lang="en" type="button">English</button>
+        </div>
+      </div>
       <div class="account-status hidden" id="accountStatus"></div>
-      <button class="theme-btn" type="button" id="themeBtn" aria-label="Змінити тему">
+      <button class="theme-btn" type="button" id="themeBtn" data-i18n-aria="theme.toggleLabel" aria-label="Змінити тему">
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
-      <button class="burger" id="burgerBtn" type="button" aria-label="Меню"><span></span></button>
+      <button class="burger" id="burgerBtn" type="button" data-i18n-aria="burger.label" aria-label="Меню"><span></span></button>
     </div>
   </nav>
 </header>
 <div class="mobile-panel" id="mobilePanel">
-  <a href="../index.html">Головна</a>
-  <a href="../features.html">Можливості</a>
-  <a href="../pricing.html">Тарифи</a>
-  <a href="../instructions.html">Інструкція</a>
-  <a href="../contacts.html">Контакти</a>
+  <a href="../index.html" data-i18n="nav.home">Головна</a>
+  <a href="../features.html" data-i18n="nav.features">Можливості</a>
+  <a href="../how-it-works.html" data-i18n="nav.how">Як це працює</a>
+  <a href="../pricing.html" data-i18n="nav.pricing">Тарифи</a>
+  <a href="../instructions.html" data-i18n="nav.instructions">Інструкція</a>
+  <a href="../contacts.html" data-i18n="nav.contacts">Контакти</a>
+  <a href="./" class="active" data-i18n="nav.cabinet">Особистий кабінет</a>
   <div class="account-status hidden" id="accountStatusMobile"></div>
 </div>
 
@@ -250,22 +268,23 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
   <!-- Створення готелю (перший вхід) -->
   <div class="hidden wrap-cab" id="onboardScreen">
     <h1 class="page-title">Створіть профіль готелю</h1>
-    <p class="lede">Це займе хвилину. Далі можна буде все змінити. Перші 3 дні кабінету — безкоштовно.</p>
+    <p class="lede">Це займе хвилину. Далі можна буде все змінити.</p>
     <div class="card">
       <label for="obName">Назва готелю / апартаментів</label>
       <input id="obName" type="text" placeholder="Наприклад, Panorama Apart-Hotel">
       <label for="obAddress">Адреса</label>
       <input id="obAddress" type="text" placeholder="Місто, вулиця, номер будинку">
-      <div class="actions">
-        <button class="btn-primary" id="obSubmit">Створити профіль</button>
+      <div class="actions" style="flex-wrap:wrap;">
+        <button class="btn-primary" id="obSubmitTrial">Почати 3 дні безкоштовно</button>
+        <button class="btn-secondary" id="obSubmitPay">Оплатити зараз</button>
       </div>
       <div class="msg" id="obMsg"></div>
     </div>
   </div>
 
-  <!-- Екран "підписку призупинено" -->
+  <!-- Екран "підписку призупинено" / вибір тарифу одразу при онбордингу -->
   <div class="hidden wrap-cab" id="gateScreen">
-    <h1 class="page-title">Підписку призупинено</h1>
+    <h1 class="page-title" id="gateTitle">Підписку призупинено</h1>
     <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
     <div class="card">
       <h2>Оберіть тариф</h2>
@@ -279,9 +298,10 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         <button class="btn-primary" id="gatePayBtn">Оплатити обраний тариф</button>
         <span class="msg" id="gateMsg"></span>
       </div>
-      <p class="hint" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
+      <p class="hint" id="gateDisclosure" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
     </div>
     <div class="actions">
+      <button class="btn-secondary hidden" id="gateUseTrialBtn">Скористатися пробним періодом замість цього</button>
       <button class="btn-secondary" id="gateSignOutBtn">Вийти з акаунту</button>
     </div>
   </div>
@@ -294,8 +314,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <div class="card">
       <h2>Тариф і підписка</h2>
       <p class="hint" id="subHint">Завантаження…</p>
+      <p class="hint hidden" id="subAutoRenewHint"></p>
       <div class="actions">
         <button class="btn-secondary" id="manageSubBtn">Змінити тариф / оплатити</button>
+        <button class="btn-danger hidden" id="cancelAutoRenewBtn">Скасувати автопродовження</button>
+        <span class="msg" id="cancelAutoRenewMsg"></span>
       </div>
       <div class="hidden" id="subPlanPicker" style="margin-top:18px;">
         <div class="plan-row" id="subPlanRow">
@@ -461,7 +484,69 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // Домен, де лежить widget.js (маркетинговий сайт на Netlify).
   const SITE_ORIGIN = 'https://stayai.online';
 
-  const PLAN_LABELS = { start: 'Старт (€100/міс)', pro: 'Профі (€200/міс)', network: 'Мережа (€300/міс)' };
+  // ---- i18n: той самий стан мови (localStorage-ключ), що й на решті сайту.
+  // Кабінет раніше не мав перемикача мови взагалі — звідси й бага, коли
+  // підписка/відновлення пароля залишались українською незалежно від того,
+  // яку мову людина обрала на сайті. Тут перекладені шапка й акаунт-меню;
+  // решта інтерфейсу кабінету (форми номерів/каналів) поки залишається
+  // українською.
+  const CAB_I18N = {
+    uk: {
+      "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
+      "nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cabinet":"Особистий кабінет",
+      "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
+      "acct.email":"Email","acct.registered":"Дата реєстрації","acct.subscription":"Підписка",
+      "acct.forgotPassword":"Забули пароль?","acct.sendingEmail":"Надсилаємо лист...",
+      "acct.resetSent":"Перевірте пошту — надіслали лист для скидання пароля.",
+      "acct.logout":"Вийти з акаунту",
+      "sub.active":"Активна","sub.inactive":"Не активна","sub.trial":"Пробний період","sub.until":"до","sub.daysShort":"дн.",
+      "plan.start":"Старт (€100/міс)","plan.pro":"Профі (€200/міс)","plan.network":"Мережа (€300/міс)",
+    },
+    ru: {
+      "nav.home":"Главная","nav.features":"Возможности","nav.how":"Как это работает","nav.pricing":"Тарифы",
+      "nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cabinet":"Личный кабинет",
+      "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
+      "acct.email":"Email","acct.registered":"Дата регистрации","acct.subscription":"Подписка",
+      "acct.forgotPassword":"Забыли пароль?","acct.sendingEmail":"Отправляем письмо...",
+      "acct.resetSent":"Проверьте почту — отправили письмо для сброса пароля.",
+      "acct.logout":"Выйти из аккаунта",
+      "sub.active":"Активна","sub.inactive":"Не активна","sub.trial":"Пробный период","sub.until":"до","sub.daysShort":"дн.",
+      "plan.start":"Старт (€100/мес)","plan.pro":"Профи (€200/мес)","plan.network":"Сеть (€300/мес)",
+    },
+    en: {
+      "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
+      "nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cabinet":"Personal cabinet",
+      "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
+      "acct.email":"Email","acct.registered":"Registered on","acct.subscription":"Subscription",
+      "acct.forgotPassword":"Forgot password?","acct.sendingEmail":"Sending email...",
+      "acct.resetSent":"Check your inbox — we sent a password reset email.",
+      "acct.logout":"Log out",
+      "sub.active":"Active","sub.inactive":"Inactive","sub.trial":"Trial period","sub.until":"until","sub.daysShort":"d.",
+      "plan.start":"Start (€100/mo)","plan.pro":"Pro (€200/mo)","plan.network":"Network (€300/mo)",
+    },
+  };
+  function t(key, lang) {
+    const dict = CAB_I18N[lang] || CAB_I18N.uk;
+    return dict[key] !== undefined ? dict[key] : (CAB_I18N.uk[key] !== undefined ? CAB_I18N.uk[key] : key);
+  }
+  function getLang() {
+    let saved = null;
+    try { saved = localStorage.getItem('stayMateLang'); } catch (e) {}
+    return saved || 'uk';
+  }
+  function applyI18n(lang) {
+    document.documentElement.setAttribute('lang', lang);
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n'), lang); });
+    document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'), lang)); });
+    document.querySelectorAll('.lang-menu button').forEach(b => { b.classList.toggle('active', b.dataset.lang === lang); });
+    const label = document.getElementById('langBtnLabel');
+    if (label) label.textContent = lang.toUpperCase();
+    renderAccountStatus();
+  }
+  function setLang(lang) {
+    try { localStorage.setItem('stayMateLang', lang); } catch (e) {}
+    applyI18n(lang);
+  }
 
   // Захоплюємо це ДО createClient(), бо supabase-js сам розбирає і чистить
   // хеш з токенами при ініціалізації — після цього location.hash вже не
@@ -520,71 +605,60 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // встановити новий. Тому замість "показати пароль" тут — зміна пароля.
   function formatDate(iso) {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+    const lang = getLang();
+    const locale = lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-RU' : 'uk-UA';
+    return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   function subscriptionStatusText(property) {
     if (!property) return '—';
+    const lang = getLang();
     if (property.subscription_status === 'active') {
-      const until = property.subscription_active_until ? formatDate(property.subscription_active_until) : '—';
-      return `${PLAN_LABELS[property.subscription_plan] || property.subscription_plan || 'Активна'} · до ${until}`;
+      const planLabel = (property.subscription_plan && t('plan.' + property.subscription_plan, lang) !== ('plan.' + property.subscription_plan))
+        ? t('plan.' + property.subscription_plan, lang)
+        : (property.subscription_plan || t('sub.active', lang));
+      if (property.subscription_active_until && new Date(property.subscription_active_until) > new Date()) {
+        const daysLeft = Math.max(1, Math.ceil((new Date(property.subscription_active_until) - new Date()) / 86400000));
+        return `${planLabel} · ${daysLeft} ${t('sub.daysShort', lang)} (${t('sub.until', lang)} ${formatDate(property.subscription_active_until)})`;
+      }
+      return planLabel;
     }
     if (property.trial_ends_at && new Date(property.trial_ends_at) > new Date()) {
       const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
-      return `Пробний період · ${daysLeft} дн.`;
+      return `${t('sub.trial', lang)} · ${daysLeft} ${t('sub.daysShort', lang)}`;
     }
-    return 'Не активна';
+    return t('sub.inactive', lang);
   }
 
-  const EYE_SVG = '<svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>';
-
   function buildAccountInfoHTML(suffix) {
-    const pwId = 'acctNewPassword' + suffix;
     const msgId = 'acctPwMsg' + suffix;
+    const lang = getLang();
     return `
-      <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value">${currentUser.email}</span></div>
-      <div class="acct-row"><span class="acct-label">Дата реєстрації</span><span class="acct-value">${formatDate(currentUser.created_at)}</span></div>
-      <div class="acct-row"><span class="acct-label">Підписка</span><span class="acct-value">${subscriptionStatusText(currentProperty)}</span></div>
+      <div class="acct-row"><span class="acct-label">${t('acct.email', lang)}</span><span class="acct-value">${currentUser.email}</span></div>
+      <div class="acct-row"><span class="acct-label">${t('acct.registered', lang)}</span><span class="acct-value">${formatDate(currentUser.created_at)}</span></div>
+      <div class="acct-row"><span class="acct-label">${t('acct.subscription', lang)}</span><span class="acct-value">${subscriptionStatusText(currentProperty)}</span></div>
       <div class="acct-pw">
-        <p class="acct-pw-note">Поточний пароль не можна показати — жодна безпечна система його не зберігає у відкритому вигляді, навіть StayAI. Можна тільки встановити новий.</p>
-        <div class="acct-pw-row">
-          <input type="password" id="${pwId}" placeholder="Новий пароль">
-          <button type="button" class="acct-pw-toggle" data-target="${pwId}" aria-label="Показати введений пароль">${EYE_SVG}</button>
-        </div>
-        <button type="button" class="btn-secondary acct-pw-save" data-target="${pwId}" data-msg="${msgId}">Зберегти новий пароль</button>
+        <button type="button" class="btn-secondary acct-forgot-pw" data-msg="${msgId}" data-email="${currentUser.email}">${t('acct.forgotPassword', lang)}</button>
         <span class="msg" id="${msgId}"></span>
       </div>
-      <button type="button" class="btn-secondary acct-logout">Вийти з акаунту</button>
+      <button type="button" class="btn-secondary acct-logout">${t('acct.logout', lang)}</button>
     `;
   }
 
   function wireAccountInfoEvents(container) {
-    container.querySelectorAll('.acct-pw-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const input = document.getElementById(btn.dataset.target);
-        input.type = input.type === 'password' ? 'text' : 'password';
-      });
-    });
-    container.querySelectorAll('.acct-pw-save').forEach(btn => {
+    container.querySelectorAll('.acct-forgot-pw').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const input = document.getElementById(btn.dataset.target);
         const msg = document.getElementById(btn.dataset.msg);
-        const newPassword = input.value;
         msg.className = 'msg';
-        if (!newPassword || newPassword.length < 6) {
-          msg.className = 'msg error';
-          msg.textContent = 'Пароль має містити щонайменше 6 символів.';
-          return;
-        }
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        msg.textContent = t('acct.sendingEmail', getLang());
+        const { error } = await supabase.auth.resetPasswordForEmail(btn.dataset.email, { redirectTo: window.location.href });
         if (error) {
           msg.className = 'msg error';
           msg.textContent = translateAuthError(error.message);
           return;
         }
         msg.className = 'msg ok';
-        msg.textContent = 'Пароль змінено.';
-        input.value = '';
+        msg.textContent = t('acct.resetSent', getLang());
       });
     });
     container.querySelectorAll('.acct-logout').forEach(btn => {
@@ -782,7 +856,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   }
 
   // ---- Онбординг (створення готелю) ----
-  document.getElementById('obSubmit').addEventListener('click', async () => {
+  // Дає вибір одразу при заповненні профілю: почати з безкоштовного
+  // 3-денного пробного періоду (тоді просто відкриваємо кабінет) або
+  // одразу оплатити тариф і почати без обмежень (тоді ведемо на той самий
+  // екран вибору тарифу й оплати, що й для завершеного пробного періоду).
+  async function createPropertyFromOnboarding() {
     const name = document.getElementById('obName').value.trim();
     const address = document.getElementById('obAddress').value.trim();
     const msg = document.getElementById('obMsg');
@@ -791,7 +869,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (!name) {
       msg.className = 'msg error';
       msg.textContent = 'Вкажіть назву готелю.';
-      return;
+      return null;
     }
 
     const slug = name.toLowerCase()
@@ -810,12 +888,26 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (error) {
       msg.className = 'msg error';
       msg.textContent = translateAuthError(error.message);
-      return;
+      return null;
     }
 
+    return data;
+  }
+
+  document.getElementById('obSubmitTrial').addEventListener('click', async () => {
+    const data = await createPropertyFromOnboarding();
+    if (!data) return;
     currentProperty = data;
     onboardScreen.classList.add('hidden');
-    await showDashboard();
+    showGate('trial_card');
+  });
+
+  document.getElementById('obSubmitPay').addEventListener('click', async () => {
+    const data = await createPropertyFromOnboarding();
+    if (!data) return;
+    currentProperty = data;
+    onboardScreen.classList.add('hidden');
+    showGate('choose_plan');
   });
 
   // ---- Гейтинг доступу за статусом підписки (Фаза 2.3) ----
@@ -835,12 +927,34 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   }
 
   function showGate(reason) {
-    document.getElementById('gateLede').textContent = reason === 'active_expired'
-      ? 'Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.'
-      : 'Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.';
+    currentGateReason = reason;
+    const payBtn = document.getElementById('gatePayBtn');
+    const disclosure = document.getElementById('gateDisclosure');
+    if (reason === 'trial_card') {
+      document.getElementById('gateTitle').textContent = 'Підключіть картку — і почніть безкоштовно';
+      document.getElementById('gateLede').textContent = '3 дні повного доступу безкоштовно. Оберіть тариф, який діятиме після пробного періоду, і підключіть картку — списання не відбудеться прямо зараз.';
+      payBtn.textContent = 'Підключити картку і почати';
+      const trialEndDate = currentProperty && currentProperty.trial_ends_at ? formatDate(currentProperty.trial_ends_at) : 'через 3 дні';
+      disclosure.textContent = `Перше списання станеться ${trialEndDate} — тільки якщо ви не скасуєте підписку раніше. Скасувати автопродовження можна будь-коли в кабінеті, в картці "Тариф і підписка", без жодних додаткових умов.`;
+    } else {
+      payBtn.textContent = 'Оплатити обраний тариф';
+      disclosure.textContent = 'Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).';
+      document.getElementById('gateTitle').textContent = reason === 'choose_plan' ? 'Оберіть тариф' : 'Підписку призупинено';
+      document.getElementById('gateLede').textContent = reason === 'active_expired'
+        ? 'Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.'
+        : reason === 'choose_plan'
+        ? 'Оберіть тариф і оплатіть — доступ відкриється одразу, без обмежень пробного періоду.'
+        : 'Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.';
+    }
+    document.getElementById('gateUseTrialBtn').classList.toggle('hidden', reason !== 'choose_plan');
     setupPlanPicker(document.getElementById('gatePlanRow'));
     gateScreen.classList.remove('hidden');
   }
+
+  document.getElementById('gateUseTrialBtn').addEventListener('click', async () => {
+    gateScreen.classList.add('hidden');
+    await showDashboard();
+  });
 
   document.getElementById('gateSignOutBtn').addEventListener('click', async () => {
     await supabase.auth.signOut();
@@ -867,16 +981,17 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  async function createInvoiceAndRedirect(plan, msgEl) {
+  async function createInvoiceAndRedirect(plan, msgEl, isTrial) {
     if (!plan) {
       msgEl.className = 'msg error';
       msgEl.textContent = 'Спершу оберіть тариф.';
       return;
     }
     msgEl.className = 'msg';
-    msgEl.textContent = 'Створюємо рахунок на оплату...';
+    msgEl.textContent = isTrial ? 'Створюємо посилання для підключення картки...' : 'Створюємо рахунок на оплату...';
     try {
-      const res = await fetch(`${API_BASE_URL}/api/create-subscription-invoice`, {
+      const endpoint = isTrial ? '/api/create-trial-invoice' : '/api/create-subscription-invoice';
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ propertyId: currentProperty.property_id, plan }),
@@ -890,8 +1005,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
+  let currentGateReason = null;
+
   document.getElementById('gatePayBtn').addEventListener('click', () => {
-    createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'));
+    createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), currentGateReason === 'trial_card');
   });
   document.getElementById('subPayBtn').addEventListener('click', () => {
     createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'));
@@ -904,15 +1021,28 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function renderSubscriptionCard() {
     const hint = document.getElementById('subHint');
+    const autoRenewHint = document.getElementById('subAutoRenewHint');
+    const cancelBtn = document.getElementById('cancelAutoRenewBtn');
     const p = currentProperty;
     if (p.subscription_status === 'active') {
       const until = p.subscription_active_until ? new Date(p.subscription_active_until).toLocaleDateString('uk-UA') : '—';
-      hint.textContent = `Активна підписка: ${PLAN_LABELS[p.subscription_plan] || p.subscription_plan || '—'}. Діє до ${until}.`;
+      hint.textContent = `Активна підписка: ${CAB_I18N.uk['plan.' + p.subscription_plan] || p.subscription_plan || '—'}. Діє до ${until}.`;
     } else if (p.trial_ends_at && new Date(p.trial_ends_at) > new Date()) {
       const daysLeft = Math.max(1, Math.ceil((new Date(p.trial_ends_at) - new Date()) / 86400000));
       hint.textContent = `Пробний період — залишилось ${daysLeft} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.`;
     } else {
       hint.textContent = 'Підписка не активна.';
+    }
+    if (p.auto_renew) {
+      const chargeDate = p.subscription_active_until
+        ? new Date(p.subscription_active_until).toLocaleDateString('uk-UA')
+        : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString('uk-UA') : '—');
+      autoRenewHint.textContent = `Увімкнено автопродовження — наступне списання ${chargeDate}. ${p.last_auto_charge_failed ? 'Останнє автоматичне списання не пройшло — перевірте картку.' : ''}`;
+      autoRenewHint.classList.remove('hidden');
+      cancelBtn.classList.remove('hidden');
+    } else {
+      autoRenewHint.classList.add('hidden');
+      cancelBtn.classList.add('hidden');
     }
     // Прийшли з pricing.html з конкретним тарифом — одразу розгорнути вибір.
     if (requestedPlan) {
@@ -920,6 +1050,29 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       setupPlanPicker(document.getElementById('subPlanRow'));
     }
   }
+
+  document.getElementById('cancelAutoRenewBtn').addEventListener('click', async () => {
+    const msg = document.getElementById('cancelAutoRenewMsg');
+    if (!confirm('Скасувати автопродовження підписки? Наступне списання не відбудеться.')) return;
+    msg.className = 'msg';
+    msg.textContent = 'Скасовуємо...';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/cancel-auto-renew`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId: currentProperty.property_id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося скасувати.');
+      currentProperty.auto_renew = false;
+      msg.className = 'msg ok';
+      msg.textContent = 'Автопродовження скасовано.';
+      renderSubscriptionCard();
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
+  });
 
   // ---- Дашборд ----
   async function showDashboard() {
@@ -1184,6 +1337,18 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     msg.textContent = 'Номери збережено.';
     setTimeout(() => { msg.textContent = ''; }, 2500);
   });
+
+  // ---- Перемикач мови (той самий стан, що й на решті сайту) ----
+  const langBtn = document.getElementById('langBtn');
+  const langMenu = document.getElementById('langMenu');
+  if (langBtn && langMenu) {
+    langBtn.addEventListener('click', (e) => { e.stopPropagation(); langMenu.classList.toggle('open'); });
+    document.addEventListener('click', () => langMenu.classList.remove('open'));
+    langMenu.querySelectorAll('button').forEach(b => {
+      b.addEventListener('click', () => { setLang(b.dataset.lang); langMenu.classList.remove('open'); });
+    });
+  }
+  applyI18n(getLang());
 
   // ---- Старт ----
   (async () => {

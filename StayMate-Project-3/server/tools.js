@@ -36,7 +36,7 @@ function wfpSignature(fields) {
   return crypto.createHmac('md5', WFP_MERCHANT_SECRET).update(str).digest('hex');
 }
 
-async function createWayForPayInvoice({ orderReference, productName, price, serviceUrl, currency = 'UAH' }) {
+async function createWayForPayInvoice({ orderReference, productName, price, serviceUrl, currency = 'UAH', regular }) {
   const orderDate = Math.floor(Date.now() / 1000);
   const signature = wfpSignature([
     WFP_MERCHANT_ACCOUNT,
@@ -70,6 +70,18 @@ async function createWayForPayInvoice({ orderReference, productName, price, serv
     productCount: [1],
   };
 
+  // Автопродовження (пробний період із картою → автосписання після його
+  // закінчення). ВАЖЛИВО: ці поля (regularMode/regularCount/dateBegin)
+  // зібрані з публічних джерел WayForPay, але НЕ перевірені напряму проти
+  // їхньої документації в цьому середовищі (мережевий доступ до
+  // wiki.wayforpay.com заблоковано) — перед реальними списаннями це
+  // обов'язково перевірити в пісочниці WayForPay разом з їхньою підтримкою.
+  if (regular) {
+    body.regularMode = regular.mode || 'monthly';
+    body.regularCount = regular.count || 120; // "необмежено" на практиці
+    body.dateBegin = regular.dateBegin; // unix timestamp першого фактичного списання
+  }
+
   const response = await fetch(WFP_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -80,7 +92,34 @@ async function createWayForPayInvoice({ orderReference, productName, price, serv
   if (data.reasonCode !== 1100 || !data.invoiceUrl) {
     throw new Error(`WayForPay: ${data.reason || 'невідома помилка'} (code ${data.reasonCode})`);
   }
-  return data.invoiceUrl;
+  return { invoiceUrl: data.invoiceUrl, orderReference: data.orderReference || orderReference };
+}
+
+// Скасування регулярного платежу на стороні WayForPay — best-effort.
+// НЕ покладаємось на це як на єдиний захист від списання: перед цим
+// викликом сервер ЗАВЖДИ спершу вимикає auto_renew в БД (єдине надійне
+// джерело правди), а цей виклик — лише спроба прибрати мандат і на боці
+// самого WayForPay. Поле transactionType тут теж не перевірено проти живої
+// документації — потребує підтвердження перед продакшеном.
+async function cancelRegularPayment(orderReference) {
+  const signature = wfpSignature([WFP_MERCHANT_ACCOUNT, orderReference]);
+  try {
+    const response = await fetch(WFP_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        transactionType: 'REMOVE_REGULAR_PAYMENT',
+        merchantAccount: WFP_MERCHANT_ACCOUNT,
+        merchantSignature: signature,
+        orderReference,
+        apiVersion: 1,
+      }),
+    });
+    const data = await response.json();
+    return { ok: data.reasonCode === 1100, raw: data };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
 }
 
 /**
@@ -95,18 +134,22 @@ const SUBSCRIPTION_PLANS = {
   network: { label: 'Мережа', priceEur: 300 },
 };
 
-async function createSubscriptionInvoice({ orderId, plan, propertyName }) {
+async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRenewDateBegin }) {
   const planInfo = SUBSCRIPTION_PLANS[plan];
   if (!planInfo) {
     throw new Error(`Невідомий тариф: ${plan}`);
   }
 
-  const invoiceUrl = await createWayForPayInvoice({
+  const { invoiceUrl } = await createWayForPayInvoice({
     orderReference: orderId,
     productName: `StayAI — тариф «${planInfo.label}» ${propertyName || ''}`.trim(),
     price: planInfo.priceEur,
     currency: 'EUR',
     serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
+    // Якщо передано autoRenewDateBegin — це підключення картки одразу при
+    // старті пробного періоду: перше фактичне списання станеться саме
+    // тоді (закінчення тріалу), а не зараз.
+    regular: autoRenewDateBegin ? { mode: 'monthly', dateBegin: autoRenewDateBegin } : undefined,
   });
   return { invoiceUrl, priceEur: planInfo.priceEur };
 }
@@ -211,11 +254,11 @@ function createTools(propertyId) {
 
     let paymentLink;
     try {
-      paymentLink = await createWayForPayInvoice({
+      ({ invoiceUrl: paymentLink } = await createWayForPayInvoice({
         orderReference: bookingId,
         productName: `${room.room_type} — ${nights} ${nights === 1 ? 'ніч' : 'ночі'} (${check_in} — ${check_out})`,
         price: totalPrice,
-      });
+      }));
     } catch (wfpError) {
       console.error('[createBooking] WayForPay error:', wfpError.message);
       return { ok: false, error: 'Технічна помилка при створенні посилання на оплату.' };
@@ -316,4 +359,4 @@ const toolDefinitions = [
   },
 ];
 
-module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, SUBSCRIPTION_PLANS };
+module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS };
