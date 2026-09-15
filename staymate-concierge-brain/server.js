@@ -151,7 +151,7 @@ async function getProperty(propertyId) {
 
   const { data, error } = await supabase
     .from('properties')
-    .select('property_id, hotel_name, telegram_bot_token, subscription_status')
+    .select('property_id, hotel_name, telegram_bot_token, subscription_status, trial_ends_at, subscription_active_until')
     .eq('property_id', propertyId)
     .maybeSingle();
 
@@ -164,6 +164,28 @@ async function getProperty(propertyId) {
   propertyCache.set(propertyId, { data, expiresAt: Date.now() + PROPERTY_CACHE_TTL_MS });
   return data;
 }
+
+// Той самий гейтинг, що й у кабінеті (Фаза 2.3): пробний період 3 дні з
+// моменту створення профілю, далі — тільки активна оплачена підписка.
+// Кабінет сам блокує СВОЮ панель керування після закінчення тріалу, але
+// без цієї перевірки тут бот у Telegram/Viber/на сайті продовжував би
+// відповідати гостям НЕЗАЛЕЖНО від того, платить готель чи ні.
+function computeAccess(property) {
+  const now = new Date();
+  if (property.subscription_status === 'active') {
+    if (!property.subscription_active_until || new Date(property.subscription_active_until) > now) {
+      return { allowed: true };
+    }
+    return { allowed: false };
+  }
+  if (property.trial_ends_at && new Date(property.trial_ends_at) > now) {
+    return { allowed: true };
+  }
+  return { allowed: false };
+}
+
+const PAUSED_MESSAGE =
+  'Вибачте, наразі цей чат тимчасово недоступний. Будь ласка, зверніться до готелю напряму або спробуйте пізніше.';
 
 function sendJson(res, status, payload, extraHeaders) {
   res.writeHead(status, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, extraHeaders));
@@ -298,6 +320,9 @@ const server = http.createServer((req, res) => {
       if (!property) {
         return sendJson(res, 404, { error: `Готель з property_id="${propertyId}" не знайдено.` });
       }
+      if (!computeAccess(property).allowed) {
+        return sendJson(res, 200, { reply: PAUSED_MESSAGE });
+      }
 
       const history = await getHistory(propertyId, 'test', userId);
       history.push({ role: 'user', content: message });
@@ -350,6 +375,16 @@ const server = http.createServer((req, res) => {
       }
 
       const { chatId, text } = parsed;
+
+      if (!computeAccess(property).allowed) {
+        try {
+          await sendTelegramMessage(botToken, chatId, PAUSED_MESSAGE);
+        } catch (e2) {
+          console.error('Не вдалося надіслати повідомлення про паузу в Telegram:', e2);
+        }
+        return;
+      }
+
       const history = await getHistory(propertyId, 'telegram', chatId);
       history.push({ role: 'user', content: text });
 
@@ -410,6 +445,16 @@ const server = http.createServer((req, res) => {
       }
 
       const { chatId, text } = parsed;
+
+      if (!computeAccess(property).allowed) {
+        try {
+          await sendViberMessage(viberToken, chatId, PAUSED_MESSAGE, property.hotel_name);
+        } catch (e2) {
+          console.error('Не вдалося надіслати повідомлення про паузу в Viber:', e2);
+        }
+        return;
+      }
+
       const history = await getHistory(propertyId, 'viber', chatId);
       history.push({ role: 'user', content: text });
 
@@ -451,6 +496,9 @@ const server = http.createServer((req, res) => {
       const property = await getProperty(propertyId);
       if (!property) {
         return sendJson(res, 404, { error: 'Готель з таким ідентифікатором не знайдено.' }, corsHeaders);
+      }
+      if (!computeAccess(property).allowed) {
+        return sendJson(res, 200, { reply: PAUSED_MESSAGE }, corsHeaders);
       }
 
       const history = await getHistory(propertyId, 'website', sessionId);

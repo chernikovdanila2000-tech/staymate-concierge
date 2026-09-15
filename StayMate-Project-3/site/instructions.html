@@ -393,65 +393,45 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
   <div class="wrap">
     <span class="kicker" data-i18n="instr.hero.kicker">Підключення</span>
     <h1 data-i18n="instr.hero.title">Інструкція з налаштування</h1>
-    <p data-i18n="instr.hero.desc">Відкривається одразу після оплати підписки — тут будуть ваш ключ доступу і кроки підключення.</p>
+    <p data-i18n="instr.hero.desc">Повний доступ відкривається одразу після реєстрації — 3 дні безкоштовно, без картки. Ось кроки підключення.</p>
   </div>
 </section>
 
 <section>
   <div class="wrap">
     <div class="reveal">
-      <div class="lock-panel" id="lockPanel">
-        <div class="lock-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" stroke-width="1.6"/></svg>
-        </div>
-        <h3 data-i18n="lock.title">Доступно після оплати</h3>
-        <p data-i18n="lock.desc">Оформіть підписку — і інструкція з персональним ключем доступу відкриється прямо на цій сторінці.</p>
-        <a href="pricing.html" class="btn-secondary" data-i18n="lock.cta">Обрати тариф</a>
-      </div>
-
-      <div class="steps-wrap" id="stepsWrap">
-        <div class="key-box">
-          <span id="apiKeyText">sk_live_staymate_••••••••••••7f2a</span>
-          <button class="copy-btn" id="copyKeyBtn" type="button" data-i18n="key.copy">Скопіювати</button>
-        </div>
-
-        <div class="steps-list" style="margin-top:28px;">
+      <div class="steps-wrap on" id="stepsWrap">
+        <div class="steps-list">
           <div class="step-item done">
             <div class="step-num">01</div>
             <div>
-              <h3 data-i18n="step.s1.title">Отримайте ключ доступу</h3>
-              <p data-i18n="step.s1.desc">Ключ уже створено для вашого кабінету — він показаний вище. Він знадобиться на наступному кроці.</p>
+              <h3 data-i18n="step.s1.title">Зареєструйтеся в кабінеті</h3>
+              <p data-i18n="step.s1.desc">Створіть акаунт — і одразу отримайте 3 дні повного безкоштовного доступу до всіх функцій, картка не потрібна.</p>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num">02</div>
             <div>
-              <h3 data-i18n="step.s2.title">Підключіть канал спілкування</h3>
-              <p data-i18n="step.s2.desc">У особистому кабінеті відкрийте розділ «Канали» → оберіть WhatsApp, Telegram або чат для сайту → вставте ключ доступу.</p>
+              <h3 data-i18n="step.s2.title">Заповніть профіль і додайте номери</h3>
+              <p data-i18n="step.s2.desc">У кабінеті вкажіть назву й адресу закладу, додайте типи номерів, ціни та кількість — StayAI використовує ці дані у відповідях гостям.</p>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num">03</div>
             <div>
-              <h3 data-i18n="step.s3.title">Зв'яжіть систему бронювання</h3>
-              <p data-i18n="step.s3.desc">Вкажіть вашу PMS (Cloudbeds, Beds24 тощо) або завантажте таблицю номерів вручну.</p>
+              <h3 data-i18n="step.s3.title">Підключіть канал спілкування</h3>
+              <p data-i18n="step.s3.desc">У розділі «Канали зв'язку» підключіть Telegram-бота, Viber або скопіюйте код чат-віджета для сайту готелю — усе робиться прямо в кабінеті.</p>
             </div>
           </div>
           <div class="step-item">
             <div class="step-num">04</div>
             <div>
-              <h3 data-i18n="step.s4.title">Завантажте правила об'єкта</h3>
-              <p data-i18n="step.s4.desc">Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами.</p>
-            </div>
-          </div>
-          <div class="step-item">
-            <div class="step-num">05</div>
-            <div>
-              <h3 data-i18n="step.s5.title">Перевірте й запустіть</h3>
-              <p data-i18n="step.s5.desc">Напишіть тестове повідомлення від імені гостя, перевірте відповідь — і увімкніть канал для реальних гостей.</p>
+              <h3 data-i18n="step.s4.title">Перевірте й запустіть</h3>
+              <p data-i18n="step.s4.desc">Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність номерів — і канал готовий приймати реальних гостей.</p>
             </div>
           </div>
         </div>
+        <p class="plan-note" style="margin-top:22px;" data-i18n="instr.trialNote">Після 3 днів пробного періоду доступ ШІ-адміністратора призупиняється, доки не буде оформлено підписку — усі дані в кабінеті зберігаються.</p>
       </div>
     </div>
   </div>
@@ -585,14 +565,12 @@ uk: {
   "connect.cta.primary":"Обрати тариф","connect.cta.secondary":"Вже оплатили? Перейти до інструкції",
 
   "instr.hero.kicker":"Підключення","instr.hero.title":"Інструкція з налаштування",
-  "instr.hero.desc":"Відкривається одразу після оплати підписки — тут будуть ваш ключ доступу і кроки підключення.",
-  "lock.title":"Доступно після оплати","lock.desc":"Оформіть підписку — і інструкція з персональним ключем доступу відкриється прямо на цій сторінці.","lock.cta":"Обрати тариф",
-  "key.copy":"Скопіювати",
-  "step.s1.title":"Отримайте ключ доступу","step.s1.desc":"Ключ уже створено для вашого кабінету — він показаний вище. Він знадобиться на наступному кроці.",
-  "step.s2.title":"Підключіть канал спілкування","step.s2.desc":"У особистому кабінеті відкрийте розділ «Канали» → оберіть WhatsApp, Telegram або чат для сайту → вставте ключ доступу.",
-  "step.s3.title":"Зв'яжіть систему бронювання","step.s3.desc":"Вкажіть вашу PMS (Cloudbeds, Beds24 тощо) або завантажте таблицю номерів вручну — StayAI звірятиметься з нею.",
-  "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayAI дотримуватиметься.",
-  "step.s5.title":"Перевірте й запустіть","step.s5.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність — і увімкніть канал для реальних гостей.",
+  "instr.hero.desc":"Повний доступ відкривається одразу після реєстрації — 3 дні безкоштовно, без картки. Ось кроки підключення.",
+  "instr.trialNote":"Після 3 днів пробного періоду доступ ШІ-адміністратора призупиняється, доки не буде оформлено підписку — усі дані в кабінеті зберігаються.",
+  "step.s1.title":"Зареєструйтеся в кабінеті","step.s1.desc":"Створіть акаунт — і одразу отримайте 3 дні повного безкоштовного доступу до всіх функцій, картка не потрібна.",
+  "step.s2.title":"Заповніть профіль і додайте номери","step.s2.desc":"У кабінеті вкажіть назву й адресу закладу, додайте типи номерів, ціни та кількість — StayAI використовує ці дані у відповідях гостям.",
+  "step.s3.title":"Підключіть канал спілкування","step.s3.desc":"У розділі «Канали зв'язку» підключіть Telegram-бота, Viber або скопіюйте код чат-віджета для сайту готелю — усе робиться прямо в кабінеті.",
+  "step.s4.title":"Перевірте й запустіть","step.s4.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність номерів — і канал готовий приймати реальних гостей.",
 
   "contacts.hero.kicker":"Контакти","contacts.hero.title":"Залишились питання?",
   "contacts.hero.desc":"Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.",
@@ -715,14 +693,12 @@ ru: {
   "connect.cta.primary":"Выбрать тариф","connect.cta.secondary":"Уже оплатили? Перейти к инструкции",
 
   "instr.hero.kicker":"Подключение","instr.hero.title":"Инструкция по настройке",
-  "instr.hero.desc":"Открывается сразу после оплаты подписки — здесь будут ваш ключ доступа и шаги подключения.",
-  "lock.title":"Доступно после оплаты","lock.desc":"Оформите подписку — и инструкция с персональным ключом доступа откроется прямо на этой странице.","lock.cta":"Выбрать тариф",
-  "key.copy":"Скопировать",
-  "step.s1.title":"Получите ключ доступа","step.s1.desc":"Ключ уже создан для вашего кабинета — он показан выше. Он понадобится на следующем шаге.",
-  "step.s2.title":"Подключите канал общения","step.s2.desc":"В личном кабинете откройте раздел «Каналы» → выберите WhatsApp, Telegram или чат для сайта → вставьте ключ доступа.",
-  "step.s3.title":"Свяжите систему бронирования","step.s3.desc":"Укажите вашу PMS (Cloudbeds, Beds24 и т.п.) или загрузите таблицу номеров вручную — StayAI будет сверяться с ней.",
-  "step.s4.title":"Загрузите правила объекта","step.s4.desc":"Заезд/выезд, депозит, животные, парковка — короткий текстовый файл с условиями, которых StayAI будет придерживаться.",
-  "step.s5.title":"Протестируйте и запустите","step.s5.desc":"Напишите тестовое сообщение от лица гостя, проверьте ответ и наличие — и включите канал для реальных гостей.",
+  "instr.hero.desc":"Полный доступ открывается сразу после регистрации — 3 дня бесплатно, без карты. Вот шаги подключения.",
+  "instr.trialNote":"После 3 дней пробного периода доступ ИИ-администратора приостанавливается, пока не будет оформлена подписка — все данные в кабинете сохраняются.",
+  "step.s1.title":"Зарегистрируйтесь в кабинете","step.s1.desc":"Создайте аккаунт — и сразу получите 3 дня полного бесплатного доступа ко всем функциям, карта не нужна.",
+  "step.s2.title":"Заполните профиль и добавьте номера","step.s2.desc":"В кабинете укажите название и адрес заведения, добавьте типы номеров, цены и количество — StayAI использует эти данные в ответах гостям.",
+  "step.s3.title":"Подключите канал общения","step.s3.desc":"В разделе «Каналы связи» подключите Telegram-бота, Viber или скопируйте код чат-виджета для сайта отеля — всё делается прямо в кабинете.",
+  "step.s4.title":"Проверьте и запустите","step.s4.desc":"Напишите тестовое сообщение от лица гостя, проверьте ответ и наличие номеров — и канал готов принимать реальных гостей.",
 
   "contacts.hero.kicker":"Контакты","contacts.hero.title":"Остались вопросы?",
   "contacts.hero.desc":"Ответим по подключению, тарифам или интеграции с вашей системой бронирования.",
@@ -845,14 +821,12 @@ en: {
   "connect.cta.primary":"Choose a plan","connect.cta.secondary":"Already paid? Go to the setup guide",
 
   "instr.hero.kicker":"Setup","instr.hero.title":"Setup guide",
-  "instr.hero.desc":"Unlocks right after you pay for a subscription — your access key and connection steps will appear here.",
-  "lock.title":"Available after payment","lock.desc":"Subscribe and the guide with your personal access key unlocks right on this page.","lock.cta":"Choose a plan",
-  "key.copy":"Copy",
-  "step.s1.title":"Get your access key","step.s1.desc":"Your key is already created for your account — shown above. You'll need it for the next step.",
-  "step.s2.title":"Connect a messaging channel","step.s2.desc":"In your dashboard, open “Channels” → pick WhatsApp, Telegram or the website chat → paste your access key.",
-  "step.s3.title":"Link your booking system","step.s3.desc":"Point it to your PMS (Cloudbeds, Beds24, etc.) or upload a room sheet manually — StayAI will check against it.",
-  "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayAI will follow.",
-  "step.s5.title":"Test and launch","step.s5.desc":"Send a test message as a guest, check the reply and availability — then switch the channel on for real guests.",
+  "instr.hero.desc":"Full access unlocks right after you sign up — 3 days free, no card required. Here are the setup steps.",
+  "instr.trialNote":"After the 3-day trial, the AI concierge pauses replies until a subscription is active — nothing in your dashboard is lost.",
+  "step.s1.title":"Sign up in your dashboard","step.s1.desc":"Create an account — you'll instantly get 3 days of full free access to every feature, no card required.",
+  "step.s2.title":"Fill in your profile and add rooms","step.s2.desc":"In your dashboard, set your property name and address, and add room types, prices and quantities — StayAI uses this data to answer guests.",
+  "step.s3.title":"Connect a messaging channel","step.s3.desc":"In the “Channels” section, connect a Telegram bot, Viber, or copy the website chat widget code — all set up right from your dashboard.",
+  "step.s4.title":"Test and launch","step.s4.desc":"Send a test message as a guest, check the reply and room availability — then the channel is ready for real guests.",
 
   "contacts.hero.kicker":"Contact","contacts.hero.title":"Still have questions?",
   "contacts.hero.desc":"We'll help with setup, pricing, or integrating your booking system.",
@@ -1105,10 +1079,6 @@ function initMisc(){
   const payForm = document.getElementById('payForm');
   if(payForm) initCheckout();
 
-  /* instructions page */
-  const lockPanel = document.getElementById('lockPanel');
-  if(lockPanel) initInstructions();
-
   /* contact form */
   const contactForm = document.getElementById('contactForm');
   if(contactForm){
@@ -1116,16 +1086,6 @@ function initMisc(){
       e.preventDefault();
       showToast(t('toast.contactSent', getLang()));
       contactForm.reset();
-    });
-  }
-
-  /* copy key button */
-  const copyBtn = document.getElementById('copyKeyBtn');
-  if(copyBtn){
-    copyBtn.addEventListener('click', ()=>{
-      const text = document.getElementById('apiKeyText')?.textContent || '';
-      navigator.clipboard?.writeText(text.trim());
-      showToast(t('toast.keyCopied', getLang()));
     });
   }
 
@@ -1403,24 +1363,6 @@ async function initCheckout(){
   document.querySelectorAll('.lang-menu button').forEach(b=>{
     b.addEventListener('click', ()=> setTimeout(updatePlanTag, 0));
   });
-}
-
-/* ---------- instructions page: gate content behind a real account subscription ---------- */
-async function initInstructions(){
-  let subscribed = false;
-  if(window.sb){
-    const session = await authGetSession();
-    if(session){
-      const sub = await getSubscription();
-      subscribed = !!(sub && sub.active);
-    }
-  } else {
-    try{ subscribed = localStorage.getItem('stayMateSubscribed') === '1'; }catch(e){}
-  }
-  if(subscribed){
-    document.getElementById('lockPanel').style.display = 'none';
-    document.getElementById('stepsWrap').classList.add('on');
-  }
 }
 
 </script>

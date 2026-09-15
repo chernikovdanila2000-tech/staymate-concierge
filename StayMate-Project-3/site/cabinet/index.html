@@ -67,7 +67,9 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 .account-icon-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:border-color .2s ease;}
 .account-icon-btn:hover{border-color:var(--ink);}
 .account-icon-btn svg{width:17px; height:17px; color:var(--ink-soft);}
-.account-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:290px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:0 24px 50px -12px rgba(0,0,0,.45); padding:18px; z-index:70;}
+.account-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:290px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:0 24px 50px -12px rgba(0,0,0,.45); padding:18px; z-index:70; opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .16s ease, transform .16s ease; transform-origin:top right;}
+.account-dropdown.open{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+@media (prefers-reduced-motion: reduce){.account-dropdown{transition:none;}}
 .acct-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
 .acct-row:last-of-type{border-bottom:none;}
 .acct-label{color:var(--muted); flex-shrink:0;}
@@ -602,12 +604,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="Акаунт" title="${currentUser.email}">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
-      <div class="account-dropdown hidden" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
+      <div class="account-dropdown" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
     `;
     wireAccountInfoEvents(accountStatus);
     document.getElementById('accountMenuBtn').addEventListener('click', (e) => {
       e.stopPropagation();
-      document.getElementById('accountDropdown').classList.toggle('hidden');
+      document.getElementById('accountDropdown').classList.toggle('open');
     });
 
     accountStatusMobile.classList.remove('hidden');
@@ -618,8 +620,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   document.addEventListener('click', (e) => {
     const dropdown = document.getElementById('accountDropdown');
     const btn = document.getElementById('accountMenuBtn');
-    if (dropdown && !dropdown.classList.contains('hidden') && e.target !== btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
-      dropdown.classList.add('hidden');
+    if (dropdown && dropdown.classList.contains('open') && e.target !== btn && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+      dropdown.classList.remove('open');
     }
   });
 
