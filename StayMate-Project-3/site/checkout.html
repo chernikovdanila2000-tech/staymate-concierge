@@ -942,6 +942,11 @@ function applyI18n(lang){
   document.querySelectorAll('a[data-href-base]').forEach(a=>{
     /* keep query params like ?plan= intact while switching pages, language itself is stored globally, not in URL */
   });
+  // Акаунт-меню будується асинхронно (чекає сесію Supabase) вже ПІСЛЯ першого
+  // виклику applyI18n при завантаженні сторінки, тому його вміст (підписка,
+  // "Забули пароль?") інакше застрягає мовою моменту першого рендеру.
+  // Перебудовуємо його наново при кожній зміні мови.
+  if(typeof initAccountNav === 'function') initAccountNav();
 }
 
 function setLang(lang){
@@ -1065,36 +1070,64 @@ function translateAuthError(message){
 
 /* ---------- account dropdown: субскрипшн-статус і зміна пароля (той самий
    компонент, що й у кабінеті) ---------- */
-const ACCT_PLAN_LABELS = { start: 'Старт (€100/міс)', pro: 'Профі (€200/міс)', network: 'Мережа (€300/міс)' };
+const ACCT_I18N = {
+  uk: {
+    'acct.subscription':'Підписка','acct.forgotPassword':'Забули пароль?',
+    'acct.sendingEmail':'Надсилаємо лист...','acct.resetSent':'Перевірте пошту — надіслали лист для скидання пароля.',
+    'sub.active':'Активна','sub.inactive':'Не активна','sub.trial':'Пробний період','sub.until':'до','sub.daysShort':'дн.',
+    'plan.start':'Старт (€100/міс)','plan.pro':'Профі (€200/міс)','plan.network':'Мережа (€300/міс)',
+  },
+  ru: {
+    'acct.subscription':'Подписка','acct.forgotPassword':'Забыли пароль?',
+    'acct.sendingEmail':'Отправляем письмо...','acct.resetSent':'Проверьте почту — отправили письмо для сброса пароля.',
+    'sub.active':'Активна','sub.inactive':'Не активна','sub.trial':'Пробный период','sub.until':'до','sub.daysShort':'дн.',
+    'plan.start':'Старт (€100/мес)','plan.pro':'Профи (€200/мес)','plan.network':'Сеть (€300/мес)',
+  },
+  en: {
+    'acct.subscription':'Subscription','acct.forgotPassword':'Forgot password?',
+    'acct.sendingEmail':'Sending email...','acct.resetSent':'Check your inbox — we sent a password reset email.',
+    'sub.active':'Active','sub.inactive':'Inactive','sub.trial':'Trial period','sub.until':'until','sub.daysShort':'d.',
+    'plan.start':'Start (€100/mo)','plan.pro':'Pro (€200/mo)','plan.network':'Network (€300/mo)',
+  },
+};
+function acctT(key, lang){
+  const dict = ACCT_I18N[lang] || ACCT_I18N.uk;
+  return dict[key] !== undefined ? dict[key] : (ACCT_I18N.uk[key] !== undefined ? ACCT_I18N.uk[key] : key);
+}
 function acctFormatDate(iso){
   if(!iso) return '—';
-  return new Date(iso).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
+  const lang = getLang();
+  const locale = lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-RU' : 'uk-UA';
+  return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function acctSubscriptionStatusText(property){
   if(!property) return '—';
+  const lang = getLang();
   if(property.subscription_status === 'active'){
-    const planLabel = ACCT_PLAN_LABELS[property.subscription_plan] || property.subscription_plan || 'Активна';
+    const planKey = 'plan.' + property.subscription_plan;
+    const planLabel = acctT(planKey, lang) !== planKey ? acctT(planKey, lang) : (property.subscription_plan || acctT('sub.active', lang));
     if(property.subscription_active_until && new Date(property.subscription_active_until) > new Date()){
       const daysLeft = Math.max(1, Math.ceil((new Date(property.subscription_active_until) - new Date()) / 86400000));
-      return `${planLabel} · ${daysLeft} дн. (до ${acctFormatDate(property.subscription_active_until)})`;
+      return `${planLabel} · ${daysLeft} ${acctT('sub.daysShort', lang)} (${acctT('sub.until', lang)} ${acctFormatDate(property.subscription_active_until)})`;
     }
     return planLabel;
   }
   if(property.trial_ends_at && new Date(property.trial_ends_at) > new Date()){
     const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
-    return `Пробний період · ${daysLeft} дн.`;
+    return `${acctT('sub.trial', lang)} · ${daysLeft} ${acctT('sub.daysShort', lang)}`;
   }
-  return 'Не активна';
+  return acctT('sub.inactive', lang);
 }
 function buildAcctDropdownHTML(session, property){
+  const lang = getLang();
   return `
     <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value" title="${session.user.email}">${session.user.email}</span></div>
-    <div class="acct-row"><span class="acct-label">Підписка</span><span class="acct-value">${acctSubscriptionStatusText(property)}</span></div>
+    <div class="acct-row"><span class="acct-label">${acctT('acct.subscription', lang)}</span><span class="acct-value">${acctSubscriptionStatusText(property)}</span></div>
     <div class="acct-pw">
-      <button type="button" class="btn-secondary acct-forgot-pw" id="acctForgotPwNav" data-email="${session.user.email}">Забули пароль?</button>
+      <button type="button" class="btn-secondary acct-forgot-pw" id="acctForgotPwNav" data-email="${session.user.email}">${acctT('acct.forgotPassword', lang)}</button>
       <span class="msg acct-pw-msg" id="acctPwMsgNav"></span>
     </div>
-    <a href="cabinet/" class="btn-secondary acct-cabinet-link" data-i18n="nav.cabinet">Особистий кабінет</a>
+    <a href="cabinet/" class="btn-secondary acct-cabinet-link" data-i18n="nav.cabinet">${t('nav.cabinet', lang)}</a>
   `;
 }
 function wireAcctDropdownEvents(){
@@ -1102,8 +1135,9 @@ function wireAcctDropdownEvents(){
   if(forgotBtn){
     forgotBtn.addEventListener('click', async () => {
       const msg = document.getElementById('acctPwMsgNav');
+      const lang = getLang();
       msg.className = 'msg acct-pw-msg';
-      msg.textContent = 'Надсилаємо лист...';
+      msg.textContent = acctT('acct.sendingEmail', lang);
       const { error } = await window.sb.auth.resetPasswordForEmail(forgotBtn.dataset.email, { redirectTo: window.location.origin + '/cabinet/' });
       if(error){
         msg.className = 'msg acct-pw-msg error';
@@ -1111,7 +1145,7 @@ function wireAcctDropdownEvents(){
         return;
       }
       msg.className = 'msg acct-pw-msg ok';
-      msg.textContent = 'Перевірте пошту — надіслали лист для скидання пароля.';
+      msg.textContent = acctT('acct.resetSent', lang);
     });
   }
 }
