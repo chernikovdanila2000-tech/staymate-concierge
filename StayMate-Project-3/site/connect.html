@@ -103,7 +103,7 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 
 @media (max-width:920px){
   .nav-links a.nav-link{display:none;}
-  .nav-cta, .nav-account-link{display:none !important;}
+  .nav-cta, .nav-account-link, .account-status{display:none !important;}
   .burger{display:flex;}
   .wrap{padding:0 20px;}
   .nav-tools{gap:8px;}
@@ -169,6 +169,17 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 .account-row .a-value{font-size:15.5px; font-weight:600;}
 .nav-account-link{font-size:14px; color:var(--ink-soft); transition:color .2s ease; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle;}
 .nav-account-link:hover{color:var(--ink);}
+.account-status{position:relative; display:flex; align-items:center; flex-shrink:0;}
+.account-icon-btn{width:36px; height:36px; border-radius:50%; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:border-color .2s ease;}
+.account-icon-btn:hover{border-color:var(--ink);}
+.account-icon-btn svg{width:17px; height:17px; color:var(--ink-soft);}
+.account-dropdown{position:absolute; top:calc(100% + 10px); right:0; width:260px; background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-s); box-shadow:0 24px 50px -12px rgba(0,0,0,.45); padding:16px; z-index:70; opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .16s ease, transform .16s ease; transform-origin:top right;}
+.account-dropdown.open{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+@media (prefers-reduced-motion: reduce){.account-dropdown{transition:none;}}
+.account-dropdown .acct-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; padding-bottom:14px;}
+.account-dropdown .acct-label{color:var(--muted); flex-shrink:0;}
+.account-dropdown .acct-value{font-weight:600; text-align:right; word-break:break-word; max-width:170px;}
+.account-dropdown .acct-cabinet-link{width:100%; justify-content:center;}
 
 /* ---------- hero (home) ---------- */
 .hero{padding:88px 0 104px; position:relative; overflow:hidden;}
@@ -372,7 +383,7 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
         <svg class="icon-moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6"/></svg>
         <svg class="icon-sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
-      <a href="cabinet/" class="nav-account-link" id="navAccountLink" data-i18n="nav.login">Увійти</a>
+      <div class="account-status" id="accountStatus"><a href="cabinet/" class="nav-account-link" id="navAccountLink" data-i18n="nav.login">Увійти</a></div>
       <a href="cabinet/" class="nav-cta nav-connect-btn" data-i18n="nav.cta">Підключити</a>
       <button class="burger" id="burgerBtn" type="button" data-i18n-aria="burger.label" aria-label="Меню"><span></span></button>
     </div>
@@ -957,18 +968,51 @@ function isSubscriptionActive(sub){
 
 /* ---------- nav: swap "Увійти" ↔ account email once session is known ---------- */
 async function initAccountNav(){
-  const links = document.querySelectorAll('.nav-account-link');
+  const accountStatus = document.getElementById('accountStatus');
+  const mobileLinks = document.querySelectorAll('.mobile-panel .nav-account-link');
   const connectBtns = document.querySelectorAll('.nav-connect-btn');
-  if(!links.length && !connectBtns.length) return;
+  if(!accountStatus && !mobileLinks.length && !connectBtns.length) return;
   if(typeof SUPABASE_CONFIGURED !== 'undefined' && !SUPABASE_CONFIGURED){
-    links.forEach(a=>{ a.textContent = t('nav.login', getLang()); a.setAttribute('href','cabinet/'); });
+    mobileLinks.forEach(a=>{ a.textContent = t('nav.login', getLang()); a.setAttribute('href','cabinet/'); });
     return;
   }
   const session = await authGetSession();
-  links.forEach(a=>{
+
+  // Десктоп: замість тексту з email — іконка людини з випадним меню
+  // (той самий компонент, що й у кабінеті), щоб не займати місце в шапці
+  // довгим email і не обрізати його трикрапкою.
+  if(accountStatus){
     if(session){
-      // Email тут лише статус, не посилання — вхід у кабінет тепер через
-      // окрему вкладку "Особистий кабінет" у навігації.
+      accountStatus.innerHTML = `
+        <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="Акаунт" title="${session.user.email}">
+          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <div class="account-dropdown" id="accountDropdown">
+          <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value">${session.user.email}</span></div>
+          <a href="cabinet/" class="btn-secondary acct-cabinet-link" data-i18n="nav.cabinet">Особистий кабінет</a>
+        </div>
+      `;
+      const menuBtn = document.getElementById('accountMenuBtn');
+      menuBtn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        document.getElementById('accountDropdown').classList.toggle('open');
+      });
+    } else {
+      accountStatus.innerHTML = `<a href="cabinet/" class="nav-account-link" id="navAccountLink" data-i18n="nav.login">${t('nav.login', getLang())}</a>`;
+    }
+  }
+  document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('accountDropdown');
+    const btn = document.getElementById('accountMenuBtn');
+    if(dropdown && dropdown.classList.contains('open') && e.target !== btn && !dropdown.contains(e.target) && !(btn && btn.contains(e.target))){
+      dropdown.classList.remove('open');
+    }
+  });
+
+  // Мобільна панель: залишаємо простим текстом (вже на весь екран, іконка
+  // там не потрібна).
+  mobileLinks.forEach(a=>{
+    if(session){
       a.textContent = session.user.email;
       a.removeAttribute('href');
       a.style.cursor = 'default';

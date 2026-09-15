@@ -699,6 +699,16 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       }
     }
 
+    if (mode === 'signin') {
+      // Fire-and-forget: лист-сповіщення про вхід не повинен затримувати чи
+      // блокувати сам вхід, навіть якщо надсилання зараз не налаштоване.
+      fetch(`${API_BASE_URL}/api/notify-signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+    }
+
     await afterLogin();
   });
 

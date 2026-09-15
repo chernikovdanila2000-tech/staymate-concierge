@@ -14,6 +14,7 @@
      POST /webhook/wayforpay                 — підтвердження оплати гостя за бронювання
      POST /webhook/wayforpay-subscription    — підтвердження оплати підписки готелю
      POST /api/create-subscription-invoice   — кабінет запитує рахунок на оплату підписки
+     POST /api/notify-signin                 — кабінет просить надіслати лист "новий вхід в акаунт"
      GET  /health
 
    Запуск:  node server.js
@@ -34,6 +35,8 @@ const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 const WFP_MERCHANT_SECRET = process.env.WAYFORPAY_MERCHANT_SECRET || 'flk3409refn54t54t*FNJRET';
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'StayAI <noreply@stayai.online>';
 const META_MESSENGER_PAGE_ACCESS_TOKEN = process.env.META_MESSENGER_PAGE_ACCESS_TOKEN || '';
 const META_MESSENGER_APP_SECRET = process.env.META_MESSENGER_APP_SECRET || '';
 const META_MESSENGER_VERIFY_TOKEN = process.env.META_MESSENGER_VERIFY_TOKEN || '';
@@ -201,6 +204,46 @@ function readBody(req) {
   });
 }
 
+// Сповіщення "виконано вхід в акаунт" — Supabase такого листа сам не шле
+// (він розсилає листи лише для signup/reset/тощо), тому відправляємо його
+// самі через Resend одразу після успішного signInWithPassword у кабінеті.
+// Якщо RESEND_API_KEY ще не налаштовано на Railway — просто тихо нічого не
+// робимо, щоб відсутність цього листа ніколи не заважала людині увійти.
+async function sendSignInNotification(email) {
+  if (!RESEND_API_KEY || !email) return;
+  const html = `
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background:#ffffff; color:#17181b;">
+  <div style="margin-bottom: 28px;">
+    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#33513f; margin-right:8px;"></span>
+    <span style="font-size:19px; font-weight:700; color:#17181b; font-family: Georgia, 'Times New Roman', serif;">StayAI</span>
+  </div>
+  <h1 style="font-size:21px; margin:0 0 14px; color:#17181b; font-family: Georgia, 'Times New Roman', serif; font-weight:600;">Новий вхід в акаунт</h1>
+  <p style="font-size:15px; line-height:1.6; color:#4b4d53; margin:0 0 20px;">
+    Хтось щойно увійшов у ваш акаунт StayAI (${email}) за допомогою email і пароля.
+  </p>
+  <p style="font-size:15px; line-height:1.6; color:#4b4d53; margin:0;">
+    Якщо це були ви — жодних дій не потрібно. Якщо ви не входили в акаунт щойно — негайно змініть пароль через кнопку "Забули пароль?" на сторінці входу.
+  </p>
+</div>`;
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: RESEND_FROM_EMAIL,
+        to: [email],
+        subject: 'Новий вхід в акаунт — StayAI',
+        html,
+      }),
+    });
+    if (!res.ok) {
+      console.error('[sendSignInNotification] Resend error:', res.status, await res.text());
+    }
+  } catch (error) {
+    console.error('[sendSignInNotification] Failed to send:', error.message);
+  }
+}
+
 function wfpAcceptResponse(orderReference) {
   const time = Math.floor(Date.now() / 1000);
   const signature = crypto
@@ -292,7 +335,7 @@ const server = http.createServer((req, res) => {
     });
     return res.end();
   }
-  if (req.method === 'OPTIONS' && (req.url === '/api/create-subscription-invoice' || req.url === '/api/connect-channel')) {
+  if (req.method === 'OPTIONS' && (req.url === '/api/create-subscription-invoice' || req.url === '/api/connect-channel' || req.url === '/api/notify-signin')) {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -647,6 +690,27 @@ const server = http.createServer((req, res) => {
       }
 
       return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
+    });
+    return;
+  }
+
+  // POST /api/notify-signin — кабінет повідомляє бекенд про успішний вхід,
+  // щоб надіслати листа-сповіщення (Supabase сам такий лист не шле).
+  if (req.method === 'POST' && req.url === '/api/notify-signin') {
+    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+    readBody(req).then(async body => {
+      let parsed;
+      try {
+        parsed = JSON.parse(body || '{}');
+      } catch (e) {
+        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
+      }
+      const { email } = parsed;
+      if (!email) {
+        return sendJson(res, 400, { error: 'Потрібне поле email.' }, corsHeaders);
+      }
+      sendSignInNotification(email).catch(() => {});
+      return sendJson(res, 200, { ok: true }, corsHeaders);
     });
     return;
   }

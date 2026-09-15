@@ -54,6 +54,8 @@ WAYFORPAY_MERCHANT_SECRET
 WAYFORPAY_DOMAIN
 API_BASE_URL                  = https://staymate-concierge-production.up.railway.app
 CABINET_URL                   = https://stayai.online/cabinet/  (необов'язково, є дефолт)
+RESEND_API_KEY                (необов'язково — без нього лист "новий вхід в акаунт" просто не шлеться)
+RESEND_FROM_EMAIL             = StayAI <noreply@stayai.online>  (необов'язково, є дефолт)
 PORT
 ```
 
@@ -71,6 +73,7 @@ PORT
 | `POST /webhook/messenger` | підписані вхідні події Meta Messenger |
 | `POST /api/connect-channel` | кабінет підключає Telegram/Viber (сервер сам реєструє вебхук) |
 | `POST /api/create-subscription-invoice` | кабінет запитує рахунок на оплату підписки |
+| `POST /api/notify-signin` | кабінет просить надіслати лист "новий вхід в акаунт" (через Resend) |
 | `GET /health` | перевірка живості |
 
 ## Структура файлів
