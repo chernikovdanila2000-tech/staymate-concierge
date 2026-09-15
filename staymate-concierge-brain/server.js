@@ -877,6 +877,7 @@ const server =
       }
 
       // =========================
+           // =========================
       // INSTAGRAM MESSAGE
       // =========================
 
@@ -924,6 +925,8 @@ const server =
               );
             }
 
+            console.log('[instagram] PAYLOAD:', rawBody);
+
             const events =
               parseInstagramEvents(
                 payload
@@ -940,6 +943,12 @@ const server =
                   )
                 : '';
 
+            console.log('[instagram] PARSED:', {
+              accountId,
+              eventsCount: events.length,
+              events,
+            });
+
             sendJson(
               res,
               200,
@@ -952,6 +961,10 @@ const server =
               !accountId ||
               events.length === 0
             ) {
+              console.error('[instagram] Nothing to process:', {
+                accountId,
+                eventsCount: events.length,
+              });
               return;
             }
 
@@ -961,6 +974,12 @@ const server =
                   await resolveInstagramConnection(
                     accountId
                   );
+
+                console.log('[instagram] CONNECTION:', {
+                  found: !!connection,
+                  propertyId: connection ? connection.propertyId : null,
+                  instagramAccountId: connection ? connection.instagramAccountId : null,
+                });
 
                 if (!connection) {
                   console.error(
