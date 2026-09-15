@@ -32,6 +32,7 @@ function parseInstagramEvents(payload) {
   const events = [];
 
   for (const entry of payload.entry) {
+    // Формат 1: entry.messaging
     for (const item of entry.messaging || []) {
       if (item.message?.is_echo || !item.sender?.id) continue;
 
@@ -44,6 +45,27 @@ function parseInstagramEvents(payload) {
 
       events.push({
         senderId: String(item.sender.id),
+        text: text.trim(),
+      });
+    }
+
+    // Формат 2: entry.changes[].field === "messages"
+    for (const change of entry.changes || []) {
+      if (change.field !== 'messages') continue;
+
+      const value = change.value || {};
+
+      if (!value.sender?.id) continue;
+
+      const text =
+        value.message?.text ||
+        value.postback?.title ||
+        value.postback?.payload;
+
+      if (typeof text !== 'string' || !text.trim()) continue;
+
+      events.push({
+        senderId: String(value.sender.id),
         text: text.trim(),
       });
     }
@@ -76,6 +98,7 @@ async function sendInstagramMessage(
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
+
     throw new Error(
       `Instagram send failed: ${response.status} ${body.slice(0, 500)}`
     );
