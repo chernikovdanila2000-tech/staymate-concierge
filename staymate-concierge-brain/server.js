@@ -349,9 +349,23 @@ async function resolveInstagramConnection(
     data.credentials &&
     data.credentials.access_token
   ) {
+    let propertyId =
+      String(data.property_id || '').trim();
+
+    if (
+      !propertyId ||
+      !(await getProperty(propertyId))
+    ) {
+      propertyId =
+        await resolveMessengerPropertyId('');
+    }
+
+    if (!propertyId) {
+      return null;
+    }
+
     return {
-      propertyId:
-        String(data.property_id),
+      propertyId,
 
       accessToken:
         String(
@@ -370,7 +384,7 @@ async function resolveInstagramConnection(
       META_INSTAGRAM_ACCOUNT_ID
     ) === accountId
   ) {
-    const propertyId =
+    let propertyId =
       String(
         META_INSTAGRAM_PROPERTY_ID ||
         META_MESSENGER_PROPERTY_ID ||
@@ -378,17 +392,41 @@ async function resolveInstagramConnection(
         ''
       ).trim();
 
-    if (propertyId) {
-      return {
-        propertyId,
+    if (
+      !propertyId ||
+      !(await getProperty(propertyId))
+    ) {
+      console.log(
+        '[instagram] Configured property not found, using property fallback:',
+        propertyId
+      );
 
-        accessToken:
-          META_INSTAGRAM_ACCESS_TOKEN,
-
-        instagramAccountId:
-          accountId,
-      };
+      propertyId =
+        await resolveMessengerPropertyId('');
     }
+
+    if (!propertyId) {
+      console.error(
+        '[instagram] No valid property resolved'
+      );
+
+      return null;
+    }
+
+    console.log(
+      '[instagram] Resolved property:',
+      propertyId
+    );
+
+    return {
+      propertyId,
+
+      accessToken:
+        META_INSTAGRAM_ACCESS_TOKEN,
+
+      instagramAccountId:
+        accountId,
+    };
   }
 
   return null;
