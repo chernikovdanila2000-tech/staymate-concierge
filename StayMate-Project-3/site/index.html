@@ -38,7 +38,8 @@ html[data-theme="dark"]{
 }
 
 *{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth; overflow-x:hidden;}
+body{overflow-x:hidden;}
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
@@ -139,7 +140,7 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 
 /* ---------- 3D animated background: large variant spanning nav + hero on the home page ---------- */
 .hero-3d-wrap{position:relative;}
-.grid-floor-full{position:absolute; inset:0; clip-path:inset(0); z-index:0; pointer-events:none; perspective:760px;}
+.grid-floor-full{position:absolute; inset:0; overflow:hidden; clip-path:inset(0); z-index:0; pointer-events:none; perspective:760px;}
 .grid-floor-full .grid-floor-plane{position:absolute; left:-60%; right:-60%; top:0; bottom:-45%; margin:auto; height:270%; width:220%;
   background-image:linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size:60px 60px;
@@ -317,7 +318,7 @@ html[data-theme="dark"] .spinner{border:2px solid color-mix(in srgb, var(--accen
 .steps-list{display:flex; flex-direction:column;}
 .step-item{display:grid; grid-template-columns:64px 1fr; gap:24px; padding:28px 0; border-bottom:1px solid var(--line);}
 .step-item:last-child{border-bottom:none;}
-.step-num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; color:var(--line-strong);}
+.step-num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; color:var(--ink-soft);}
 .step-item.done .step-num{color:var(--accent-text);}
 .step-item h3{font-size:17px; margin-bottom:8px; font-weight:600;}
 .step-item p{font-size:14.5px; color:var(--ink-soft); line-height:1.6; max-width:560px;}

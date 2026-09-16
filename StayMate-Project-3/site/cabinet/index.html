@@ -32,7 +32,8 @@ html[data-theme="dark"]{
 }
 
 *{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth; overflow-x:hidden;}
+body{overflow-x:hidden;}
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
@@ -736,6 +737,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   });
 
   document.getElementById('authSubmit').addEventListener('click', async () => {
+    const submitBtn = document.getElementById('authSubmit');
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     const msg = document.getElementById('authMsg');
@@ -748,54 +750,66 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
 
-    const { data, error } = mode === 'signin'
-      ? await supabase.auth.signInWithPassword({ email, password })
-      : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href } });
+    // Без цього швидкий подвійний клік (або нетерплячий повторний клік, поки
+    // Supabase ще відповідає) міг надіслати два signIn/signUp одночасно.
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    try {
+      const { data, error } = mode === 'signin'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.href } });
 
-    if (error) {
-      msg.className = 'msg error';
-      msg.textContent = translateAuthError(error.message);
-      return;
-    }
-
-    if (mode === 'signup') {
-      // Supabase, з міркувань безпеки (щоб не розкривати список зареєстрованих
-      // email), повертає "успіх" без помилки навіть якщо цей email вже
-      // зареєстровано й підтверджено — просто identities буде порожнім масивом
-      // і лист повторно НЕ надсилається. Без цієї перевірки людина, що вже
-      // має акаунт, безкінечно бачитиме "перевірте пошту" і не зможе зрозуміти,
-      // чому реєстрація "не працює".
-      const identities = data && data.user && data.user.identities;
-      if (Array.isArray(identities) && identities.length === 0) {
+      if (error) {
         msg.className = 'msg error';
-        msg.textContent = 'Цей email вже зареєстровано. Спробуйте увійти або натисніть "Забули пароль?" (перемкніться на вхід, поле з\'явиться під паролем).';
-        return;
-      }
-      if (!data.session) {
-        msg.className = 'msg ok';
-        msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
+        msg.textContent = translateAuthError(error.message);
         return;
       }
 
-      // Реєстрація одразу з активною сесією (підтвердження email вимкнено
-      // в Supabase) — не змушуємо одразу заповнювати профіль готелю, просто
-      // відправляємо на головну. Заповнити готель можна будь-коли пізніше,
-      // повернувшись у кабінет самостійно.
-      window.location.href = SITE_ORIGIN + '/';
-      return;
-    }
+      if (mode === 'signup') {
+        // Supabase, з міркувань безпеки (щоб не розкривати список зареєстрованих
+        // email), повертає "успіх" без помилки навіть якщо цей email вже
+        // зареєстровано й підтверджено — просто identities буде порожнім масивом
+        // і лист повторно НЕ надсилається. Без цієї перевірки людина, що вже
+        // має акаунт, безкінечно бачитиме "перевірте пошту" і не зможе зрозуміти,
+        // чому реєстрація "не працює".
+        const identities = data && data.user && data.user.identities;
+        if (Array.isArray(identities) && identities.length === 0) {
+          msg.className = 'msg error';
+          msg.textContent = 'Цей email вже зареєстровано. Спробуйте увійти або натисніть "Забули пароль?" (перемкніться на вхід, поле з\'явиться під паролем).';
+          return;
+        }
+        if (!data.session) {
+          msg.className = 'msg ok';
+          msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
+          return;
+        }
 
-    if (mode === 'signin') {
-      // Fire-and-forget: лист-сповіщення про вхід не повинен затримувати чи
-      // блокувати сам вхід, навіть якщо надсилання зараз не налаштоване.
-      fetch(`${API_BASE_URL}/api/notify-signin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      }).catch(() => {});
-    }
+        // Реєстрація одразу з активною сесією (підтвердження email вимкнено
+        // в Supabase) — не змушуємо одразу заповнювати профіль готелю, просто
+        // відправляємо на головну. Заповнити готель можна будь-коли пізніше,
+        // повернувшись у кабінет самостійно.
+        // ВАЖЛИВО: беремо поточний origin, а НЕ SITE_ORIGIN (жорстко
+        // stayai.online) — інакше вхід/реєстрація на будь-якому іншому хості
+        // (netlify.app, прев'ю-деплой, localhost) одразу викидає людину на
+        // продакшен-домен, який може бути ще не готовий чи недоступний.
+        window.location.href = window.location.origin + '/';
+        return;
+      }
 
-    await afterLogin();
+      if (mode === 'signin') {
+        // Fire-and-forget: лист-сповіщення про вхід не повинен затримувати чи
+        // блокувати сам вхід, навіть якщо надсилання зараз не налаштоване.
+        fetch(`${API_BASE_URL}/api/notify-signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        }).catch(() => {});
+      }
+
+      await afterLogin();
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
 
   // ---- Скидання пароля (перехід за посиланням з листа) ----
@@ -1357,8 +1371,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (cameFromSignupConfirmation) {
       // Щойно перейшли за посиланням підтвердження email — так само, як і
       // при миттєвій сесії одразу після реєстрації, не змушуємо заповнювати
-      // профіль готелю просто зараз.
-      window.location.href = SITE_ORIGIN + '/';
+      // профіль готелю просто зараз. Поточний origin, не SITE_ORIGIN — з тих
+      // самих причин, що й вище.
+      window.location.href = window.location.origin + '/';
       return;
     }
     await afterLogin();

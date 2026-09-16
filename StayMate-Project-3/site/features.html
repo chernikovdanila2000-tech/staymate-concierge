@@ -38,7 +38,8 @@ html[data-theme="dark"]{
 }
 
 *{box-sizing:border-box;}
-html{scroll-behavior:smooth;}
+html{scroll-behavior:smooth; overflow-x:hidden;}
+body{overflow-x:hidden;}
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;
@@ -317,7 +318,7 @@ html[data-theme="dark"] .spinner{border:2px solid color-mix(in srgb, var(--accen
 .steps-list{display:flex; flex-direction:column;}
 .step-item{display:grid; grid-template-columns:64px 1fr; gap:24px; padding:28px 0; border-bottom:1px solid var(--line);}
 .step-item:last-child{border-bottom:none;}
-.step-num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; color:var(--line-strong);}
+.step-num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600; color:var(--ink-soft);}
 .step-item.done .step-num{color:var(--accent-text);}
 .step-item h3{font-size:17px; margin-bottom:8px; font-weight:600;}
 .step-item p{font-size:14.5px; color:var(--ink-soft); line-height:1.6; max-width:560px;}
