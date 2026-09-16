@@ -1,949 +1,2995 @@
-/* ============================================================
-   StayAI — сервер ШІ-адміністратора (мультитенантна, мультиканальна версія)
-
-   Один сервер обслуговує БАГАТО готелів одночасно, кожен — з кількома
-   каналами зв'язку (Telegram, Viber, віджет на сайті готелю; WhatsApp
-   та Instagram підключаються пізніше, коли пройде верифікація Meta —
-   див. staymate-completion-plan.md, Фаза 4).
-
-   Роути:
-     POST /chat                              — тестовий роут (потрібен propertyId в тілі)
-     POST /webhook/telegram/<property_id>    — вебхук Telegram-бота готелю
-     POST /webhook/viber/<property_id>       — вебхук Viber-бота готелю
-     POST /webhook/website/<property_id>     — чат-віджет на сайті готелю
-     POST /webhook/wayforpay                 — підтвердження оплати гостя за бронювання
-     POST /webhook/wayforpay-subscription    — підтвердження оплати підписки готелю
-     POST /api/create-subscription-invoice   — кабінет запитує рахунок на оплату підписки
-     POST /api/create-trial-invoice          — кабінет підключає картку на старті пробного періоду (регулярний платіж)
-     POST /api/cancel-auto-renew             — кабінет скасовує автопродовження підписки
-     POST /api/notify-signin                 — кабінет просить надіслати лист "новий вхід в акаунт"
-     GET  /health
-
-   Запуск:  node server.js
-   ============================================================ */
-
 const http = require('http');
 const crypto = require('crypto');
+
 const { runConciergeTurn } = require('./claude-client');
-const { parseTelegramUpdate, sendTelegramMessage, setWebhook: setTelegramWebhook } = require('./telegram');
-const { parseViberUpdate, sendViberMessage, setViberWebhook } = require('./viber');
-const { safeEqual, verifyMessengerSignature, parseMessengerEvents, sendMessengerMessage } = require('./messenger');
+const {
+  parseTelegramUpdate,
+  sendTelegramMessage,
+  setWebhook: setTelegramWebhook,
+} = require('./telegram');
+const {
+  parseViberUpdate,
+  sendViberMessage,
+  setViberWebhook,
+} = require('./viber');
+const {
+  safeEqual,
+  verifyMessengerSignature,
+  parseMessengerEvents,
+  sendMessengerMessage,
+} = require('./messenger');
+const {
+  verifyInstagramSignature,
+  parseInstagramEvents,
+  sendInstagramMessage,
+} = require('./instagram');
 const { serveLegalPage } = require('./legal-pages');
-const { getTelegramToken, getViberToken, invalidateChannel } = require('./channels');
+const {
+  getTelegramToken,
+  getViberToken,
+  invalidateChannel,
+} = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
-const { createSubscriptionInvoice, cancelRegularPayment } = require('./tools');
+const {
+  createSubscriptionInvoice,
+  cancelRegularPayment,
+} = require('./tools');
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const WFP_MERCHANT_SECRET = process.env.WAYFORPAY_MERCHANT_SECRET || 'flk3409refn54t54t*FNJRET';
-const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
-const RESEND_API_KEY = process.env.RESEND_API_KEY || '';
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'StayAI <noreply@stayai.online>';
-const META_MESSENGER_PAGE_ACCESS_TOKEN = process.env.META_MESSENGER_PAGE_ACCESS_TOKEN || '';
-const META_MESSENGER_APP_SECRET = process.env.META_MESSENGER_APP_SECRET || '';
-const META_MESSENGER_VERIFY_TOKEN = process.env.META_MESSENGER_VERIFY_TOKEN || '';
-const META_MESSENGER_PAGE_ID = process.env.META_MESSENGER_PAGE_ID || '';
-const META_MESSENGER_PROPERTY_ID = process.env.META_MESSENGER_PROPERTY_ID || '';
-const PROPERTY_ID = process.env.PROPERTY_ID || '';
-const META_MESSENGER_PAGE_TO_PROPERTY_MAP = process.env.META_MESSENGER_PAGE_TO_PROPERTY_MAP || '';
-const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v24.0';
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+const WFP_MERCHANT_SECRET =
+  process.env.WAYFORPAY_MERCHANT_SECRET ||
+  'flk3409refn54t54t*FNJRET';
+
+const API_BASE_URL =
+  process.env.API_BASE_URL || 'http://localhost:3000';
+
+const RESEND_API_KEY =
+  process.env.RESEND_API_KEY || '';
+
+const RESEND_FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL ||
+  'StayAI <noreply@stayai.online>';
+
+const META_MESSENGER_PAGE_ACCESS_TOKEN =
+  process.env.META_MESSENGER_PAGE_ACCESS_TOKEN || '';
+
+const META_MESSENGER_APP_SECRET =
+  process.env.META_MESSENGER_APP_SECRET || '';
+
+const META_MESSENGER_VERIFY_TOKEN =
+  process.env.META_MESSENGER_VERIFY_TOKEN || '';
+
+const META_MESSENGER_PAGE_ID =
+  process.env.META_MESSENGER_PAGE_ID || '';
+
+const META_MESSENGER_PROPERTY_ID =
+  process.env.META_MESSENGER_PROPERTY_ID || '';
+
+const META_MESSENGER_PAGE_TO_PROPERTY_MAP =
+  process.env.META_MESSENGER_PAGE_TO_PROPERTY_MAP || '';
+
+const META_GRAPH_VERSION =
+  process.env.META_GRAPH_VERSION || 'v24.0';
+
+const PROPERTY_ID =
+  process.env.PROPERTY_ID || '';
+
+const META_INSTAGRAM_VERIFY_TOKEN =
+  process.env.META_INSTAGRAM_VERIFY_TOKEN || '';
+
+const META_INSTAGRAM_ACCESS_TOKEN =
+  process.env.META_INSTAGRAM_ACCESS_TOKEN || '';
+
+const META_INSTAGRAM_ACCOUNT_ID =
+  process.env.META_INSTAGRAM_ACCOUNT_ID || '';
+
+const META_INSTAGRAM_PROPERTY_ID =
+  process.env.META_INSTAGRAM_PROPERTY_ID || '';
 
 const PORT = process.env.PORT || 3000;
 
-// Проста кеш-пам'ять даних готелю на 60 секунд, щоб не бити Supabase
-// на кожне повідомлення від активного гостя.
-const propertyCache = new Map(); // property_id -> { data, expiresAt }
+const propertyCache = new Map();
 const PROPERTY_CACHE_TTL_MS = 60 * 1000;
-let fallbackPropertyId;
-const invalidPropertyCache = new Map(); // property_id -> number (until timestamp)
+
+const invalidPropertyCache = new Map();
 const MESSENGER_INVALID_PROPERTY_TTL_MS = 5 * 60 * 1000;
 
+let fallbackPropertyId = '';
+
 let parsedMetaPagePropertyMap = {};
+
 try {
   if (META_MESSENGER_PAGE_TO_PROPERTY_MAP) {
-    const parsedMap = JSON.parse(META_MESSENGER_PAGE_TO_PROPERTY_MAP);
-    if (parsedMap && typeof parsedMap === 'object' && !Array.isArray(parsedMap)) {
-      parsedMetaPagePropertyMap = Object.fromEntries(
-        Object.entries(parsedMap).map(([pageId, propertyId]) => [String(pageId), String(propertyId)])
-      );
+    const parsedMap =
+      JSON.parse(META_MESSENGER_PAGE_TO_PROPERTY_MAP);
+
+    if (
+      parsedMap &&
+      typeof parsedMap === 'object' &&
+      !Array.isArray(parsedMap)
+    ) {
+      parsedMetaPagePropertyMap =
+        Object.fromEntries(
+          Object.entries(parsedMap).map(
+            ([pageId, propertyId]) => [
+              String(pageId),
+              String(propertyId),
+            ]
+          )
+        );
     }
   }
 } catch (error) {
-  console.error('[messenger] Failed to parse META_MESSENGER_PAGE_TO_PROPERTY_MAP JSON:', error.message);
+  console.error(
+    '[messenger] Failed to parse page map:',
+    error.message
+  );
 }
 
-async function resolveMessengerPropertyId(entryPageId) {
+async function getProperty(propertyId) {
+  const id = String(propertyId || '').trim();
+
+  if (!id) return null;
+
+  const cached = propertyCache.get(id);
+
+  if (
+    cached &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.data;
+  }
+
+  const { data, error } =
+    await supabase
+      .from('properties')
+      .select(
+        'property_id, hotel_name, telegram_bot_token, subscription_status, trial_ends_at, subscription_active_until'
+      )
+      .eq('property_id', id)
+      .maybeSingle();
+
+  if (error) {
+    console.error(
+      '[getProperty] Supabase error:',
+      error
+    );
+
+    return null;
+  }
+
+  if (!data) return null;
+
+  propertyCache.set(id, {
+    data,
+    expiresAt:
+      Date.now() + PROPERTY_CACHE_TTL_MS,
+  });
+
+  return data;
+}
+
+async function resolveMessengerPropertyId(
+  entryPageId
+) {
   const candidates = [];
-  const addCandidate = (source, propertyId) => {
+
+  const addCandidate = (
+    source,
+    propertyId
+  ) => {
     if (!propertyId) return;
-    const id = String(propertyId).trim();
+
+    const id =
+      String(propertyId).trim();
+
     if (!id) return;
-    if (!candidates.some(item => item.propertyId === id)) {
-      candidates.push({ source, propertyId: id });
+
+    if (
+      !candidates.some(
+        item => item.propertyId === id
+      )
+    ) {
+      candidates.push({
+        source,
+        propertyId: id,
+      });
     }
   };
 
-  if (entryPageId && parsedMetaPagePropertyMap[String(entryPageId)]) {
-    addCandidate(`page:${entryPageId}`, parsedMetaPagePropertyMap[String(entryPageId)]);
-  }
-  if (META_MESSENGER_PROPERTY_ID) {
-    addCandidate('env META_MESSENGER_PROPERTY_ID', META_MESSENGER_PROPERTY_ID);
-  }
-  if (PROPERTY_ID) {
-    addCandidate('env PROPERTY_ID', PROPERTY_ID);
-  }
-  if (candidates.length === 0 && parsedMetaPagePropertyMap && Object.keys(parsedMetaPagePropertyMap).length > 0 && !entryPageId) {
-    for (const [mappedPageId, mappedPropertyId] of Object.entries(parsedMetaPagePropertyMap)) {
-      addCandidate(`map:${mappedPageId}`, mappedPropertyId);
-    }
-  }
-
-  for (const candidate of candidates) {
-    const { propertyId, source } = candidate;
-    const cacheEntry = invalidPropertyCache.get(propertyId);
-    if (cacheEntry && cacheEntry > Date.now()) {
-      continue;
-    }
-
-    const exists = await getProperty(propertyId);
-    if (exists) return propertyId;
-
-    invalidPropertyCache.set(propertyId, Date.now() + MESSENGER_INVALID_PROPERTY_TTL_MS);
-    console.error(
-      `[messenger] Configured property not found for candidate="${propertyId}" from ${source}. ` +
-      `It will be retried after cache expiry.`
+  if (
+    entryPageId &&
+    parsedMetaPagePropertyMap[
+      String(entryPageId)
+    ]
+  ) {
+    addCandidate(
+      `page:${entryPageId}`,
+      parsedMetaPagePropertyMap[
+        String(entryPageId)
+      ]
     );
   }
 
-  if (fallbackPropertyId && !(await getProperty(fallbackPropertyId))) {
-    invalidPropertyCache.set(fallbackPropertyId, Date.now() + MESSENGER_INVALID_PROPERTY_TTL_MS);
-    fallbackPropertyId = '';
-  }
-  if (fallbackPropertyId) return fallbackPropertyId;
+  addCandidate(
+    'META_MESSENGER_PROPERTY_ID',
+    META_MESSENGER_PROPERTY_ID
+  );
 
-  const fallbackAll = await supabase
-    .from('properties')
-    .select('property_id')
-    .order('created_at', { ascending: true })
-    .limit(2);
-  if (!fallbackAll.error && Array.isArray(fallbackAll.data) && fallbackAll.data.length === 1) {
-    fallbackPropertyId = String(fallbackAll.data[0].propertyId || fallbackAll.data[0].property_id);
-    if (fallbackPropertyId) {
-      console.log('[messenger] Auto-chosen single property from DB fallback:', fallbackPropertyId);
-      return fallbackPropertyId;
+  addCandidate(
+    'PROPERTY_ID',
+    PROPERTY_ID
+  );
+
+  for (const candidate of candidates) {
+    const {
+      propertyId,
+      source,
+    } = candidate;
+
+    const invalidUntil =
+      invalidPropertyCache.get(propertyId);
+
+    if (
+      invalidUntil &&
+      invalidUntil > Date.now()
+    ) {
+      continue;
     }
+
+    const property =
+      await getProperty(propertyId);
+
+    if (property) {
+      return propertyId;
+    }
+
+    invalidPropertyCache.set(
+      propertyId,
+      Date.now() +
+        MESSENGER_INVALID_PROPERTY_TTL_MS
+    );
+
+    console.error(
+      `[messenger] Property "${propertyId}" from ${source} not found`
+    );
   }
-  if (!fallbackAll.error && Array.isArray(fallbackAll.data)) {
-    const listed = fallbackAll.data.map((row) => row.property_id).filter(Boolean);
-    if (listed.length > 0 && !fallbackPropertyId) {
-      const candidate = listed[0];
-      fallbackPropertyId = candidate;
-      console.warn('[messenger] Configured property candidates are invalid. ' +
-        `Auto-selected first available property for runtime fallback: ${candidate}`);
-      return candidate;
-    }
-    console.error(`[messenger] Missing property resolution. Configured candidates were invalid. Available properties=${JSON.stringify(listed)}.`);
+
+  if (
+    fallbackPropertyId &&
+    await getProperty(fallbackPropertyId)
+  ) {
+    return fallbackPropertyId;
+  }
+
+  const result =
+    await supabase
+      .from('properties')
+      .select('property_id')
+      .order('created_at', {
+        ascending: true,
+      })
+      .limit(2);
+
+  if (
+    !result.error &&
+    Array.isArray(result.data) &&
+    result.data.length === 1
+  ) {
+    fallbackPropertyId =
+      String(
+        result.data[0].property_id || ''
+      );
+
+    return fallbackPropertyId;
+  }
+
+  if (
+    !result.error &&
+    Array.isArray(result.data) &&
+    result.data.length > 0
+  ) {
+    fallbackPropertyId =
+      String(
+        result.data[0].property_id || ''
+      );
+
+    return fallbackPropertyId;
   }
 
   return '';
 }
 
-async function getProperty(propertyId) {
-  const cached = propertyCache.get(propertyId);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.data;
-  }
+async function resolveInstagramConnection(
+  instagramAccountId
+) {
+  const accountId =
+    String(instagramAccountId || '').trim();
 
-  const { data, error } = await supabase
-    .from('properties')
-    .select('property_id, hotel_name, telegram_bot_token, subscription_status, trial_ends_at, subscription_active_until')
-    .eq('property_id', propertyId)
-    .maybeSingle();
+  if (!accountId) return null;
+
+  const { data, error } =
+    await supabase
+      .from('channels')
+      .select(
+        'property_id, credentials, connected'
+      )
+      .eq(
+        'channel_type',
+        'instagram'
+      )
+      .eq(
+        'connected',
+        true
+      )
+      .contains(
+        'credentials',
+        {
+          instagram_account_id:
+            accountId,
+        }
+      )
+      .limit(1)
+      .maybeSingle();
 
   if (error) {
-    console.error('[getProperty] Supabase error:', error);
-    return null;
+    console.error(
+      '[instagram] Channel lookup error:',
+      error
+    );
   }
-  if (!data) return null;
 
-  propertyCache.set(propertyId, { data, expiresAt: Date.now() + PROPERTY_CACHE_TTL_MS });
-  return data;
+  if (
+    data &&
+    data.credentials &&
+    data.credentials.access_token
+  ) {
+    let propertyId =
+      String(data.property_id || '').trim();
+
+    if (
+      !propertyId ||
+      !(await getProperty(propertyId))
+    ) {
+      propertyId =
+        await resolveMessengerPropertyId('');
+    }
+
+    if (!propertyId) {
+      return null;
+    }
+
+    return {
+      propertyId,
+
+      accessToken:
+        String(
+          data.credentials.access_token
+        ),
+
+      instagramAccountId:
+        accountId,
+    };
+  }
+
+  if (
+    META_INSTAGRAM_ACCESS_TOKEN &&
+    META_INSTAGRAM_ACCOUNT_ID &&
+    String(
+      META_INSTAGRAM_ACCOUNT_ID
+    ) === accountId
+  ) {
+    let propertyId =
+      String(
+        META_INSTAGRAM_PROPERTY_ID ||
+        META_MESSENGER_PROPERTY_ID ||
+        PROPERTY_ID ||
+        ''
+      ).trim();
+
+    if (
+      !propertyId ||
+      !(await getProperty(propertyId))
+    ) {
+      console.log(
+        '[instagram] Configured property not found, using property fallback:',
+        propertyId
+      );
+
+      propertyId =
+        await resolveMessengerPropertyId('');
+    }
+
+    if (!propertyId) {
+      console.error(
+        '[instagram] No valid property resolved'
+      );
+
+      return null;
+    }
+
+    console.log(
+      '[instagram] Resolved property:',
+      propertyId
+    );
+
+    return {
+      propertyId,
+
+      accessToken:
+        META_INSTAGRAM_ACCESS_TOKEN,
+
+      instagramAccountId:
+        accountId,
+    };
+  }
+
+  return null;
 }
 
-// Той самий гейтинг, що й у кабінеті (Фаза 2.3): пробний період 3 дні з
-// моменту створення профілю, далі — тільки активна оплачена підписка.
-// Кабінет сам блокує СВОЮ панель керування після закінчення тріалу, але
-// без цієї перевірки тут бот у Telegram/Viber/на сайті продовжував би
-// відповідати гостям НЕЗАЛЕЖНО від того, платить готель чи ні.
 function computeAccess(property) {
   const now = new Date();
-  if (property.subscription_status === 'active') {
-    if (!property.subscription_active_until || new Date(property.subscription_active_until) > now) {
-      return { allowed: true };
+
+  if (
+    property.subscription_status ===
+    'active'
+  ) {
+    if (
+      !property.subscription_active_until ||
+      new Date(
+        property.subscription_active_until
+      ) > now
+    ) {
+      return {
+        allowed: true,
+      };
     }
-    return { allowed: false };
+
+    return {
+      allowed: false,
+    };
   }
-  if (property.trial_ends_at && new Date(property.trial_ends_at) > now) {
-    return { allowed: true };
+
+  if (
+    property.trial_ends_at &&
+    new Date(
+      property.trial_ends_at
+    ) > now
+  ) {
+    return {
+      allowed: true,
+    };
   }
-  return { allowed: false };
+
+  return {
+    allowed: false,
+  };
 }
 
 const PAUSED_MESSAGE =
   'Вибачте, наразі цей чат тимчасово недоступний. Будь ласка, зверніться до готелю напряму або спробуйте пізніше.';
 
-function sendJson(res, status, payload, extraHeaders) {
-  res.writeHead(status, Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, extraHeaders));
-  res.end(JSON.stringify(payload));
+function sendJson(
+  res,
+  status,
+  payload,
+  extraHeaders
+) {
+  res.writeHead(
+    status,
+    Object.assign(
+      {
+        'Content-Type':
+          'application/json; charset=utf-8',
+      },
+      extraHeaders || {}
+    )
+  );
+
+  res.end(
+    JSON.stringify(payload)
+  );
 }
 
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => resolve(body));
-    req.on('error', reject);
-  });
+  return new Promise(
+    (resolve, reject) => {
+      let body = '';
+
+      req.on(
+        'data',
+        chunk => {
+          body += chunk;
+        }
+      );
+
+      req.on(
+        'end',
+        () => resolve(body)
+      );
+
+      req.on(
+        'error',
+        reject
+      );
+    }
+  );
 }
 
-// Сповіщення "виконано вхід в акаунт" — Supabase такого листа сам не шле
-// (він розсилає листи лише для signup/reset/тощо), тому відправляємо його
-// самі через Resend одразу після успішного signInWithPassword у кабінеті.
-// Якщо RESEND_API_KEY ще не налаштовано на Railway — просто тихо нічого не
-// робимо, щоб відсутність цього листа ніколи не заважала людині увійти.
-async function sendSignInNotification(email) {
-  if (!RESEND_API_KEY || !email) return;
+async function sendSignInNotification(
+  email
+) {
+  if (
+    !RESEND_API_KEY ||
+    !email
+  ) {
+    return;
+  }
+
   const html = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background:#ffffff; color:#17181b;">
-  <div style="margin-bottom: 28px;">
-    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#33513f; margin-right:8px;"></span>
-    <span style="font-size:19px; font-weight:700; color:#17181b; font-family: Georgia, 'Times New Roman', serif;">StayAI</span>
-  </div>
-  <h1 style="font-size:21px; margin:0 0 14px; color:#17181b; font-family: Georgia, 'Times New Roman', serif; font-weight:600;">Новий вхід в акаунт</h1>
-  <p style="font-size:15px; line-height:1.6; color:#4b4d53; margin:0 0 20px;">
-    Хтось щойно увійшов у ваш акаунт StayAI (${email}) за допомогою email і пароля.
-  </p>
-  <p style="font-size:15px; line-height:1.6; color:#4b4d53; margin:0;">
-    Якщо це були ви — жодних дій не потрібно. Якщо ви не входили в акаунт щойно — негайно змініть пароль через кнопку "Забули пароль?" на сторінці входу.
-  </p>
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#17181b">
+  <h2>StayAI</h2>
+  <h3>Новий вхід в акаунт</h3>
+  <p>Хтось щойно увійшов у ваш акаунт StayAI (${email}).</p>
+  <p>Якщо це були ви — нічого робити не потрібно. Якщо ні — негайно змініть пароль.</p>
 </div>`;
+
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [email],
-        subject: 'Новий вхід в акаунт — StayAI',
-        html,
-      }),
-    });
-    if (!res.ok) {
-      console.error('[sendSignInNotification] Resend error:', res.status, await res.text());
+    const response =
+      await fetch(
+        'https://api.resend.com/emails',
+        {
+          method: 'POST',
+
+          headers: {
+            Authorization:
+              `Bearer ${RESEND_API_KEY}`,
+
+            'Content-Type':
+              'application/json',
+          },
+
+          body:
+            JSON.stringify({
+              from:
+                RESEND_FROM_EMAIL,
+
+              to: [email],
+
+              subject:
+                'Новий вхід в акаунт — StayAI',
+
+              html,
+            }),
+        }
+      );
+
+    if (!response.ok) {
+      console.error(
+        '[signin-email]',
+        response.status,
+        await response.text()
+      );
     }
   } catch (error) {
-    console.error('[sendSignInNotification] Failed to send:', error.message);
+    console.error(
+      '[signin-email]',
+      error.message
+    );
   }
 }
 
-function wfpAcceptResponse(orderReference) {
-  const time = Math.floor(Date.now() / 1000);
-  const signature = crypto
-    .createHmac('md5', WFP_MERCHANT_SECRET)
-    .update(`${orderReference};accept;${time}`)
-    .digest('hex');
-  return { orderReference, status: 'accept', time, signature };
+function wfpAcceptResponse(
+  orderReference
+) {
+  const time =
+    Math.floor(
+      Date.now() / 1000
+    );
+
+  const signature =
+    crypto
+      .createHmac(
+        'md5',
+        WFP_MERCHANT_SECRET
+      )
+      .update(
+        `${orderReference};accept;${time}`
+      )
+      .digest('hex');
+
+  return {
+    orderReference,
+    status: 'accept',
+    time,
+    signature,
+  };
 }
 
-const server = http.createServer((req, res) => {
-  const requestUrl = new URL(req.url, 'http://localhost');
-
-  // Public policy pages required by Meta App Review.
-  if (req.method === 'GET' && serveLegalPage(requestUrl.pathname, res)) return;
-
-  // GET/POST /webhook/messenger — Meta Messenger webhook.
-  if (requestUrl.pathname === '/webhook/messenger' && req.method === 'GET') {
-    const mode = requestUrl.searchParams.get('hub.mode');
-    const token = requestUrl.searchParams.get('hub.verify_token');
-    const challenge = requestUrl.searchParams.get('hub.challenge');
-    if (mode === 'subscribe' && challenge && safeEqual(token, META_MESSENGER_VERIFY_TOKEN)) {
-      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end(challenge);
-    }
-    return sendJson(res, 403, { error: 'Webhook verification failed.' });
-  }
-
-  if (requestUrl.pathname === '/webhook/messenger' && req.method === 'POST') {
-    readBody(req).then(rawBody => {
-      if (!verifyMessengerSignature(rawBody, req.headers['x-hub-signature-256'], META_MESSENGER_APP_SECRET)) {
-        return sendJson(res, 401, { error: 'Invalid webhook signature.' });
-      }
-      let payload;
-      try {
-        payload = JSON.parse(rawBody || '{}');
-      } catch (error) {
-        return sendJson(res, 400, { error: 'Invalid JSON.' });
-      }
-      const events = parseMessengerEvents(payload, META_MESSENGER_PAGE_ID);
-      sendJson(res, 200, { ok: true });
-
-      setImmediate(async () => {
-        if (!META_MESSENGER_PAGE_ACCESS_TOKEN) {
-          console.error('[messenger] META_MESSENGER_PAGE_ACCESS_TOKEN is not configured.');
-          return;
-        }
-        const entryPageId = Array.isArray(payload.entry) && payload.entry[0] ? payload.entry[0].id : '';
-        const propertyId = await resolveMessengerPropertyId(entryPageId);
-        if (!propertyId) {
-          console.error(
-            `[messenger] Missing property id mapping for page_id=${entryPageId || 'unknown'}. ` +
-            'Set META_MESSENGER_PROPERTY_ID or META_MESSENGER_PAGE_TO_PROPERTY_MAP[page_id].'
-          );
-          return;
-        }
-        const property = await getProperty(propertyId);
-        if (!property) {
-          console.error(
-            `[messenger] Configured property was not found. ` +
-              `Query=properties where property_id="${propertyId}" (page_id=${entryPageId || 'unknown'}).`
-          );
-          return;
-        }
-        for (const event of events) {
-          try {
-            const history = await getHistory(propertyId, 'messenger', event.senderId);
-            history.push({ role: 'user', content: event.text });
-            const { replyText, updatedHistory } = await runConciergeTurn(history, {
-              propertyId,
-              propertyName: property.hotel_name,
-            });
-            await saveHistory(propertyId, 'messenger', event.senderId, updatedHistory);
-            await sendMessengerMessage(META_MESSENGER_PAGE_ACCESS_TOKEN, event.senderId, replyText, META_GRAPH_VERSION);
-          } catch (error) {
-            console.error('[messenger] Failed to process event:', error.message);
-          }
-        }
-      });
-    }).catch(error => sendJson(res, 500, { error: error.message }));
-    return;
-  }
-
-  // CORS preflight для віджета сайту (він може викликатись з домену готелю).
-  if (req.method === 'OPTIONS' && req.url.startsWith('/webhook/website/')) {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
-    return res.end();
-  }
-  if (req.method === 'OPTIONS' && (req.url === '/api/create-subscription-invoice' || req.url === '/api/connect-channel' || req.url === '/api/notify-signin' || req.url === '/api/create-trial-invoice' || req.url === '/api/cancel-auto-renew')) {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    });
-    return res.end();
-  }
-
-  // POST /chat — тестовий роут без месенджера, для перевірки "мозку" напряму.
-  if (req.method === 'POST' && req.url === '/chat') {
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' });
-      }
-
-      const { userId, message, propertyId } = parsed;
-      if (!userId || !message || !propertyId) {
-        return sendJson(res, 400, { error: 'Потрібні поля userId, message і propertyId.' });
-      }
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        return sendJson(res, 404, { error: `Готель з property_id="${propertyId}" не знайдено.` });
-      }
-      if (!computeAccess(property).allowed) {
-        return sendJson(res, 200, { reply: PAUSED_MESSAGE });
-      }
-
-      const history = await getHistory(propertyId, 'test', userId);
-      history.push({ role: 'user', content: message });
-
-      try {
-        const { replyText, updatedHistory } = await runConciergeTurn(history, {
-          propertyId,
-          propertyName: property.hotel_name,
-        });
-        await saveHistory(propertyId, 'test', userId, updatedHistory);
-        return sendJson(res, 200, { reply: replyText });
-      } catch (err) {
-        console.error('Concierge error:', err);
-        return sendJson(res, 500, { error: 'Помилка ШІ-адміністратора: ' + String(err.message || err) });
-      }
-    });
-    return;
-  }
-
-  // POST /webhook/telegram/<property_id> — вебхук конкретного готелю.
-  if (req.method === 'POST' && req.url.startsWith('/webhook/telegram/')) {
-    const propertyId = decodeURIComponent(req.url.slice('/webhook/telegram/'.length));
-
-    readBody(req).then(async body => {
-      // Telegram чекає швидку відповідь 200 — підтверджуємо прийом одразу,
-      // а обробляємо і відповідаємо гостю вже асинхронно.
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end('{"ok":true}');
-
-      let update;
-      try {
-        update = JSON.parse(body || '{}');
-      } catch (e) {
-        console.error('Telegram webhook: невалідний JSON');
-        return;
-      }
-
-      const parsed = parseTelegramUpdate(update);
-      if (!parsed) return; // не текстове повідомлення — ігноруємо
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        console.error(`Telegram webhook: готель "${propertyId}" не знайдено.`);
-        return;
-      }
-      const botToken = await getTelegramToken(propertyId, property);
-      if (!botToken) {
-        console.error(`Telegram webhook: у готелю "${propertyId}" не підключено бота.`);
-        return;
-      }
-
-      const { chatId, text } = parsed;
-
-      if (!computeAccess(property).allowed) {
-        try {
-          await sendTelegramMessage(botToken, chatId, PAUSED_MESSAGE);
-        } catch (e2) {
-          console.error('Не вдалося надіслати повідомлення про паузу в Telegram:', e2);
-        }
-        return;
-      }
-
-      const history = await getHistory(propertyId, 'telegram', chatId);
-      history.push({ role: 'user', content: text });
-
-      try {
-        const { replyText, updatedHistory } = await runConciergeTurn(history, {
-          propertyId,
-          propertyName: property.hotel_name,
-        });
-        await saveHistory(propertyId, 'telegram', chatId, updatedHistory);
-        await sendTelegramMessage(botToken, chatId, replyText);
-      } catch (err) {
-        console.error(`Concierge error (telegram, ${propertyId}):`, err);
-        try {
-          await sendTelegramMessage(
-            botToken,
-            chatId,
-            'Вибачте, сталася технічна помилка. Спробуйте, будь ласка, ще раз трохи пізніше.'
-          );
-        } catch (e2) {
-          console.error('Не вдалося надіслати повідомлення про помилку в Telegram:', e2);
-        }
-      }
-    });
-    return;
-  }
-
-  // POST /webhook/viber/<property_id> — вебхук Viber-бота готелю.
-  if (req.method === 'POST' && req.url.startsWith('/webhook/viber/')) {
-    const propertyId = decodeURIComponent(req.url.slice('/webhook/viber/'.length));
-
-    readBody(req).then(async body => {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end('{}');
-
-      let update;
-      try {
-        update = JSON.parse(body || '{}');
-      } catch (e) {
-        console.error('Viber webhook: невалідний JSON');
-        return;
-      }
-
-      // Службові події (перевірка вебхука, підписка тощо) — ігноруємо.
-      if (update.event !== 'message') return;
-
-      const parsed = parseViberUpdate(update);
-      if (!parsed) return;
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        console.error(`Viber webhook: готель "${propertyId}" не знайдено.`);
-        return;
-      }
-      const viberToken = await getViberToken(propertyId);
-      if (!viberToken) {
-        console.error(`Viber webhook: у готелю "${propertyId}" не підключено Viber-бота.`);
-        return;
-      }
-
-      const { chatId, text } = parsed;
-
-      if (!computeAccess(property).allowed) {
-        try {
-          await sendViberMessage(viberToken, chatId, PAUSED_MESSAGE, property.hotel_name);
-        } catch (e2) {
-          console.error('Не вдалося надіслати повідомлення про паузу в Viber:', e2);
-        }
-        return;
-      }
-
-      const history = await getHistory(propertyId, 'viber', chatId);
-      history.push({ role: 'user', content: text });
-
-      try {
-        const { replyText, updatedHistory } = await runConciergeTurn(history, {
-          propertyId,
-          propertyName: property.hotel_name,
-        });
-        await saveHistory(propertyId, 'viber', chatId, updatedHistory);
-        await sendViberMessage(viberToken, chatId, replyText, property.hotel_name);
-      } catch (err) {
-        console.error(`Concierge error (viber, ${propertyId}):`, err);
-      }
-    });
-    return;
-  }
-
-  // POST /webhook/website/<property_id> — чат-віджет, вбудований на сайт готелю.
-  if (req.method === 'POST' && req.url.startsWith('/webhook/website/')) {
-    const propertyId = decodeURIComponent(req.url.slice('/webhook/website/'.length));
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-
-      const { sessionId, message } = parsed;
-      if (!sessionId || !message) {
-        return sendJson(res, 400, { error: 'Потрібні поля sessionId і message.' }, corsHeaders);
-      }
-      if (String(message).length > 2000) {
-        return sendJson(res, 400, { error: 'Повідомлення занадто довге.' }, corsHeaders);
-      }
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        return sendJson(res, 404, { error: 'Готель з таким ідентифікатором не знайдено.' }, corsHeaders);
-      }
-      if (!computeAccess(property).allowed) {
-        return sendJson(res, 200, { reply: PAUSED_MESSAGE }, corsHeaders);
-      }
-
-      const history = await getHistory(propertyId, 'website', sessionId);
-      history.push({ role: 'user', content: String(message) });
-
-      try {
-        const { replyText, updatedHistory } = await runConciergeTurn(history, {
-          propertyId,
-          propertyName: property.hotel_name,
-        });
-        await saveHistory(propertyId, 'website', sessionId, updatedHistory);
-        return sendJson(res, 200, { reply: replyText }, corsHeaders);
-      } catch (err) {
-        console.error(`Concierge error (website, ${propertyId}):`, err);
-        return sendJson(res, 500, { error: 'Помилка ШІ-адміністратора. Спробуйте ще раз трохи пізніше.' }, corsHeaders);
-      }
-    });
-    return;
-  }
-
-  // POST /webhook/wayforpay — підтвердження оплати ГОСТЯ за бронювання.
-  if (req.method === 'POST' && req.url === '/webhook/wayforpay') {
-    readBody(req).then(async rawBody => {
-      let payload;
-      try {
-        payload = JSON.parse(rawBody);
-      } catch (err) {
-        console.error('WayForPay webhook: невалідний JSON —', err.message);
-        res.writeHead(400);
-        return res.end();
-      }
-
-      const { orderReference, transactionStatus } = payload;
-      console.log(`WayForPay webhook (booking): ${orderReference} → ${transactionStatus}`);
-
-      if (orderReference && transactionStatus === 'Approved') {
-        const { error } = await supabase
-          .from('bookings')
-          .update({ status: 'paid' })
-          .eq('booking_id', orderReference);
-        if (error) {
-          console.error('WayForPay webhook: не вдалося оновити статус бронювання', orderReference, error);
-        } else {
-          console.log(`WayForPay webhook: бронювання ${orderReference} оплачено ✅`);
-        }
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(wfpAcceptResponse(orderReference)));
-    });
-    return;
-  }
-
-  // POST /webhook/wayforpay-subscription — підтвердження оплати ПІДПИСКИ готелю (Фаза 2).
-  if (req.method === 'POST' && req.url === '/webhook/wayforpay-subscription') {
-    readBody(req).then(async rawBody => {
-      let payload;
-      try {
-        payload = JSON.parse(rawBody);
-      } catch (err) {
-        console.error('WayForPay webhook (subscription): невалідний JSON —', err.message);
-        res.writeHead(400);
-        return res.end();
-      }
-
-      const { orderReference, transactionStatus } = payload;
-      console.log(`WayForPay webhook (subscription): ${orderReference} → ${transactionStatus}`);
-
-      if (orderReference && transactionStatus === 'Approved') {
-        const { data: order, error: orderError } = await supabase
-          .from('subscription_orders')
-          .select('property_id, plan, is_trial_card')
-          .eq('order_id', orderReference)
-          .maybeSingle();
-
-        if (orderError) {
-          console.error('WayForPay webhook (subscription): помилка пошуку замовлення', orderError);
-        } else if (order) {
-          await supabase.from('subscription_orders').update({ status: 'paid' }).eq('order_id', orderReference);
-
-          if (order.is_trial_card) {
-            // Це підключення картки на старті тріалу, а НЕ обов'язково сам
-            // факт списання грошей — WayForPay може підтвердити мандат ще
-            // до dateBegin. Захищаємось від передчасного "активна" статусу:
-            // якщо тріал ще триває, тільки вмикаємо auto_renew і чекаємо
-            // на dateBegin, коли прийде вже реальне списання (той самий
-            // вебхук спрацює вдруге з тим самим orderReference).
-            const { data: prop } = await supabase
-              .from('properties')
-              .select('trial_ends_at')
-              .eq('property_id', order.property_id)
-              .maybeSingle();
-            const trialStillActive = prop && prop.trial_ends_at && new Date(prop.trial_ends_at) > new Date();
-
-            const update = { auto_renew: true, last_auto_charge_failed: false };
-            if (!trialStillActive) {
-              update.subscription_status = 'active';
-              update.subscription_plan = order.plan;
-              update.subscription_active_until = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
-            }
-            const { error: propError } = await supabase.from('properties').update(update).eq('property_id', order.property_id);
-            if (propError) {
-              console.error('WayForPay webhook (subscription): не вдалося оновити properties (trial card)', propError);
-            } else {
-              propertyCache.delete(order.property_id);
-              console.log(`WayForPay webhook (subscription): картку для "${order.property_id}" підключено, auto_renew=true${trialStillActive ? ' (тріал ще триває)' : ' (списання підтверджено)'}`);
-            }
-          } else {
-            const activeUntil = new Date(Date.now() + 31 * 24 * 60 * 60 * 1000).toISOString();
-            const { error: propError } = await supabase
-              .from('properties')
-              .update({
-                subscription_status: 'active',
-                subscription_plan: order.plan,
-                subscription_active_until: activeUntil,
-              })
-              .eq('property_id', order.property_id);
-            if (propError) {
-              console.error('WayForPay webhook (subscription): не вдалося оновити properties', propError);
-            } else {
-              propertyCache.delete(order.property_id);
-              console.log(`WayForPay webhook (subscription): підписку "${order.property_id}" активовано ✅`);
-            }
-          }
-        }
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(wfpAcceptResponse(orderReference)));
-    });
-    return;
-  }
-
-  // POST /api/create-subscription-invoice — кабінет запитує рахунок на оплату підписки.
-  if (req.method === 'POST' && req.url === '/api/create-subscription-invoice') {
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-
-      const { propertyId, plan } = parsed;
-      if (!propertyId || !plan) {
-        return sendJson(res, 400, { error: 'Потрібні поля propertyId і plan.' }, corsHeaders);
-      }
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
-      }
-
-      const orderId = 'SUB' + Math.random().toString(36).slice(2, 8).toUpperCase();
-
-      let invoiceUrl, priceEur;
-      try {
-        ({ invoiceUrl, priceEur } = await createSubscriptionInvoice({
-          orderId,
-          plan,
-          propertyName: property.hotel_name,
-        }));
-      } catch (e) {
-        console.error('[create-subscription-invoice] WayForPay error:', e.message);
-        return sendJson(res, 500, { error: 'Не вдалося створити рахунок на оплату: ' + e.message }, corsHeaders);
-      }
-
-      const { error: insertError } = await supabase
-        .from('subscription_orders')
-        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_eur: priceEur });
-
-      if (insertError) {
-        console.error('[create-subscription-invoice] Supabase error:', insertError);
-        return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
-      }
-
-      return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
-    });
-    return;
-  }
-
-  // POST /api/create-trial-invoice — старт пробного періоду з прив'язкою
-  // картки: перше фактичне списання призначене на дату закінчення тріалу
-  // (property.trial_ends_at), а не зараз. ВАЖЛИВО: поля регулярного платежу
-  // WayForPay (regularMode/dateBegin) зібрані з відкритих джерел і НЕ
-  // перевірені напряму проти документації WayForPay в цьому середовищі —
-  // перед реальними списаннями обов'язково протестувати в їхній пісочниці.
-  if (req.method === 'POST' && req.url === '/api/create-trial-invoice') {
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-
-      const { propertyId, plan } = parsed;
-      if (!propertyId || !plan) {
-        return sendJson(res, 400, { error: 'Потрібні поля propertyId і plan.' }, corsHeaders);
-      }
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
-      }
-      if (!property.trial_ends_at) {
-        return sendJson(res, 400, { error: 'У цього готелю немає активного пробного періоду.' }, corsHeaders);
-      }
-
-      const orderId = 'TRL' + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const dateBegin = Math.floor(new Date(property.trial_ends_at).getTime() / 1000);
-
-      let invoiceUrl, priceEur;
-      try {
-        ({ invoiceUrl, priceEur } = await createSubscriptionInvoice({
-          orderId,
-          plan,
-          propertyName: property.hotel_name,
-          autoRenewDateBegin: dateBegin,
-        }));
-      } catch (e) {
-        console.error('[create-trial-invoice] WayForPay error:', e.message);
-        return sendJson(res, 500, { error: 'Не вдалося підготувати підключення картки: ' + e.message }, corsHeaders);
-      }
-
-      const { error: insertError } = await supabase
-        .from('subscription_orders')
-        .insert({ order_id: orderId, property_id: propertyId, plan, status: 'pending', amount_eur: priceEur, is_trial_card: true });
-
-      if (insertError) {
-        console.error('[create-trial-invoice] Supabase error:', insertError);
-        return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
-      }
-
-      const { error: propError } = await supabase
-        .from('properties')
-        .update({ regular_payment_reference: orderId })
-        .eq('property_id', propertyId);
-      if (propError) {
-        console.error('[create-trial-invoice] Не вдалося зберегти regular_payment_reference:', propError);
-      }
-      propertyCache.delete(propertyId);
-
-      return sendJson(res, 200, { invoiceUrl, orderId, priceEur }, corsHeaders);
-    });
-    return;
-  }
-
-  // POST /api/cancel-auto-renew — власник скасовує автопродовження з кабінету.
-  // Спершу ЗАВЖДИ вимикаємо auto_renew в БД (це єдине надійне джерело
-  // правди — жоден подальший вебхук WayForPay вже не продовжить підписку,
-  // навіть якщо виклик до WayForPay нижче не вдасться), і лише потім робимо
-  // best-effort спробу скасувати сам регулярний платіж на боці WayForPay.
-  if (req.method === 'POST' && req.url === '/api/cancel-auto-renew') {
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-
-      const { propertyId } = parsed;
-      if (!propertyId) {
-        return sendJson(res, 400, { error: 'Потрібне поле propertyId.' }, corsHeaders);
-      }
-
-      const { data: property, error: fetchError } = await supabase
-        .from('properties')
-        .select('regular_payment_reference')
-        .eq('property_id', propertyId)
-        .maybeSingle();
-      if (fetchError || !property) {
-        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
-      }
-
-      const { error: updateError } = await supabase
-        .from('properties')
-        .update({ auto_renew: false, subscription_cancelled_at: new Date().toISOString() })
-        .eq('property_id', propertyId);
-      propertyCache.delete(propertyId);
-
-      if (updateError) {
-        console.error('[cancel-auto-renew] Supabase error:', updateError);
-        return sendJson(res, 500, { error: 'Не вдалося скасувати автопродовження.' }, corsHeaders);
-      }
-
-      let wfpResult = { ok: false, skipped: true };
-      if (property.regular_payment_reference) {
-        wfpResult = await cancelRegularPayment(property.regular_payment_reference);
-        if (!wfpResult.ok) {
-          console.error('[cancel-auto-renew] WayForPay-side cancel не підтверджено (auto_renew все одно вимкнено в БД):', wfpResult);
-        }
-      }
-
-      return sendJson(res, 200, { ok: true, wayforpayConfirmed: !!wfpResult.ok }, corsHeaders);
-    });
-    return;
-  }
-
-  // POST /api/notify-signin — кабінет повідомляє бекенд про успішний вхід,
-  // щоб надіслати листа-сповіщення (Supabase сам такий лист не шле).
-  if (req.method === 'POST' && req.url === '/api/notify-signin') {
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-      const { email } = parsed;
-      if (!email) {
-        return sendJson(res, 400, { error: 'Потрібне поле email.' }, corsHeaders);
-      }
-      sendSignInNotification(email).catch(() => {});
-      return sendJson(res, 200, { ok: true }, corsHeaders);
-    });
-    return;
-  }
-
-  // POST /api/connect-channel — кабінет підключає Telegram або Viber:
-  // сервер сам реєструє вебхук у месенджера (уникаємо CORS-залежності від
-  // сторонніх API з браузера) і зберігає токен у таблиці channels.
-  if (req.method === 'POST' && req.url === '/api/connect-channel') {
-    const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
-    readBody(req).then(async body => {
-      let parsed;
-      try {
-        parsed = JSON.parse(body || '{}');
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Некоректний JSON у тілі запиту.' }, corsHeaders);
-      }
-
-      const { propertyId, channelType, credentials } = parsed;
-      if (!propertyId || !channelType || !credentials || !credentials.bot_token) {
-        return sendJson(res, 400, { error: 'Потрібні поля propertyId, channelType і credentials.bot_token.' }, corsHeaders);
-      }
-      if (channelType !== 'telegram' && channelType !== 'viber') {
-        return sendJson(res, 400, { error: 'Цей канал підключається інакше (немає токена-вебхука).' }, corsHeaders);
-      }
-
-      const property = await getProperty(propertyId);
-      if (!property) {
-        return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
-      }
-
-      try {
-        if (channelType === 'telegram') {
-          const result = await setTelegramWebhook(credentials.bot_token, `${API_BASE_URL}/webhook/telegram/${propertyId}`);
-          if (!result.ok) throw new Error(result.description || 'Telegram відхилив токен.');
-        } else {
-          const result = await setViberWebhook(credentials.bot_token, `${API_BASE_URL}/webhook/viber/${propertyId}`);
-          if (result.status !== 0) throw new Error(result.status_message || 'Viber відхилив токен.');
-        }
-      } catch (e) {
-        return sendJson(res, 400, { error: 'Не вдалося підключити: ' + e.message }, corsHeaders);
-      }
-
-      const { error: upsertError } = await supabase
-        .from('channels')
-        .upsert(
-          {
-            property_id: propertyId,
-            channel_type: channelType,
-            credentials,
-            connected: true,
-            connected_at: new Date().toISOString(),
-          },
-          { onConflict: 'property_id,channel_type' }
+const server =
+  http.createServer(
+    (req, res) => {
+      const requestUrl =
+        new URL(
+          req.url,
+          'http://localhost'
         );
 
-      if (upsertError) {
-        console.error('[connect-channel] Supabase error:', upsertError);
-        return sendJson(res, 500, { error: 'Канал підключено, але не вдалося зберегти дані. Спробуйте ще раз.' }, corsHeaders);
+      if (
+        req.method === 'GET' &&
+        serveLegalPage(
+          requestUrl.pathname,
+          res
+        )
+      ) {
+        return;
       }
 
-      invalidateChannel(propertyId, channelType);
-      return sendJson(res, 200, { ok: true }, corsHeaders);
-    });
-    return;
+      // =========================
+      // MESSENGER VERIFY
+      // =========================
+
+      if (
+        requestUrl.pathname ===
+          '/webhook/messenger' &&
+        req.method === 'GET'
+      ) {
+        const mode =
+          requestUrl.searchParams.get(
+            'hub.mode'
+          );
+
+        const token =
+          requestUrl.searchParams.get(
+            'hub.verify_token'
+          );
+
+        const challenge =
+          requestUrl.searchParams.get(
+            'hub.challenge'
+          );
+
+        if (
+          mode === 'subscribe' &&
+          challenge &&
+          safeEqual(
+            token,
+            META_MESSENGER_VERIFY_TOKEN
+          )
+        ) {
+          res.writeHead(
+            200,
+            {
+              'Content-Type':
+                'text/plain; charset=utf-8',
+            }
+          );
+
+          return res.end(
+            challenge
+          );
+        }
+
+        return sendJson(
+          res,
+          403,
+          {
+            error:
+              'Webhook verification failed.',
+          }
+        );
+      }
+
+      // =========================
+      // MESSENGER MESSAGE
+      // =========================
+
+      if (
+        requestUrl.pathname ===
+          '/webhook/messenger' &&
+        req.method === 'POST'
+      ) {
+        readBody(req)
+          .then(rawBody => {
+            if (
+              !verifyMessengerSignature(
+                rawBody,
+                req.headers[
+                  'x-hub-signature-256'
+                ],
+                META_MESSENGER_APP_SECRET
+              )
+            ) {
+              return sendJson(
+                res,
+                401,
+                {
+                  error:
+                    'Invalid webhook signature.',
+                }
+              );
+            }
+
+            let payload;
+
+            try {
+              payload =
+                JSON.parse(
+                  rawBody || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Invalid JSON.',
+                }
+              );
+            }
+
+            const events =
+              parseMessengerEvents(
+                payload,
+                META_MESSENGER_PAGE_ID
+              );
+
+            sendJson(
+              res,
+              200,
+              {
+                ok: true,
+              }
+            );
+
+            setImmediate(
+              async () => {
+                if (
+                  !META_MESSENGER_PAGE_ACCESS_TOKEN
+                ) {
+                  console.error(
+                    '[messenger] Missing access token'
+                  );
+
+                  return;
+                }
+
+                const pageId =
+                  Array.isArray(
+                    payload.entry
+                  ) &&
+                  payload.entry[0]
+                    ? payload
+                        .entry[0]
+                        .id
+                    : '';
+
+                const propertyId =
+                  await resolveMessengerPropertyId(
+                    pageId
+                  );
+
+                if (!propertyId) {
+                  console.error(
+                    '[messenger] Property not resolved'
+                  );
+
+                  return;
+                }
+
+                const property =
+                  await getProperty(
+                    propertyId
+                  );
+
+                if (!property) {
+                  return;
+                }
+
+                for (
+                  const event of events
+                ) {
+                  try {
+                    const history =
+                      await getHistory(
+                        propertyId,
+                        'messenger',
+                        event.senderId
+                      );
+
+                    history.push({
+                      role: 'user',
+                      content:
+                        event.text,
+                    });
+
+                    const {
+                      replyText,
+                      updatedHistory,
+                    } =
+                      await runConciergeTurn(
+                        history,
+                        {
+                          propertyId,
+                          propertyName:
+                            property.hotel_name,
+                        }
+                      );
+
+                    await saveHistory(
+                      propertyId,
+                      'messenger',
+                      event.senderId,
+                      updatedHistory
+                    );
+
+                    await sendMessengerMessage(
+                      META_MESSENGER_PAGE_ACCESS_TOKEN,
+                      event.senderId,
+                      replyText,
+                      META_GRAPH_VERSION
+                    );
+                  } catch (error) {
+                    console.error(
+                      '[messenger]',
+                      error.message
+                    );
+                  }
+                }
+              }
+            );
+          })
+          .catch(
+            error =>
+              sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                }
+              )
+          );
+
+        return;
+      }
+
+      // =========================
+      // INSTAGRAM VERIFY
+      // =========================
+
+      if (
+        requestUrl.pathname ===
+          '/webhook/instagram' &&
+        req.method === 'GET'
+      ) {
+        const mode =
+          requestUrl.searchParams.get(
+            'hub.mode'
+          );
+
+        const token =
+          requestUrl.searchParams.get(
+            'hub.verify_token'
+          );
+
+        const challenge =
+          requestUrl.searchParams.get(
+            'hub.challenge'
+          );
+
+        if (
+          mode === 'subscribe' &&
+          challenge &&
+          safeEqual(
+            token,
+            META_INSTAGRAM_VERIFY_TOKEN
+          )
+        ) {
+          res.writeHead(
+            200,
+            {
+              'Content-Type':
+                'text/plain; charset=utf-8',
+            }
+          );
+
+          return res.end(
+            challenge
+          );
+        }
+
+        return sendJson(
+          res,
+          403,
+          {
+            error:
+              'Instagram webhook verification failed.',
+          }
+        );
+      }
+
+      // =========================
+      // INSTAGRAM MESSAGE
+      // =========================
+
+      if (
+        requestUrl.pathname ===
+          '/webhook/instagram' &&
+        req.method === 'POST'
+      ) {
+        readBody(req)
+          .then(rawBody => {
+            if (
+              !verifyInstagramSignature(
+                rawBody,
+                req.headers[
+                  'x-hub-signature-256'
+                ],
+                META_MESSENGER_APP_SECRET
+              )
+            ) {
+              return sendJson(
+                res,
+                401,
+                {
+                  error:
+                    'Invalid Instagram signature.',
+                }
+              );
+            }
+
+            let payload;
+
+            try {
+              payload =
+                JSON.parse(
+                  rawBody || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Invalid JSON.',
+                }
+              );
+            }
+
+            console.log(
+              '[instagram] PAYLOAD:',
+              rawBody
+            );
+
+            const events =
+              parseInstagramEvents(
+                payload
+              );
+
+            const accountId =
+              Array.isArray(
+                payload.entry
+              ) &&
+              payload.entry[0]
+                ? String(
+                    payload.entry[0]
+                      .id || ''
+                  )
+                : '';
+
+            console.log(
+              '[instagram] PARSED:',
+              {
+                accountId,
+                eventsCount:
+                  events.length,
+                events,
+              }
+            );
+
+            sendJson(
+              res,
+              200,
+              {
+                ok: true,
+              }
+            );
+
+            if (
+              !accountId ||
+              events.length === 0
+            ) {
+              console.error(
+                '[instagram] Nothing to process:',
+                {
+                  accountId,
+                  eventsCount:
+                    events.length,
+                }
+              );
+
+              return;
+            }
+
+            setImmediate(
+              async () => {
+                try {
+                  console.log(
+                    '[instagram] BEFORE CONNECTION'
+                  );
+
+                  const connection =
+                    await resolveInstagramConnection(
+                      accountId
+                    );
+
+                  console.log(
+                    '[instagram] CONNECTION:',
+                    {
+                      found:
+                        !!connection,
+
+                      propertyId:
+                        connection
+                          ? connection.propertyId
+                          : null,
+
+                      instagramAccountId:
+                        connection
+                          ? connection.instagramAccountId
+                          : null,
+                    }
+                  );
+
+                  if (!connection) {
+                    console.error(
+                      `[instagram] No channel for ${accountId}`
+                    );
+
+                    return;
+                  }
+
+                  console.log(
+                    '[instagram] BEFORE PROPERTY:',
+                    connection.propertyId
+                  );
+
+                  const property =
+                    await getProperty(
+                      connection.propertyId
+                    );
+
+                  console.log(
+                    '[instagram] PROPERTY:',
+                    {
+                      found:
+                        !!property,
+
+                      hotelName:
+                        property
+                          ? property.hotel_name
+                          : null,
+
+                      subscriptionStatus:
+                        property
+                          ? property.subscription_status
+                          : null,
+
+                      trialEndsAt:
+                        property
+                          ? property.trial_ends_at
+                          : null,
+
+                      subscriptionActiveUntil:
+                        property
+                          ? property.subscription_active_until
+                          : null,
+                    }
+                  );
+
+                  if (!property) {
+                    console.error(
+                      '[instagram] Property not found:',
+                      connection.propertyId
+                    );
+
+                    return;
+                  }
+
+                  const access =
+                    computeAccess(
+                      property
+                    );
+
+                  console.log(
+                    '[instagram] ACCESS:',
+                    access
+                  );
+
+                  for (
+                    const event of events
+                  ) {
+                    try {
+                      console.log(
+                        '[instagram] EVENT START:',
+                        {
+                          senderId:
+                            event.senderId,
+
+                          text:
+                            event.text,
+                        }
+                      );
+
+                      if (
+                        !access.allowed
+                      ) {
+                        console.log(
+                          '[instagram] BEFORE PAUSED SEND'
+                        );
+
+                        await sendInstagramMessage(
+                          connection.accessToken,
+                          connection.instagramAccountId,
+                          event.senderId,
+                          PAUSED_MESSAGE,
+                          META_GRAPH_VERSION
+                        );
+
+                        console.log(
+                          '[instagram] AFTER PAUSED SEND'
+                        );
+
+                        continue;
+                      }
+
+                      console.log(
+                        '[instagram] BEFORE HISTORY'
+                      );
+
+                      const history =
+                        await getHistory(
+                          connection.propertyId,
+                          'instagram',
+                          event.senderId
+                        );
+
+                      console.log(
+                        '[instagram] HISTORY LOADED:',
+                        {
+                          length:
+                            Array.isArray(
+                              history
+                            )
+                              ? history.length
+                              : null,
+                        }
+                      );
+
+                      history.push({
+                        role: 'user',
+                        content:
+                          event.text,
+                      });
+
+                      console.log(
+                        '[instagram] BEFORE AI'
+                      );
+
+                      const {
+                        replyText,
+                        updatedHistory,
+                      } =
+                        await runConciergeTurn(
+                          history,
+                          {
+                            propertyId:
+                              connection.propertyId,
+
+                            propertyName:
+                              property.hotel_name,
+                          }
+                        );
+
+                      console.log(
+                        '[instagram] AFTER AI:',
+                        {
+                          replyLength:
+                            String(
+                              replyText || ''
+                            ).length,
+
+                          historyLength:
+                            Array.isArray(
+                              updatedHistory
+                            )
+                              ? updatedHistory.length
+                              : null,
+                        }
+                      );
+
+                      console.log(
+                        '[instagram] BEFORE SAVE HISTORY'
+                      );
+
+                      await saveHistory(
+                        connection.propertyId,
+                        'instagram',
+                        event.senderId,
+                        updatedHistory
+                      );
+
+                      console.log(
+                        '[instagram] AFTER SAVE HISTORY'
+                      );
+
+                      console.log(
+                        '[instagram] BEFORE SEND'
+                      );
+
+                      await sendInstagramMessage(
+                        connection.accessToken,
+                        connection.instagramAccountId,
+                        event.senderId,
+                        replyText,
+                        META_GRAPH_VERSION
+                      );
+
+                      console.log(
+                        '[instagram] AFTER SEND'
+                      );
+                    } catch (
+                      error
+                    ) {
+                      console.error(
+                        '[instagram] EVENT ERROR:',
+                        error &&
+                        error.stack
+                          ? error.stack
+                          : error
+                      );
+                    }
+                  }
+                } catch (error) {
+                  console.error(
+                    '[instagram] PROCESS ERROR:',
+                    error &&
+                    error.stack
+                      ? error.stack
+                      : error
+                  );
+                }
+              }
+            );
+          })
+          .catch(
+            error => {
+              console.error(
+                '[instagram] WEBHOOK ERROR:',
+                error &&
+                error.stack
+                  ? error.stack
+                  : error
+              );
+
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                }
+              );
+            }
+          );
+
+        return;
+      }
+
+      // =========================
+      // CORS
+      // =========================
+
+      if (
+        req.method === 'OPTIONS' &&
+        req.url.startsWith(
+          '/webhook/website/'
+        )
+      ) {
+        res.writeHead(
+          204,
+          {
+            'Access-Control-Allow-Origin':
+              '*',
+
+            'Access-Control-Allow-Methods':
+              'POST, OPTIONS',
+
+            'Access-Control-Allow-Headers':
+              'Content-Type',
+          }
+        );
+
+        return res.end();
+      }
+
+      if (
+        req.method === 'OPTIONS' &&
+        [
+          '/api/create-subscription-invoice',
+          '/api/connect-channel',
+          '/api/notify-signin',
+          '/api/create-trial-invoice',
+          '/api/cancel-auto-renew',
+        ].includes(req.url)
+      ) {
+        res.writeHead(
+          204,
+          {
+            'Access-Control-Allow-Origin':
+              '*',
+
+            'Access-Control-Allow-Methods':
+              'POST, OPTIONS',
+
+            'Access-Control-Allow-Headers':
+              'Content-Type',
+          }
+        );
+
+        return res.end();
+      }
+
+      // =========================
+      // TEST CHAT
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url === '/chat'
+      ) {
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                }
+              );
+            }
+
+            const {
+              userId,
+              message,
+              propertyId,
+            } = parsed;
+
+            if (
+              !userId ||
+              !message ||
+              !propertyId
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібні userId, message, propertyId.',
+                }
+              );
+            }
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) {
+              return sendJson(
+                res,
+                404,
+                {
+                  error:
+                    'Готель не знайдено.',
+                }
+              );
+            }
+
+            if (
+              !computeAccess(
+                property
+              ).allowed
+            ) {
+              return sendJson(
+                res,
+                200,
+                {
+                  reply:
+                    PAUSED_MESSAGE,
+                }
+              );
+            }
+
+            const history =
+              await getHistory(
+                propertyId,
+                'test',
+                userId
+              );
+
+            history.push({
+              role: 'user',
+              content: message,
+            });
+
+            try {
+              const {
+                replyText,
+                updatedHistory,
+              } =
+                await runConciergeTurn(
+                  history,
+                  {
+                    propertyId,
+                    propertyName:
+                      property.hotel_name,
+                  }
+                );
+
+              await saveHistory(
+                propertyId,
+                'test',
+                userId,
+                updatedHistory
+              );
+
+              return sendJson(
+                res,
+                200,
+                {
+                  reply:
+                    replyText,
+                }
+              );
+            } catch (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                }
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // TELEGRAM
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url.startsWith(
+          '/webhook/telegram/'
+        )
+      ) {
+        const propertyId =
+          decodeURIComponent(
+            req.url.slice(
+              '/webhook/telegram/'
+                .length
+            )
+          );
+
+        readBody(req).then(
+          async body => {
+            res.writeHead(
+              200,
+              {
+                'Content-Type':
+                  'application/json',
+              }
+            );
+
+            res.end(
+              '{"ok":true}'
+            );
+
+            let update;
+
+            try {
+              update =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return;
+            }
+
+            const parsed =
+              parseTelegramUpdate(
+                update
+              );
+
+            if (!parsed) return;
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) return;
+
+            const botToken =
+              await getTelegramToken(
+                propertyId,
+                property
+              );
+
+            if (!botToken) return;
+
+            const {
+              chatId,
+              text,
+            } = parsed;
+
+            if (
+              !computeAccess(
+                property
+              ).allowed
+            ) {
+              try {
+                await sendTelegramMessage(
+                  botToken,
+                  chatId,
+                  PAUSED_MESSAGE
+                );
+              } catch {}
+
+              return;
+            }
+
+            const history =
+              await getHistory(
+                propertyId,
+                'telegram',
+                chatId
+              );
+
+            history.push({
+              role: 'user',
+              content: text,
+            });
+
+            try {
+              const {
+                replyText,
+                updatedHistory,
+              } =
+                await runConciergeTurn(
+                  history,
+                  {
+                    propertyId,
+                    propertyName:
+                      property.hotel_name,
+                  }
+                );
+
+              await saveHistory(
+                propertyId,
+                'telegram',
+                chatId,
+                updatedHistory
+              );
+
+              await sendTelegramMessage(
+                botToken,
+                chatId,
+                replyText
+              );
+            } catch (error) {
+              console.error(
+                '[telegram]',
+                error.message
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // VIBER
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url.startsWith(
+          '/webhook/viber/'
+        )
+      ) {
+        const propertyId =
+          decodeURIComponent(
+            req.url.slice(
+              '/webhook/viber/'
+                .length
+            )
+          );
+
+        readBody(req).then(
+          async body => {
+            res.writeHead(
+              200,
+              {
+                'Content-Type':
+                  'application/json',
+              }
+            );
+
+            res.end('{}');
+
+            let update;
+
+            try {
+              update =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return;
+            }
+
+            if (
+              update.event !==
+              'message'
+            ) {
+              return;
+            }
+
+            const parsed =
+              parseViberUpdate(
+                update
+              );
+
+            if (!parsed) return;
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) return;
+
+            const viberToken =
+              await getViberToken(
+                propertyId
+              );
+
+            if (!viberToken) return;
+
+            const {
+              chatId,
+              text,
+            } = parsed;
+
+            if (
+              !computeAccess(
+                property
+              ).allowed
+            ) {
+              try {
+                await sendViberMessage(
+                  viberToken,
+                  chatId,
+                  PAUSED_MESSAGE,
+                  property.hotel_name
+                );
+              } catch {}
+
+              return;
+            }
+
+            const history =
+              await getHistory(
+                propertyId,
+                'viber',
+                chatId
+              );
+
+            history.push({
+              role: 'user',
+              content: text,
+            });
+
+            try {
+              const {
+                replyText,
+                updatedHistory,
+              } =
+                await runConciergeTurn(
+                  history,
+                  {
+                    propertyId,
+                    propertyName:
+                      property.hotel_name,
+                  }
+                );
+
+              await saveHistory(
+                propertyId,
+                'viber',
+                chatId,
+                updatedHistory
+              );
+
+              await sendViberMessage(
+                viberToken,
+                chatId,
+                replyText,
+                property.hotel_name
+              );
+            } catch (error) {
+              console.error(
+                '[viber]',
+                error.message
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // WEBSITE
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url.startsWith(
+          '/webhook/website/'
+        )
+      ) {
+        const propertyId =
+          decodeURIComponent(
+            req.url.slice(
+              '/webhook/website/'
+                .length
+            )
+          );
+
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              sessionId,
+              message,
+            } = parsed;
+
+            if (
+              !sessionId ||
+              !message
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібні sessionId і message.',
+                },
+                corsHeaders
+              );
+            }
+
+            if (
+              String(message).length >
+              2000
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Повідомлення занадто довге.',
+                },
+                corsHeaders
+              );
+            }
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) {
+              return sendJson(
+                res,
+                404,
+                {
+                  error:
+                    'Готель не знайдено.',
+                },
+                corsHeaders
+              );
+            }
+
+            if (
+              !computeAccess(
+                property
+              ).allowed
+            ) {
+              return sendJson(
+                res,
+                200,
+                {
+                  reply:
+                    PAUSED_MESSAGE,
+                },
+                corsHeaders
+              );
+            }
+
+            const history =
+              await getHistory(
+                propertyId,
+                'website',
+                sessionId
+              );
+
+            history.push({
+              role: 'user',
+              content:
+                String(message),
+            });
+
+            try {
+              const {
+                replyText,
+                updatedHistory,
+              } =
+                await runConciergeTurn(
+                  history,
+                  {
+                    propertyId,
+                    propertyName:
+                      property.hotel_name,
+                  }
+                );
+
+              await saveHistory(
+                propertyId,
+                'website',
+                sessionId,
+                updatedHistory
+              );
+
+              return sendJson(
+                res,
+                200,
+                {
+                  reply:
+                    replyText,
+                },
+                corsHeaders
+              );
+            } catch (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                },
+                corsHeaders
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // WAYFORPAY BOOKING
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/webhook/wayforpay'
+      ) {
+        readBody(req).then(
+          async rawBody => {
+            let payload;
+
+            try {
+              payload =
+                JSON.parse(
+                  rawBody
+                );
+            } catch {
+              res.writeHead(400);
+              return res.end();
+            }
+
+            const {
+              orderReference,
+              transactionStatus,
+            } = payload;
+
+            if (
+              orderReference &&
+              transactionStatus ===
+                'Approved'
+            ) {
+              const { error } =
+                await supabase
+                  .from('bookings')
+                  .update({
+                    status:
+                      'paid',
+                  })
+                  .eq(
+                    'booking_id',
+                    orderReference
+                  );
+
+              if (error) {
+                console.error(
+                  '[wayforpay booking]',
+                  error
+                );
+              }
+            }
+
+            res.writeHead(
+              200,
+              {
+                'Content-Type':
+                  'application/json',
+              }
+            );
+
+            res.end(
+              JSON.stringify(
+                wfpAcceptResponse(
+                  orderReference
+                )
+              )
+            );
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // WAYFORPAY SUBSCRIPTION
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/webhook/wayforpay-subscription'
+      ) {
+        readBody(req).then(
+          async rawBody => {
+            let payload;
+
+            try {
+              payload =
+                JSON.parse(
+                  rawBody
+                );
+            } catch {
+              res.writeHead(400);
+              return res.end();
+            }
+
+            const {
+              orderReference,
+              transactionStatus,
+            } = payload;
+
+            if (
+              orderReference &&
+              transactionStatus ===
+                'Approved'
+            ) {
+              const {
+                data: order,
+                error,
+              } =
+                await supabase
+                  .from(
+                    'subscription_orders'
+                  )
+                  .select(
+                    'property_id, plan, is_trial_card'
+                  )
+                  .eq(
+                    'order_id',
+                    orderReference
+                  )
+                  .maybeSingle();
+
+              if (
+                !error &&
+                order
+              ) {
+                await supabase
+                  .from(
+                    'subscription_orders'
+                  )
+                  .update({
+                    status:
+                      'paid',
+                  })
+                  .eq(
+                    'order_id',
+                    orderReference
+                  );
+
+                if (
+                  order.is_trial_card
+                ) {
+                  const {
+                    data: prop,
+                  } =
+                    await supabase
+                      .from(
+                        'properties'
+                      )
+                      .select(
+                        'trial_ends_at'
+                      )
+                      .eq(
+                        'property_id',
+                        order.property_id
+                      )
+                      .maybeSingle();
+
+                  const trialActive =
+                    prop &&
+                    prop.trial_ends_at &&
+                    new Date(
+                      prop.trial_ends_at
+                    ) >
+                      new Date();
+
+                  const update = {
+                    auto_renew: true,
+                    last_auto_charge_failed:
+                      false,
+                  };
+
+                  if (!trialActive) {
+                    update.subscription_status =
+                      'active';
+
+                    update.subscription_plan =
+                      order.plan;
+
+                    update.subscription_active_until =
+                      new Date(
+                        Date.now() +
+                          31 *
+                            24 *
+                            60 *
+                            60 *
+                            1000
+                      ).toISOString();
+                  }
+
+                  await supabase
+                    .from('properties')
+                    .update(update)
+                    .eq(
+                      'property_id',
+                      order.property_id
+                    );
+                } else {
+                  await supabase
+                    .from('properties')
+                    .update({
+                      subscription_status:
+                        'active',
+
+                      subscription_plan:
+                        order.plan,
+
+                      subscription_active_until:
+                        new Date(
+                          Date.now() +
+                            31 *
+                              24 *
+                              60 *
+                              60 *
+                              1000
+                        ).toISOString(),
+                    })
+                    .eq(
+                      'property_id',
+                      order.property_id
+                    );
+                }
+
+                propertyCache.delete(
+                  order.property_id
+                );
+              }
+            }
+
+            res.writeHead(
+              200,
+              {
+                'Content-Type':
+                  'application/json',
+              }
+            );
+
+            res.end(
+              JSON.stringify(
+                wfpAcceptResponse(
+                  orderReference
+                )
+              )
+            );
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // CREATE SUBSCRIPTION
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/api/create-subscription-invoice'
+      ) {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              propertyId,
+              plan,
+            } = parsed;
+
+            if (
+              !propertyId ||
+              !plan
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібні propertyId і plan.',
+                },
+                corsHeaders
+              );
+            }
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) {
+              return sendJson(
+                res,
+                404,
+                {
+                  error:
+                    'Готель не знайдено.',
+                },
+                corsHeaders
+              );
+            }
+
+            const orderId =
+              'SUB' +
+              Math.random()
+                .toString(36)
+                .slice(2, 8)
+                .toUpperCase();
+
+            try {
+              const {
+                invoiceUrl,
+                priceEur,
+              } =
+                await createSubscriptionInvoice(
+                  {
+                    orderId,
+                    plan,
+                    propertyName:
+                      property.hotel_name,
+                  }
+                );
+
+              const {
+                error,
+              } =
+                await supabase
+                  .from(
+                    'subscription_orders'
+                  )
+                  .insert({
+                    order_id:
+                      orderId,
+
+                    property_id:
+                      propertyId,
+
+                    plan,
+
+                    status:
+                      'pending',
+
+                    amount_eur:
+                      priceEur,
+                  });
+
+              if (error) {
+                return sendJson(
+                  res,
+                  500,
+                  {
+                    error:
+                      'Не вдалося створити замовлення.',
+                  },
+                  corsHeaders
+                );
+              }
+
+              return sendJson(
+                res,
+                200,
+                {
+                  invoiceUrl,
+                  orderId,
+                  priceEur,
+                },
+                corsHeaders
+              );
+            } catch (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                },
+                corsHeaders
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // CREATE TRIAL
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/api/create-trial-invoice'
+      ) {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              propertyId,
+              plan,
+            } = parsed;
+
+            if (
+              !propertyId ||
+              !plan
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібні propertyId і plan.',
+                },
+                corsHeaders
+              );
+            }
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (
+              !property ||
+              !property.trial_ends_at
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Немає активного trial.',
+                },
+                corsHeaders
+              );
+            }
+
+            const orderId =
+              'TRL' +
+              Math.random()
+                .toString(36)
+                .slice(2, 8)
+                .toUpperCase();
+
+            const dateBegin =
+              Math.floor(
+                new Date(
+                  property.trial_ends_at
+                ).getTime() /
+                  1000
+              );
+
+            try {
+              const {
+                invoiceUrl,
+                priceEur,
+              } =
+                await createSubscriptionInvoice(
+                  {
+                    orderId,
+                    plan,
+                    propertyName:
+                      property.hotel_name,
+
+                    autoRenewDateBegin:
+                      dateBegin,
+                  }
+                );
+
+              const {
+                error,
+              } =
+                await supabase
+                  .from(
+                    'subscription_orders'
+                  )
+                  .insert({
+                    order_id:
+                      orderId,
+
+                    property_id:
+                      propertyId,
+
+                    plan,
+
+                    status:
+                      'pending',
+
+                    amount_eur:
+                      priceEur,
+
+                    is_trial_card:
+                      true,
+                  });
+
+              if (error) {
+                return sendJson(
+                  res,
+                  500,
+                  {
+                    error:
+                      'Не вдалося створити trial.',
+                  },
+                  corsHeaders
+                );
+              }
+
+              await supabase
+                .from('properties')
+                .update({
+                  regular_payment_reference:
+                    orderId,
+                })
+                .eq(
+                  'property_id',
+                  propertyId
+                );
+
+              propertyCache.delete(
+                propertyId
+              );
+
+              return sendJson(
+                res,
+                200,
+                {
+                  invoiceUrl,
+                  orderId,
+                  priceEur,
+                },
+                corsHeaders
+              );
+            } catch (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    error.message,
+                },
+                corsHeaders
+              );
+            }
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // CANCEL AUTO RENEW
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/api/cancel-auto-renew'
+      ) {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              propertyId,
+            } = parsed;
+
+            if (!propertyId) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібен propertyId.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              data: property,
+            } =
+              await supabase
+                .from('properties')
+                .select(
+                  'regular_payment_reference'
+                )
+                .eq(
+                  'property_id',
+                  propertyId
+                )
+                .maybeSingle();
+
+            if (!property) {
+              return sendJson(
+                res,
+                404,
+                {
+                  error:
+                    'Готель не знайдено.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              error,
+            } =
+              await supabase
+                .from('properties')
+                .update({
+                  auto_renew:
+                    false,
+
+                  subscription_cancelled_at:
+                    new Date().toISOString(),
+                })
+                .eq(
+                  'property_id',
+                  propertyId
+                );
+
+            if (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    'Не вдалося скасувати.',
+                },
+                corsHeaders
+              );
+            }
+
+            propertyCache.delete(
+              propertyId
+            );
+
+            let wfpResult = {
+              ok: false,
+              skipped: true,
+            };
+
+            if (
+              property.regular_payment_reference
+            ) {
+              wfpResult =
+                await cancelRegularPayment(
+                  property.regular_payment_reference
+                );
+            }
+
+            return sendJson(
+              res,
+              200,
+              {
+                ok: true,
+
+                wayforpayConfirmed:
+                  !!wfpResult.ok,
+              },
+              corsHeaders
+            );
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // LOGIN EMAIL
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/api/notify-signin'
+      ) {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            if (!parsed.email) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібен email.',
+                },
+                corsHeaders
+              );
+            }
+
+            sendSignInNotification(
+              parsed.email
+            ).catch(() => {});
+
+            return sendJson(
+              res,
+              200,
+              {
+                ok: true,
+              },
+              corsHeaders
+            );
+          }
+        );
+
+        return;
+      }
+
+      // =========================
+      // CONNECT TELEGRAM / VIBER
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url ===
+          '/api/connect-channel'
+      ) {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin':
+            '*',
+        };
+
+        readBody(req).then(
+          async body => {
+            let parsed;
+
+            try {
+              parsed =
+                JSON.parse(
+                  body || '{}'
+                );
+            } catch {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Некоректний JSON.',
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              propertyId,
+              channelType,
+              credentials,
+            } = parsed;
+
+            if (
+              !propertyId ||
+              !channelType ||
+              !credentials ||
+              !credentials.bot_token
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Потрібні propertyId, channelType, credentials.bot_token.',
+                },
+                corsHeaders
+              );
+            }
+
+            if (
+              channelType !==
+                'telegram' &&
+              channelType !==
+                'viber'
+            ) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    'Цей канал підключається інакше.',
+                },
+                corsHeaders
+              );
+            }
+
+            const property =
+              await getProperty(
+                propertyId
+              );
+
+            if (!property) {
+              return sendJson(
+                res,
+                404,
+                {
+                  error:
+                    'Готель не знайдено.',
+                },
+                corsHeaders
+              );
+            }
+
+            try {
+              if (
+                channelType ===
+                'telegram'
+              ) {
+                const result =
+                  await setTelegramWebhook(
+                    credentials.bot_token,
+                    `${API_BASE_URL}/webhook/telegram/${propertyId}`
+                  );
+
+                if (!result.ok) {
+                  throw new Error(
+                    result.description ||
+                      'Telegram error'
+                  );
+                }
+              } else {
+                const result =
+                  await setViberWebhook(
+                    credentials.bot_token,
+                    `${API_BASE_URL}/webhook/viber/${propertyId}`
+                  );
+
+                if (
+                  result.status !==
+                  0
+                ) {
+                  throw new Error(
+                    result.status_message ||
+                      'Viber error'
+                  );
+                }
+              }
+            } catch (error) {
+              return sendJson(
+                res,
+                400,
+                {
+                  error:
+                    error.message,
+                },
+                corsHeaders
+              );
+            }
+
+            const {
+              error,
+            } =
+              await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id:
+                      propertyId,
+
+                    channel_type:
+                      channelType,
+
+                    credentials,
+
+                    connected:
+                      true,
+
+                    connected_at:
+                      new Date().toISOString(),
+                  },
+                  {
+                    onConflict:
+                      'property_id,channel_type',
+                  }
+                );
+
+            if (error) {
+              return sendJson(
+                res,
+                500,
+                {
+                  error:
+                    'Не вдалося зберегти канал.',
+                },
+                corsHeaders
+              );
+            }
+
+            invalidateChannel(
+              propertyId,
+              channelType
+            );
+
+            return sendJson(
+              res,
+              200,
+              {
+                ok: true,
+              },
+              corsHeaders
+            );
+          }
+        );
+
+        return;
+      }
+
+      if (
+        req.method === 'GET' &&
+        req.url === '/health'
+      ) {
+        return sendJson(
+          res,
+          200,
+          {
+            ok: true,
+          }
+        );
+      }
+
+      return sendJson(
+        res,
+        404,
+        {
+          error:
+            'Not found',
+        }
+      );
+    }
+  );
+
+server.listen(
+  PORT,
+  () => {
+    console.log(
+      `StayAI concierge server running on http://localhost:${PORT}`
+    );
+
+    console.log(
+      '[messenger] Configured:',
+      {
+        pageId:
+          META_MESSENGER_PAGE_ID ||
+          'not_set',
+
+        propertyId:
+          META_MESSENGER_PROPERTY_ID ||
+          'not_set',
+      }
+    );
+
+    console.log(
+      '[instagram] Configured:',
+      {
+        accountId:
+          META_INSTAGRAM_ACCOUNT_ID ||
+          'not_set',
+
+        propertyId:
+          META_INSTAGRAM_PROPERTY_ID ||
+          'not_set',
+
+        hasAccessToken:
+          !!META_INSTAGRAM_ACCESS_TOKEN,
+
+        hasVerifyToken:
+          !!META_INSTAGRAM_VERIFY_TOKEN,
+      }
+    );
   }
-
-  if (req.method === 'GET' && req.url === '/health') {
-    return sendJson(res, 200, { ok: true });
-  }
-
-  sendJson(res, 404, { error: 'Not found' });
-});
-
-server.listen(PORT, () => {
-  console.log(`StayAI concierge server running on http://localhost:${PORT}`);
-  const mapKeys = Object.keys(parsedMetaPagePropertyMap || {});
-  console.log('[messenger] Configured:', {
-    pageId: META_MESSENGER_PAGE_ID || 'not_set',
-    propertyId: META_MESSENGER_PROPERTY_ID || 'not_set',
-    hasDirectMap: mapKeys.length > 0,
-    mapCount: mapKeys.length,
-  });
-});
+);
