@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { installBackendMock } = require('../helpers/mockBackend');
-const { MARKETING_PAGES, LANGS } = require('../helpers/pages');
+const { MARKETING_PAGES, ALL_SITE_PAGES, LANGS } = require('../helpers/pages');
 
 const CYRILLIC = /[Ѐ-ӿ]/;
 
@@ -49,9 +49,39 @@ test.describe('i18n — language persists across navigation and reload', () => {
   test('language persists after a full page reload', async ({ page }) => {
     await installBackendMock(page);
     await page.goto('/index.html');
-    await switchLang(page, 'ru');
+    await switchLang(page, 'en');
     await page.reload();
-    await expect(page.locator('#langBtnLabel')).toHaveText('RU');
+    await expect(page.locator('#langBtnLabel')).toHaveText('EN');
+  });
+});
+
+test.describe('i18n — Russian removed site-wide (regression)', () => {
+  for (const pagePath of ALL_SITE_PAGES) {
+    test(`${pagePath}: language switcher has no Russian option`, async ({ page }) => {
+      await installBackendMock(page);
+      await page.goto(`/${pagePath}`);
+      await expect(page.locator('#langMenu button[data-lang="ru"]')).toHaveCount(0);
+      await expect(page.locator('#langMenu button')).toHaveCount(2); // uk + en only
+    });
+  }
+
+  test('cabinet language switcher has no Russian option', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#langMenu button[data-lang="ru"]')).toHaveCount(0);
+    await expect(page.locator('#langMenu button')).toHaveCount(2);
+  });
+
+  test('a stale stayMateLang=ru from before the removal falls back to Ukrainian, not a broken state', async ({ page }) => {
+    await installBackendMock(page);
+    await page.addInitScript(() => { try { localStorage.setItem('stayMateLang', 'ru'); } catch (e) {} });
+    await page.goto('/index.html');
+    await expect(page.locator('#langBtnLabel')).toHaveText('UK');
+    await expect(page.locator('.nav-links a[data-i18n="nav.home"]')).toHaveText('Головна');
   });
 });
 

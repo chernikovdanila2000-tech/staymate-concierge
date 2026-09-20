@@ -380,7 +380,6 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
         </button>
         <div class="lang-menu" id="langMenu">
           <button data-lang="uk" type="button">Українська</button>
-          <button data-lang="ru" type="button">Русский</button>
           <button data-lang="en" type="button">English</button>
         </div>
       </div>
@@ -473,7 +472,7 @@ uk: {
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити",
   "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
-  "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
+  "theme.toggleLabel":"Змінити тему","burger.label":"Меню","acct.ariaLabel":"Акаунт",
   "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Повідомлення надіслано — відповімо протягом дня",
   "toast.paySuccess":"Оплата пройшла успішно","toast.keyCopied":"Ключ скопійовано",
@@ -597,139 +596,11 @@ uk: {
   "form.msg.label":"Повідомлення","form.msg.ph":"Розкажіть про об'єкт і що хочете автоматизувати",
   "form.submit":"Надіслати повідомлення"
 },
-ru: {
-  "nav.home":"Главная","nav.features":"Возможности","nav.how":"Как это работает","nav.pricing":"Тарифы",
-  "nav.connect":"Подключить","nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cta":"Подключить",
-  "nav.login":"Войти","nav.account":"Кабинет","nav.cabinet":"Личный кабинет","nav.logout":"Выйти",
-  "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
-  "footer.rights":"© 2026 StayAI",
-  "toast.contactSent":"Сообщение отправлено — ответим в течение дня",
-  "toast.paySuccess":"Оплата прошла успешно","toast.keyCopied":"Ключ скопирован",
-  "config.notSetup":"Supabase ещё не настроен разработчиком сайта. Откройте файл supabase-config.js и вставьте свои ключи проекта.",
-
-  "login.hero.kicker":"Вход","login.hero.title":"Войти в кабинет",
-  "login.hero.desc":"Доступ к статусу подписки и инструкции — с любого устройства.",
-  "login.email.label":"Email","login.password.label":"Пароль","login.submit":"Войти",
-  "login.noAccount":"Ещё нет аккаунта?","login.toRegister":"Зарегистрироваться",
-  "login.error.generic":"Не удалось войти. Проверьте email и пароль (или подтвердите email после регистрации).",
-
-  "register.hero.kicker":"Регистрация","register.hero.title":"Создать аккаунт StayAI",
-  "register.hero.desc":"Понадобится, чтобы оформить подписку и сохранять доступ к кабинету с любого устройства. Первые 3 дня — бесплатно, без привязки карты.",
-  "register.name.label":"Имя","register.email.label":"Email","register.password.label":"Пароль","register.submit":"Зарегистрироваться",
-  "register.haveAccount":"Уже есть аккаунт?","register.toLogin":"Войти",
-  "register.success.title":"Аккаунт создан","register.success.desc":"Если в Supabase включено подтверждение email — проверьте почту и перейдите по ссылке. Если выключено — вход уже выполнен, сейчас перенаправим в кабинет.",
-  "register.error.generic":"Не удалось зарегистрироваться. Возможно, такой email уже используется.",
-
-  "account.hero.kicker":"Кабинет","account.hero.title":"Ваш аккаунт","account.hero.desc":"Статус подписки и доступ к инструкции подключения.",
-  "account.loading":"Загрузка…",
-  "account.notLoggedIn.title":"Вы не вошли","account.notLoggedIn.desc":"Войдите в аккаунт, чтобы увидеть статус подписки.","account.notLoggedIn.cta":"Войти",
-  "account.email.label":"Email","account.plan.label":"Тариф","account.status.label":"Статус",
-  "account.plan.none":"Нет активной подписки","account.status.active":"Активна","account.status.inactive":"Не активна","account.status.trial":"Пробный период — осталось {days} дн.","account.status.trialEnded":"Пробный период завершился",
-  "account.cta.pricing":"Выбрать тариф","account.cta.instructions":"Перейти к инструкции","account.logout":"Выйти",
-
-  "checkout.authgate.title":"Сначала войдите в аккаунт","checkout.authgate.desc":"Подписка привязывается к вашему аккаунту StayAI, чтобы оставаться доступной с любого устройства.",
-
-  "home.eyebrow":"StayAI уже отвечает 214 гостям прямо сейчас",
-  "home.h1pre":"Гости пишут ночью.","home.h1em":"Отвечает StayAI.",
-  "home.sub":"ИИ-администратор подключается к вашим каналам, проверяет свободные номера, принимает оплату и бронирует — пока вы спите или заняты заездом.",
-  "home.cta1":"Выбрать тариф","home.cta2":"Как это работает",
-  "home.proof1val":"24/7","home.proof1label":"без выходных и обеда",
-  "home.proof2val":"< 9 сек","home.proof2label":"среднее время ответа",
-  "home.proof3val":"3 языка","home.proof3label":"сразу из коробки",
-  "home.chat.status":"на связи","home.chat.object":"апартаменты «Луч»",
-  "home.chat.foot.status":"статус ·","home.chat.foot.confirmed":"бронь подтверждена",
-  "chat.g1":"Добрый вечер! Есть свободная студия на 14–17 августа?",
-  "chat.a1tag":"проверка наличия","chat.a1":"Да, студия №3 свободна на эти даты. 3 ночи — €186, включая уборку.",
-  "chat.g2":"Отлично, бронирую. Как оплатить?",
-  "chat.a2tag":"оплата","chat.a2":"Отправил защищённую ссылку на оплату. После оплаты бронь подтвердится автоматически.",
-  "chat.g3":"Оплатила ✅",
-  "chat.a3tag":"бронь создана","chat.a3":"Спасибо! Студия №3 забронирована за вами. Инструкция по заезду придёт за день до прибытия.",
-  "home.process.kicker":"Сценарий","home.process.title":"Один диалог — четыре действия",
-  "home.process.desc":"StayAI проходит весь путь гостя сам: от первого сообщения до подтверждённой брони, без переключения на менеджера.",
-  "home.process.more":"Подробнее о сценарии →",
-  "process.step1.tag":"01 · сообщение","process.step1.title":"Отвечает гостю",
-  "process.step1.desc":"Понимает вопрос на любом языке, отвечает по правилам объекта — заезд, депозит, парковка, животные.",
-  "process.step2.tag":"02 · наличие","process.step2.title":"Проверяет номера",
-  "process.step2.desc":"Смотрит актуальный календарь занятости через вашу PMS или систему учёта — без ручных сверок.",
-  "process.step3.tag":"03 · оплата","process.step3.title":"Принимает платёж",
-  "process.step3.desc":"Выставляет ссылку на оплату через защищённый платёжный шлюз, подтверждает поступление.",
-  "process.step4.tag":"04 · бронь","process.step4.title":"Создаёт бронирование",
-  "process.step4.desc":"Фиксирует бронь в системе и присылает гостю подтверждение с деталями заезда.",
-  "home.feat.kicker":"Возможности","home.feat.title":"Что умеет StayAI",
-  "home.feat.desc":"Не просто чат-бот с заготовленными ответами — агент, который понимает контекст и знает, когда передать диалог человеку.",
-  "home.feat.more":"Все возможности →",
-  "cap.card1.title":"Работает в ваших каналах","cap.card1.desc":"WhatsApp, Telegram, Instagram и чат на сайте — гость пишет туда, где ему удобно.",
-  "cap.card2.title":"Подключается к вашей PMS","cap.card2.desc":"Cloudbeds, Beds24, MyAllocator и другие — синхронизация наличия в реальном времени.",
-  "cap.card3.title":"Знает правила объекта","cap.card3.desc":"Загрузите условия проживания один раз — StayAI будет отвечать строго по ним.",
-  "cap.card4.title":"Передаёт сложные случаи","cap.card4.desc":"Если ситуация нестандартная — жалоба, спор, форс-мажор — диалог уходит менеджеру.",
-  "cap.card5.title":"Принимает оплату","cap.card5.desc":"Депозит, полная оплата или предоплата — гость платит по защищённой ссылке, вы видите статус.",
-  "cap.card6.title":"Растёт вместе с объектом","cap.card6.desc":"Один апартамент или сеть из тридцати — логика подключается на каждый объект отдельно.",
-  "home.cta.title":"Готовы подключить StayAI?","home.cta.desc":"Выберите тариф и активируйте подписку за несколько минут.","home.cta.button":"Выбрать тариф",
-
-  "features.hero.kicker":"Возможности","features.hero.title":"Что умеет StayAI",
-  "features.hero.desc":"Полный перечень того, что агент делает самостоятельно — от первого сообщения гостя до подтверждённой брони.",
-  "features.photo.kicker":"Ваш бренд, не наш","features.photo.title":"StayAI говорит от лица вашего объекта",
-  "features.photo.desc":"Имя, тон общения и фото можно настроить под конкретные апартаменты — гость не почувствует разницы с обычной перепиской с администратором.",
-
-  "how.hero.kicker":"Сценарий","how.hero.title":"Как это работает",
-  "how.hero.desc":"Один диалог гостя проходит четыре шага — StayAI не передаёт его дальше, пока всё не подтверждено.",
-  "how.extra.kicker":"Нестандартные ситуации","how.extra.title":"Когда подключается человек",
-  "how.extra.desc":"StayAI хорошо знает границы своей компетенции и не пытается решить всё сам.",
-  "how.card1.title":"Сложный или спорный запрос","how.card1.desc":"Жалоба, конфликт, нетипичная просьба — диалог сразу передаётся менеджеру вместе с историей переписки.",
-  "how.card2.title":"Нет свободных номеров","how.card2.desc":"StayAI предлагает ближайшие свободные даты или записывает гостя в лист ожидания, если это настроено.",
-
-  "pricing.hero.kicker":"Тарифы","pricing.hero.title":"Одна подписка на объект",
-  "pricing.hero.desc":"Без скрытых процентов с бронирований. Оплата ежемесячная, отменить можно в любой момент.",
-  "plan.badge":"чаще всего выбирают","pricing.period":"/ мес","plan.cta":"Выбрать",
-  "plan.start.name":"Старт","plan.start.desc":"До 5 объектов, без автобронирования","plan.start.price":"100",
-  "plan.start.f1":"До 5 объектов в кабинете","plan.start.f2":"Отвечает гостям и проверяет наличие",
-  "plan.start.f3":"Формирует готовые данные брони для администратора","plan.start.f4":"Без автоматического бронирования и оплаты",
-  "plan.pro.name":"Профи","plan.pro.desc":"До 20 объектов, полная автоматизация","plan.pro.price":"200",
-  "plan.pro.f1":"До 20 объектов в кабинете","plan.pro.f2":"Все каналы: WhatsApp, Telegram, сайт",
-  "plan.pro.f3":"Подключение к PMS и синхронизация","plan.pro.f4":"Самостоятельно бронирует и принимает оплату",
-  "plan.pro.f5":"Передаёт сложные случаи менеджеру",
-  "plan.network.name":"Сеть","plan.network.desc":"Без ограничений на объекты","plan.network.price":"300",
-  "plan.network.f1":"Неограниченное количество объектов","plan.network.f2":"Всё из тарифа «Профи»: бронь и оплата",
-  "plan.network.f3":"Передаёт только жалобы и сложные ситуации","plan.network.f4":"Приоритетная поддержка",
-  "plan.auto.note":"Автобронирование и проверка номеров в реальном времени раскрываются в полной мере, когда ваш объект подключён к PMS или Channel Manager.",
-
-  "checkout.hero.kicker":"Оформление","checkout.hero.title":"Выбрать тариф",
-  "checkout.hero.desc":"Заполните данные, чтобы активировать подписку StayAI. Это демонстрационная форма оплаты.",
-  "pay.head.title":"Оформление подписки",
-  "pay.email.label":"Email для доступа","pay.card.label":"Номер карты","pay.exp.label":"Срок действия","pay.cvc.label":"CVC",
-  "pay.submit.default":"Оплатить подписку","pay.submit.loading":"Обрабатываем оплату…",
-  "pay.secure":"Защищённое соединение · демо-форма",
-  "pay.success.title":"Подписка активна","pay.success.desc":"Кабинет и инструкция по подключению уже доступны ниже.",
-  "pay.success.cta":"Перейти к инструкции",
-
-  "connect.hero.kicker":"Начало работы","connect.hero.title":"Подключить StayAI к вашему профилю",
-  "connect.hero.desc":"Три шага от оплаты до первого диалога с гостем.",
-  "connect.step1.title":"Выберите тариф","connect.step1.desc":"Подпишитесь на план, соответствующий размеру вашего объекта.",
-  "connect.step2.title":"Получите ключ доступа","connect.step2.desc":"Сразу после оплаты откроется личный ключ и пошаговая инструкция.",
-  "connect.step3.title":"Подключите каналы и правила","connect.step3.desc":"Добавьте мессенджеры, PMS и условия проживания — и запускайте StayAI на реальных гостях.",
-  "connect.cta.primary":"Выбрать тариф","connect.cta.secondary":"Уже оплатили? Перейти к инструкции",
-
-  "instr.hero.kicker":"Подключение","instr.hero.title":"Инструкция по настройке",
-  "instr.hero.desc":"Полный доступ открывается сразу после регистрации — 3 дня бесплатно, без карты. Вот шаги подключения.",
-  "instr.trialNote":"После 3 дней пробного периода доступ ИИ-администратора приостанавливается, пока не будет оформлена подписка — все данные в кабинете сохраняются.",
-  "step.s1.title":"Зарегистрируйтесь в кабинете","step.s1.desc":"Создайте аккаунт — и сразу получите 3 дня полного бесплатного доступа ко всем функциям, карта не нужна.",
-  "step.s2.title":"Заполните профиль и добавьте номера","step.s2.desc":"В кабинете укажите название и адрес заведения, добавьте типы номеров, цены и количество — StayAI использует эти данные в ответах гостям.",
-  "step.s3.title":"Подключите канал общения","step.s3.desc":"В разделе «Каналы связи» подключите Telegram-бота, Viber или скопируйте код чат-виджета для сайта отеля — всё делается прямо в кабинете.",
-  "step.s4.title":"Проверьте и запустите","step.s4.desc":"Напишите тестовое сообщение от лица гостя, проверьте ответ и наличие номеров — и канал готов принимать реальных гостей.",
-
-  "contacts.hero.kicker":"Контакты","contacts.hero.title":"Остались вопросы?",
-  "contacts.hero.desc":"Ответим по подключению, тарифам или интеграции с вашей системой бронирования.",
-  "contact.email.label":"Почта","contact.telegram.label":"Telegram",
-  "contact.response.label":"Ответ на обращения","contact.response.value":"в течение рабочего дня",
-  "form.name.label":"Имя","form.name.ph":"Ваше имя","form.email.label":"Email","form.email.ph":"you@hotel.com",
-  "form.msg.label":"Сообщение","form.msg.ph":"Расскажите об объекте и что хотите автоматизировать",
-  "form.submit":"Отправить сообщение"
-},
 en: {
   "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected",
   "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
-  "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
+  "theme.toggleLabel":"Toggle theme","burger.label":"Menu","acct.ariaLabel":"Account",
   "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Message sent — we'll reply within a day",
   "toast.paySuccess":"Payment successful","toast.keyCopied":"Key copied",
@@ -888,6 +759,9 @@ function setLang(lang){
 function getLang(){
   let saved = null;
   try{ saved = localStorage.getItem('stayMateLang'); }catch(e){}
+  // 'ru' був варіантом мови раніше — прибрано з сайту; повертаємо на uk
+  // для будь-кого, у кого це ще лежить у localStorage з попереднього візиту.
+  if(saved === 'ru') saved = 'uk';
   return saved || window.__stayMateLang || 'uk';
 }
 
@@ -1027,7 +901,7 @@ function acctT(key, lang){
 function acctFormatDate(iso){
   if(!iso) return '—';
   const lang = getLang();
-  const locale = lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-RU' : 'uk-UA';
+  const locale = lang === 'en' ? 'en-GB' : 'uk-UA';
   return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 function acctSubscriptionStatusText(property){
@@ -1103,7 +977,7 @@ async function initAccountNav(){
         property = data;
       }
       accountStatus.innerHTML = `
-        <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="Акаунт" title="${session.user.email}">
+        <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="${t('acct.ariaLabel', getLang())}" title="${session.user.email}">
           <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         </button>
         <div class="account-dropdown" id="accountDropdown">${buildAcctDropdownHTML(session, property)}</div>

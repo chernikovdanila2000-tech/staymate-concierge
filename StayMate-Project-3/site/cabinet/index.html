@@ -245,7 +245,6 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         </button>
         <div class="lang-menu" id="langMenu">
           <button data-lang="uk" type="button">Українська</button>
-          <button data-lang="ru" type="button">Русский</button>
           <button data-lang="en" type="button">English</button>
         </div>
       </div>
@@ -274,23 +273,23 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
   <!-- Екран автентифікації -->
   <div class="wrap-cab center-screen" id="authScreen">
     <div class="auth-card">
-      <h2 id="authTitle">Вхід у кабінет</h2>
-      <p class="lede" id="authHint" style="margin:6px 0 24px;">Керуйте номерами та ШІ-ботом свого готелю.</p>
+      <h2 id="authTitle" data-i18n="auth.title.signin">Вхід у кабінет</h2>
+      <p class="lede" id="authHint" style="margin:6px 0 24px;" data-i18n="auth.hint">Керуйте номерами та ШІ-ботом свого готелю.</p>
       <div class="auth-error" id="authErrorUnused"></div>
-      <label for="authEmail">Email</label>
+      <label for="authEmail" data-i18n="auth.emailLabel">Email</label>
       <input id="authEmail" type="email" autocomplete="email" placeholder="you@hotel.com">
-      <label for="authPassword">Пароль</label>
-      <input id="authPassword" type="password" autocomplete="current-password" placeholder="Мінімум 6 символів">
+      <label for="authPassword" data-i18n="auth.passwordLabel">Пароль</label>
+      <input id="authPassword" type="password" autocomplete="current-password" placeholder="Мінімум 6 символів" data-i18n-ph="auth.passwordPh">
       <div class="forgot-row" id="forgotRow">
-        <button id="forgotBtn" type="button">Забули пароль?</button>
+        <button id="forgotBtn" type="button" data-i18n="auth.forgotPassword">Забули пароль?</button>
       </div>
       <div class="actions">
-        <button class="btn-primary" id="authSubmit">Увійти</button>
+        <button class="btn-primary" id="authSubmit" data-i18n="auth.submit.signin">Увійти</button>
       </div>
       <div class="msg" id="authMsg"></div>
       <div class="switcher">
-        <span id="switcherText">Ще немає акаунту?</span>
-        <button id="switcherBtn">Зареєструватися</button>
+        <span id="switcherText" data-i18n="auth.noAccount">Ще немає акаунту?</span>
+        <button id="switcherBtn" data-i18n="auth.switch.toSignup">Зареєструватися</button>
       </div>
     </div>
   </div>
@@ -298,12 +297,12 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
   <!-- Екран встановлення нового пароля -->
   <div class="hidden wrap-cab center-screen" id="resetScreen">
     <div class="auth-card">
-      <h2>Новий пароль</h2>
-      <p class="lede" style="margin:6px 0 24px;">Встановіть новий пароль для входу в кабінет.</p>
-      <label for="newPassword">Новий пароль</label>
-      <input id="newPassword" type="password" placeholder="Мінімум 6 символів" minlength="6">
+      <h2 data-i18n="reset.title">Новий пароль</h2>
+      <p class="lede" style="margin:6px 0 24px;" data-i18n="reset.hint">Встановіть новий пароль для входу в кабінет.</p>
+      <label for="newPassword" data-i18n="reset.label">Новий пароль</label>
+      <input id="newPassword" type="password" placeholder="Мінімум 6 символів" data-i18n-ph="auth.passwordPh" minlength="6">
       <div class="actions">
-        <button class="btn-primary" id="resetSubmit">Зберегти пароль</button>
+        <button class="btn-primary" id="resetSubmit" data-i18n="reset.submit">Зберегти пароль</button>
       </div>
       <div class="msg" id="resetMsg"></div>
     </div>
@@ -311,16 +310,16 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
 
   <!-- Створення готелю (перший вхід) -->
   <div class="hidden wrap-cab" id="onboardScreen">
-    <h1 class="page-title">Створіть профіль готелю</h1>
-    <p class="lede">Це займе хвилину. Далі можна буде все змінити.</p>
+    <h1 class="page-title" data-i18n="onboard.title">Створіть профіль готелю</h1>
+    <p class="lede" data-i18n="onboard.lede">Це займе хвилину. Далі можна буде все змінити.</p>
     <div class="card">
-      <label for="obName">Назва готелю / апартаментів</label>
-      <input id="obName" type="text" placeholder="Наприклад, Panorama Apart-Hotel">
-      <label for="obAddress">Адреса</label>
-      <input id="obAddress" type="text" placeholder="Місто, вулиця, номер будинку">
+      <label for="obName" data-i18n="onboard.nameLabel">Назва готелю / апартаментів</label>
+      <input id="obName" type="text" placeholder="Наприклад, Panorama Apart-Hotel" data-i18n-ph="onboard.namePh">
+      <label for="obAddress" data-i18n="onboard.addressLabel">Адреса</label>
+      <input id="obAddress" type="text" placeholder="Місто, вулиця, номер будинку" data-i18n-ph="onboard.addressPh">
       <div class="actions" style="flex-wrap:wrap;">
-        <button class="btn-primary" id="obSubmitTrial">Почати 3 дні безкоштовно</button>
-        <button class="btn-secondary" id="obSubmitPay">Оплатити зараз</button>
+        <button class="btn-primary" id="obSubmitTrial" data-i18n="onboard.trialBtn">Почати 3 дні безкоштовно</button>
+        <button class="btn-secondary" id="obSubmitPay" data-i18n="onboard.payBtn">Оплатити зараз</button>
       </div>
       <div class="msg" id="obMsg"></div>
     </div>
@@ -331,137 +330,137 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <h1 class="page-title" id="gateTitle">Підписку призупинено</h1>
     <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
     <div class="card">
-      <h2>Оберіть тариф</h2>
-      <p class="hint">Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.</p>
+      <h2 data-i18n="gate.chooseTariff">Оберіть тариф</h2>
+      <p class="hint" data-i18n="gate.planRowHint">Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.</p>
       <div class="plan-row" id="gatePlanRow">
-        <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
-        <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
-        <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
+        <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">€100 / міс</span></div>
+        <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">€200 / міс</span></div>
+        <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">€300 / міс</span></div>
       </div>
       <div class="actions">
-        <button class="btn-primary" id="gatePayBtn">Оплатити обраний тариф</button>
+        <button class="btn-primary" id="gatePayBtn" data-i18n="gate.payBtn">Оплатити обраний тариф</button>
         <span class="msg" id="gateMsg"></span>
       </div>
       <p class="hint" id="gateDisclosure" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
     </div>
     <div class="actions">
-      <button class="btn-secondary hidden" id="gateUseTrialBtn">Скористатися пробним періодом замість цього</button>
-      <button class="btn-secondary" id="gateSignOutBtn">Вийти з акаунту</button>
+      <button class="btn-secondary hidden" id="gateUseTrialBtn" data-i18n="gate.useTrialBtn">Скористатися пробним періодом замість цього</button>
+      <button class="btn-secondary" id="gateSignOutBtn" data-i18n="gate.signOutBtn">Вийти з акаунту</button>
     </div>
   </div>
 
   <!-- Основний кабінет -->
   <div class="hidden wrap-cab" id="dashScreen">
     <h1 class="page-title" id="dashHotelName">Ваш готель</h1>
-    <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.</p>
+    <p class="lede" data-i18n="dash.lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.</p>
 
     <div class="dash-tabs">
-      <button class="dash-tab active" type="button" data-tab="overview">Огляд</button>
-      <button class="dash-tab" type="button" data-tab="channels">Канали</button>
+      <button class="dash-tab active" type="button" data-tab="overview" data-i18n="dash.tab.overview">Огляд</button>
+      <button class="dash-tab" type="button" data-tab="channels" data-i18n="dash.tab.channels">Канали</button>
     </div>
 
     <div id="tabOverview">
     <div class="card">
-      <h2>Тариф і підписка</h2>
-      <p class="hint" id="subHint">Завантаження…</p>
+      <h2 data-i18n="sub.title">Тариф і підписка</h2>
+      <p class="hint" id="subHint" data-i18n="common.loading">Завантаження…</p>
       <p class="hint hidden" id="subAutoRenewHint"></p>
       <div class="actions">
-        <button class="btn-secondary" id="manageSubBtn">Змінити тариф / оплатити</button>
-        <button class="btn-danger hidden" id="cancelAutoRenewBtn">Скасувати автопродовження</button>
+        <button class="btn-secondary" id="manageSubBtn" data-i18n="sub.manageBtn">Змінити тариф / оплатити</button>
+        <button class="btn-danger hidden" id="cancelAutoRenewBtn" data-i18n="sub.cancelAutoRenewBtn">Скасувати автопродовження</button>
         <span class="msg" id="cancelAutoRenewMsg"></span>
       </div>
       <div class="hidden" id="subPlanPicker" style="margin-top:18px;">
         <div class="plan-row" id="subPlanRow">
-          <div class="plan-opt" data-plan="start"><b>Старт</b><span>€100 / міс</span></div>
-          <div class="plan-opt" data-plan="pro"><b>Профі</b><span>€200 / міс</span></div>
-          <div class="plan-opt" data-plan="network"><b>Мережа</b><span>€300 / міс</span></div>
+          <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">€100 / міс</span></div>
+          <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">€200 / міс</span></div>
+          <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">€300 / міс</span></div>
         </div>
         <div class="actions">
-          <button class="btn-primary" id="subPayBtn">Оплатити обраний тариф</button>
+          <button class="btn-primary" id="subPayBtn" data-i18n="sub.payBtn">Оплатити обраний тариф</button>
           <span class="msg" id="subMsg"></span>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <h2>Дані готелю</h2>
-      <p class="hint">Це ім'я ШІ-адміністратор називає гостям.</p>
-      <label for="dashName">Назва</label>
+      <h2 data-i18n="hotel.title">Дані готелю</h2>
+      <p class="hint" data-i18n="hotel.hint">Це ім'я ШІ-адміністратор називає гостям.</p>
+      <label for="dashName" data-i18n="hotel.nameLabel">Назва</label>
       <input id="dashName" type="text">
-      <label for="dashAddress">Адреса</label>
+      <label for="dashAddress" data-i18n="hotel.addressLabel">Адреса</label>
       <input id="dashAddress" type="text">
       <div class="actions">
-        <button class="btn-primary" id="dashSaveInfo">Зберегти</button>
+        <button class="btn-primary" id="dashSaveInfo" data-i18n="common.save">Зберегти</button>
         <span class="msg" id="infoMsg"></span>
       </div>
     </div>
 
     <div class="card">
-      <h2>Інформація для гостей</h2>
-      <p class="hint">ШІ-адміністратор відповідає на питання гостей САМЕ на основі цих даних. Якщо поле порожнє, а гість про це спитає — бот чесно скаже, що уточнить, і передасть питання вам (в «Ескалації»), а не вигадає відповідь. Заповніть те, що встигаєте — решту можна дозаповнити пізніше.</p>
+      <h2 data-i18n="hi.title">Інформація для гостей</h2>
+      <p class="hint" data-i18n="hi.hint">ШІ-адміністратор відповідає на питання гостей САМЕ на основі цих даних. Якщо поле порожнє, а гість про це спитає — бот чесно скаже, що уточнить, і передасть питання вам (в «Ескалації»), а не вигадає відповідь. Заповніть те, що встигаєте — решту можна дозаповнити пізніше.</p>
 
-      <label for="hiDirections">Адреса та як дістатися</label>
-      <textarea id="hiDirections" placeholder="вул. Хрещатик 1, Київ. 5 хв пішки від метро Хрещатик."></textarea>
-
-      <div class="row">
-        <div><label for="hiCheckIn">Час заїзду</label><input id="hiCheckIn" type="text" placeholder="14:00"></div>
-        <div><label for="hiCheckOut">Час виїзду</label><input id="hiCheckOut" type="text" placeholder="12:00"></div>
-      </div>
-
-      <label for="hiParking">Паркування (наявність, ціна, умови)</label>
-      <textarea id="hiParking" placeholder="Безкоштовне, на території готелю"></textarea>
-
-      <label for="hiBreakfast">Сніданок</label>
-      <textarea id="hiBreakfast" placeholder="Включено, 8:00–11:00, у ресторані на 1 поверсі"></textarea>
-
-      <label for="hiWifi">Wi-Fi</label>
-      <textarea id="hiWifi" placeholder="Безкоштовний у всіх номерах, пароль видається на рецепції"></textarea>
-
-      <label for="hiPets">Тварини</label>
-      <textarea id="hiPets" placeholder="Дозволено дрібних тварин за додаткову плату 200 грн/доба"></textarea>
-
-      <label for="hiHouseRules">Правила проживання</label>
-      <textarea id="hiHouseRules" placeholder="Тихі години з 22:00 до 8:00, паління заборонено в номерах"></textarea>
-
-      <label for="hiCancellation">Умови скасування та оплати</label>
-      <textarea id="hiCancellation" placeholder="Безкоштовне скасування за 24 години до заїзду"></textarea>
-
-      <label for="hiPayment">Способи оплати</label>
-      <textarea id="hiPayment" placeholder="Картка онлайн, готівка на місці"></textarea>
-
-      <label for="hiAmenities">Зручності та послуги</label>
-      <textarea id="hiAmenities" placeholder="Басейн, спортзал, прання, консьєрж"></textarea>
-
-      <label for="hiContacts">Контакти</label>
-      <textarea id="hiContacts" placeholder="+380 XX XXX XX XX, recepція цілодобово"></textarea>
+      <label for="hiDirections" data-i18n="hi.directions.label">Адреса та як дістатися</label>
+      <textarea id="hiDirections" placeholder="вул. Хрещатик 1, Київ. 5 хв пішки від метро Хрещатик." data-i18n-ph="hi.directions.ph"></textarea>
 
       <div class="row">
-        <div><label for="hiLateCheckout">Пізній виїзд</label><input id="hiLateCheckout" type="text" placeholder="До 15:00 безкоштовно, далі 300 грн"></div>
-        <div><label for="hiEarlyCheckin">Ранній заїзд</label><input id="hiEarlyCheckin" type="text" placeholder="За можливості, безкоштовно"></div>
+        <div><label for="hiCheckIn" data-i18n="hi.checkin.label">Час заїзду</label><input id="hiCheckIn" type="text" placeholder="14:00" data-i18n-ph="hi.checkin.ph"></div>
+        <div><label for="hiCheckOut" data-i18n="hi.checkout.label">Час виїзду</label><input id="hiCheckOut" type="text" placeholder="12:00" data-i18n-ph="hi.checkout.ph"></div>
       </div>
 
-      <label for="hiTransfer">Трансфер</label>
-      <textarea id="hiTransfer" placeholder="Трансфер з аеропорту за запитом, 500 грн"></textarea>
+      <label for="hiParking" data-i18n="hi.parking.label">Паркування (наявність, ціна, умови)</label>
+      <textarea id="hiParking" placeholder="Безкоштовне, на території готелю" data-i18n-ph="hi.parking.ph"></textarea>
 
-      <label for="hiAdditional">Додатково</label>
-      <textarea id="hiAdditional" placeholder="Будь-яка інша інформація для гостей"></textarea>
+      <label for="hiBreakfast" data-i18n="hi.breakfast.label">Сніданок</label>
+      <textarea id="hiBreakfast" placeholder="Включено, 8:00–11:00, у ресторані на 1 поверсі" data-i18n-ph="hi.breakfast.ph"></textarea>
+
+      <label for="hiWifi" data-i18n="hi.wifi.label">Wi-Fi</label>
+      <textarea id="hiWifi" placeholder="Безкоштовний у всіх номерах, пароль видається на рецепції" data-i18n-ph="hi.wifi.ph"></textarea>
+
+      <label for="hiPets" data-i18n="hi.pets.label">Тварини</label>
+      <textarea id="hiPets" placeholder="Дозволено дрібних тварин за додаткову плату 200 грн/доба" data-i18n-ph="hi.pets.ph"></textarea>
+
+      <label for="hiHouseRules" data-i18n="hi.houseRules.label">Правила проживання</label>
+      <textarea id="hiHouseRules" placeholder="Тихі години з 22:00 до 8:00, паління заборонено в номерах" data-i18n-ph="hi.houseRules.ph"></textarea>
+
+      <label for="hiCancellation" data-i18n="hi.cancellation.label">Умови скасування та оплати</label>
+      <textarea id="hiCancellation" placeholder="Безкоштовне скасування за 24 години до заїзду" data-i18n-ph="hi.cancellation.ph"></textarea>
+
+      <label for="hiPayment" data-i18n="hi.payment.label">Способи оплати</label>
+      <textarea id="hiPayment" placeholder="Картка онлайн, готівка на місці" data-i18n-ph="hi.payment.ph"></textarea>
+
+      <label for="hiAmenities" data-i18n="hi.amenities.label">Зручності та послуги</label>
+      <textarea id="hiAmenities" placeholder="Басейн, спортзал, прання, консьєрж" data-i18n-ph="hi.amenities.ph"></textarea>
+
+      <label for="hiContacts" data-i18n="hi.contacts.label">Контакти</label>
+      <textarea id="hiContacts" placeholder="+380 XX XXX XX XX, рецепція цілодобово" data-i18n-ph="hi.contacts.ph"></textarea>
+
+      <div class="row">
+        <div><label for="hiLateCheckout" data-i18n="hi.lateCheckout.label">Пізній виїзд</label><input id="hiLateCheckout" type="text" placeholder="До 15:00 безкоштовно, далі 300 грн" data-i18n-ph="hi.lateCheckout.ph"></div>
+        <div><label for="hiEarlyCheckin" data-i18n="hi.earlyCheckin.label">Ранній заїзд</label><input id="hiEarlyCheckin" type="text" placeholder="За можливості, безкоштовно" data-i18n-ph="hi.earlyCheckin.ph"></div>
+      </div>
+
+      <label for="hiTransfer" data-i18n="hi.transfer.label">Трансфер</label>
+      <textarea id="hiTransfer" placeholder="Трансфер з аеропорту за запитом, 500 грн" data-i18n-ph="hi.transfer.ph"></textarea>
+
+      <label for="hiAdditional" data-i18n="hi.additional.label">Додатково</label>
+      <textarea id="hiAdditional" placeholder="Будь-яка інша інформація для гостей" data-i18n-ph="hi.additional.ph"></textarea>
 
       <div class="actions">
-        <button class="btn-primary" id="hiSave">Зберегти інформацію</button>
+        <button class="btn-primary" id="hiSave" data-i18n="hi.saveBtn">Зберегти інформацію</button>
         <span class="msg" id="hiMsg"></span>
       </div>
     </div>
 
     <div class="card">
-      <h2>Номери</h2>
-      <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
+      <h2 data-i18n="rooms.title">Номери</h2>
+      <p class="hint" data-i18n="rooms.hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
       <div class="actions" style="margin-bottom:18px;">
-        <button class="btn-primary" id="openAddRoom">+ Додати номер</button>
-        <button class="btn-secondary" id="openBulkUpload">Завантажити прайс-лист файлом</button>
-        <a class="btn-secondary" href="/cabinet/rooms-template.xlsx" download>Завантажити шаблон Excel</a>
+        <button class="btn-primary" id="openAddRoom" data-i18n="rooms.addBtn">+ Додати номер</button>
+        <button class="btn-secondary" id="openBulkUpload" data-i18n="rooms.bulkBtn">Завантажити прайс-лист файлом</button>
+        <a class="btn-secondary" href="/cabinet/rooms-template.xlsx" download data-i18n="rooms.templateBtn">Завантажити шаблон Excel</a>
       </div>
       <div id="roomsList"></div>
-      <p class="rooms-empty hidden" id="roomsEmptyHint">Ще немає жодного номера — додайте вручну або завантажте файлом.</p>
+      <p class="rooms-empty hidden" id="roomsEmptyHint" data-i18n="rooms.emptyHint">Ще немає жодного номера — додайте вручну або завантажте файлом.</p>
       <span class="msg" id="roomsMsg"></span>
     </div>
 
@@ -469,20 +468,20 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <div class="modal-overlay hidden" id="roomFormModal">
       <div class="modal-box">
         <h2 id="roomFormTitle">Новий номер</h2>
-        <label for="rfType">Тип / назва номера</label>
-        <input id="rfType" type="text" placeholder="Наприклад, Стандарт">
+        <label for="rfType" data-i18n="rf.typeLabel">Тип / назва номера</label>
+        <input id="rfType" type="text" placeholder="Наприклад, Стандарт" data-i18n-ph="rf.typePh">
         <div class="row">
-          <div><label for="rfPrice">Ціна за ніч</label><input id="rfPrice" type="number" min="0" step="1"></div>
-          <div><label for="rfCapacity">Місткість</label><input id="rfCapacity" type="number" min="1" step="1"></div>
-          <div><label for="rfQty">Кількість номерів</label><input id="rfQty" type="number" min="1" step="1" value="1"></div>
+          <div><label for="rfPrice" data-i18n="rf.priceLabel">Ціна за ніч</label><input id="rfPrice" type="number" min="0" step="1"></div>
+          <div><label for="rfCapacity" data-i18n="rf.capacityLabel">Місткість</label><input id="rfCapacity" type="number" min="1" step="1"></div>
+          <div><label for="rfQty" data-i18n="rf.qtyLabel">Кількість номерів</label><input id="rfQty" type="number" min="1" step="1" value="1"></div>
         </div>
-        <label for="rfDesc">Опис</label>
-        <textarea id="rfDesc" placeholder="Короткий опис номера"></textarea>
-        <label for="rfAmenities">Зручності (через кому)</label>
-        <input id="rfAmenities" type="text" placeholder="Wi-Fi, Кондиціонер, Балкон">
+        <label for="rfDesc" data-i18n="rf.descLabel">Опис</label>
+        <textarea id="rfDesc" placeholder="Короткий опис номера" data-i18n-ph="rf.descPh"></textarea>
+        <label for="rfAmenities" data-i18n="rf.amenitiesLabel">Зручності (через кому)</label>
+        <input id="rfAmenities" type="text" placeholder="Wi-Fi, Кондиціонер, Балкон" data-i18n-ph="rf.amenitiesPh">
         <div class="actions">
-          <button class="btn-primary" id="rfSave">Зберегти</button>
-          <button class="btn-secondary" id="rfCancel">Скасувати</button>
+          <button class="btn-primary" id="rfSave" data-i18n="common.save">Зберегти</button>
+          <button class="btn-secondary" id="rfCancel" data-i18n="common.cancel">Скасувати</button>
           <span class="msg" id="rfMsg"></span>
         </div>
       </div>
@@ -491,17 +490,17 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <!-- Модалка: масове завантаження прайс-листа -->
     <div class="modal-overlay hidden" id="bulkUploadModal">
       <div class="modal-box" style="max-width:760px;">
-        <h2>Завантажити прайс-лист</h2>
-        <p class="hint">Підтримуються CSV, Excel (XLSX/XLS), PDF, Word (DOCX) і фото/скан прайс-листа. Максимальний розмір файлу — 10 МБ. Перед збереженням ви зможете перевірити й відредагувати розпізнані дані.</p>
+        <h2 data-i18n="bulk.title">Завантажити прайс-лист</h2>
+        <p class="hint" data-i18n="bulk.hint">Підтримуються CSV, Excel (XLSX/XLS), PDF, Word (DOCX) і фото/скан прайс-листа. Максимальний розмір файлу — 10 МБ. Перед збереженням ви зможете перевірити й відредагувати розпізнані дані.</p>
 
         <div id="bulkStepPick">
           <label class="upload-drop" for="bulkFileInput">
-            <span id="bulkDropLabel">Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)</span>
+            <span id="bulkDropLabel" data-i18n="bulk.dropLabel">Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)</span>
             <input id="bulkFileInput" type="file" accept=".csv,.xlsx,.xls,.pdf,.docx,.jpg,.jpeg,.png">
           </label>
           <div class="actions">
-            <button class="btn-primary" id="bulkAnalyzeBtn" disabled>Аналізувати файл</button>
-            <button class="btn-secondary" id="bulkCancelBtn">Скасувати</button>
+            <button class="btn-primary" id="bulkAnalyzeBtn" disabled data-i18n="bulk.analyzeBtn">Аналізувати файл</button>
+            <button class="btn-secondary" id="bulkCancelBtn" data-i18n="common.cancel">Скасувати</button>
             <span class="msg" id="bulkPickMsg"></span>
           </div>
         </div>
@@ -510,8 +509,8 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <p class="hint" id="bulkPreviewHint"></p>
           <div id="bulkPreviewList"></div>
           <div class="actions">
-            <button class="btn-primary" id="bulkConfirmBtn">Підтвердити і зберегти всі</button>
-            <button class="btn-secondary" id="bulkBackBtn">Назад до вибору файлу</button>
+            <button class="btn-primary" id="bulkConfirmBtn" data-i18n="bulk.confirmBtn">Підтвердити і зберегти всі</button>
+            <button class="btn-secondary" id="bulkBackBtn" data-i18n="bulk.backBtn">Назад до вибору файлу</button>
             <span class="msg" id="bulkPreviewMsg"></span>
           </div>
         </div>
@@ -522,96 +521,96 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
 
     <div id="tabChannels" class="hidden">
     <div class="card">
-      <h2>Канали зв'язку</h2>
-      <p class="hint">Підключіть один або кілька каналів — ШІ-адміністратор відповідає однаково скрізь, використовуючи одні й ті самі дані про номери й ціни.</p>
+      <h2 data-i18n="ch.title">Канали зв'язку</h2>
+      <p class="hint" data-i18n="ch.hint">Підключіть один або кілька каналів — ШІ-адміністратор відповідає однаково скрізь, використовуючи одні й ті самі дані про номери й ціни.</p>
 
       <div class="channel-card" data-channel="telegram">
         <div class="channel-head">
-          <span class="channel-name">Telegram</span>
+          <span class="channel-name" data-i18n="ch.telegram.name">Telegram</span>
           <span class="status-pill off" id="pill-telegram">Не підключено</span>
         </div>
-        <p class="hint">Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.</p>
-        <label for="tokenTelegram">Токен бота</label>
+        <p class="hint" data-i18n-html="ch.telegram.hintHtml">Створіть власного бота через <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.</p>
+        <label for="tokenTelegram" data-i18n="ch.telegram.tokenLabel">Токен бота</label>
         <input id="tokenTelegram" type="text" placeholder="123456789:AAG...">
         <div class="actions">
-          <button class="btn-primary" id="connectTelegram">Підключити</button>
-          <button class="btn-danger hidden" id="disconnectTelegram">Відключити</button>
+          <button class="btn-primary" id="connectTelegram" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectTelegram" data-i18n="common.disconnect">Відключити</button>
           <span class="msg" id="msgTelegram"></span>
         </div>
       </div>
 
       <div class="channel-card" data-channel="viber">
         <div class="channel-head">
-          <span class="channel-name">Viber</span>
+          <span class="channel-name" data-i18n="ch.viber.name">Viber</span>
           <span class="status-pill off" id="pill-viber">Не підключено</span>
         </div>
-        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">partners.viber.com</a> і вставте токен API нижче. Заявку на комерційне схвалення подано — до відповіді Viber бот вже приймає повідомлення в тестовому режимі.</p>
-        <label for="tokenViber">Токен API (auth token)</label>
+        <p class="hint" data-i18n-html="ch.viber.hintHtml">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">partners.viber.com</a> і вставте токен API нижче. Заявку на комерційне схвалення подано — до відповіді Viber бот вже приймає повідомлення в тестовому режимі.</p>
+        <label for="tokenViber" data-i18n="ch.viber.tokenLabel">Токен API (auth token)</label>
         <input id="tokenViber" type="text" placeholder="45f679as...">
         <div class="actions">
-          <button class="btn-primary" id="connectViber">Підключити</button>
-          <button class="btn-danger hidden" id="disconnectViber">Відключити</button>
+          <button class="btn-primary" id="connectViber" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectViber" data-i18n="common.disconnect">Відключити</button>
           <span class="msg" id="msgViber"></span>
         </div>
       </div>
 
       <div class="channel-card" data-channel="website">
         <div class="channel-head">
-          <span class="channel-name">Сайт готелю</span>
-          <span class="status-pill" id="pill-website">Готово до використання</span>
+          <span class="channel-name" data-i18n="ch.website.name">Сайт готелю</span>
+          <span class="status-pill" id="pill-website" data-i18n="ch.website.status">Готово до використання</span>
         </div>
-        <p class="hint">Не потребує окремого підключення. Вставте цей код перед <code style="font-family:'IBM Plex Mono',monospace; background:var(--accent-soft); padding:2px 6px; border-radius:4px;">&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.</p>
+        <p class="hint" data-i18n-html="ch.website.hintHtml">Не потребує окремого підключення. Вставте цей код перед <code style="font-family:'IBM Plex Mono',monospace; background:var(--accent-soft); padding:2px 6px; border-radius:4px;">&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.</p>
         <div class="key-box">
           <code id="widgetSnippet"></code>
-          <button class="copy-btn" id="copyWidget" type="button">Копіювати</button>
+          <button class="copy-btn" id="copyWidget" type="button" data-i18n="ch.website.copyBtn">Копіювати</button>
         </div>
       </div>
 
       <div class="channel-card" data-channel="whatsapp">
         <div class="channel-head">
-          <span class="channel-name">WhatsApp</span>
+          <span class="channel-name" data-i18n="ch.whatsapp.name">WhatsApp</span>
           <span class="status-pill off" id="pill-whatsapp">Не підключено</span>
         </div>
-        <p class="hint" id="hintWhatsapp">Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.</p>
-        <label for="waPhoneId">Phone Number ID</label>
+        <p class="hint" id="hintWhatsapp" data-i18n="ch.whatsapp.hint">Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.</p>
+        <label for="waPhoneId" data-i18n="ch.whatsapp.phoneLabel">Phone Number ID</label>
         <input id="waPhoneId" type="text" placeholder="1029384756...">
-        <label for="waToken">Access Token</label>
+        <label for="waToken" data-i18n="ch.whatsapp.tokenLabel">Access Token</label>
         <input id="waToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="btn-primary" id="connectWhatsapp">Підключити</button>
-          <button class="btn-danger hidden" id="disconnectWhatsapp">Відключити</button>
+          <button class="btn-primary" id="connectWhatsapp" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectWhatsapp" data-i18n="common.disconnect">Відключити</button>
           <span class="msg" id="msgWhatsapp"></span>
         </div>
       </div>
 
       <div class="channel-card" data-channel="instagram">
         <div class="channel-head">
-          <span class="channel-name">Instagram</span>
+          <span class="channel-name" data-i18n="ch.instagram.name">Instagram</span>
           <span class="status-pill off" id="pill-instagram">Не підключено</span>
         </div>
-        <p class="hint" id="hintInstagram">Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.</p>
-        <label for="igAccountId">Instagram Business Account ID</label>
+        <p class="hint" id="hintInstagram" data-i18n="ch.instagram.hint">Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.</p>
+        <label for="igAccountId" data-i18n="ch.instagram.idLabel">Instagram Business Account ID</label>
         <input id="igAccountId" type="text" placeholder="1789...">
-        <label for="igToken">Access Token</label>
+        <label for="igToken" data-i18n="ch.instagram.tokenLabel">Access Token</label>
         <input id="igToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="btn-primary" id="connectInstagram">Підключити</button>
-          <button class="btn-danger hidden" id="disconnectInstagram">Відключити</button>
+          <button class="btn-primary" id="connectInstagram" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectInstagram" data-i18n="common.disconnect">Відключити</button>
           <span class="msg" id="msgInstagram"></span>
         </div>
       </div>
 
       <div class="channel-card" data-channel="messenger">
         <div class="channel-head">
-          <span class="channel-name">Facebook Messenger</span>
+          <span class="channel-name" data-i18n="ch.messenger.name">Facebook Messenger</span>
           <span class="status-pill off" id="pill-messenger">Не підключено</span>
         </div>
-        <p class="hint" id="hintMessenger">Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.</p>
-        <label for="fbToken">Page Access Token</label>
+        <p class="hint" id="hintMessenger" data-i18n="ch.messenger.hint">Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.</p>
+        <label for="fbToken" data-i18n="ch.messenger.tokenLabel">Page Access Token</label>
         <input id="fbToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="btn-primary" id="connectMessenger">Підключити</button>
-          <button class="btn-danger hidden" id="disconnectMessenger">Відключити</button>
+          <button class="btn-primary" id="connectMessenger" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectMessenger" data-i18n="common.disconnect">Відключити</button>
           <span class="msg" id="msgMessenger"></span>
         </div>
       </div>
@@ -657,11 +656,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   const SITE_ORIGIN = 'https://stayai.online';
 
   // ---- i18n: той самий стан мови (localStorage-ключ), що й на решті сайту.
-  // Кабінет раніше не мав перемикача мови взагалі — звідси й бага, коли
-  // підписка/відновлення пароля залишались українською незалежно від того,
-  // яку мову людина обрала на сайті. Тут перекладені шапка й акаунт-меню;
-  // решта інтерфейсу кабінету (форми номерів/каналів) поки залишається
-  // українською.
+  // Раніше перекладені були тільки шапка й акаунт-меню — решта кабінету
+  // (номери/канали/дані готелю) завжди показувалась українською, незалежно
+  // від обраної мови. Тепер увесь кабінет — статичний текст, підказки,
+  // плейсхолдери, динамічно згенеровані картки номерів/каналів, повідомлення
+  // про помилки/успіх — перекладається разом з рештою сайту.
   const CAB_I18N = {
     uk: {
       "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
@@ -670,20 +669,164 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "acct.email":"Email","acct.registered":"Дата реєстрації","acct.subscription":"Підписка",
       "acct.forgotPassword":"Забули пароль?","acct.sendingEmail":"Надсилаємо лист...",
       "acct.resetSent":"Перевірте пошту — надіслали лист для скидання пароля.",
-      "acct.logout":"Вийти з акаунту",
+      "acct.logout":"Вийти з акаунту","acct.ariaLabel":"Акаунт",
       "sub.active":"Активна","sub.inactive":"Не активна","sub.trial":"Пробний період","sub.until":"до","sub.daysShort":"дн.",
       "plan.start":"Старт (€100/міс)","plan.pro":"Профі (€200/міс)","plan.network":"Мережа (€300/міс)",
-    },
-    ru: {
-      "nav.home":"Главная","nav.features":"Возможности","nav.how":"Как это работает","nav.pricing":"Тарифы",
-      "nav.instructions":"Инструкция","nav.contacts":"Контакты","nav.cabinet":"Личный кабинет",
-      "theme.toggleLabel":"Сменить тему","burger.label":"Меню",
-      "acct.email":"Email","acct.registered":"Дата регистрации","acct.subscription":"Подписка",
-      "acct.forgotPassword":"Забыли пароль?","acct.sendingEmail":"Отправляем письмо...",
-      "acct.resetSent":"Проверьте почту — отправили письмо для сброса пароля.",
-      "acct.logout":"Выйти из аккаунта",
-      "sub.active":"Активна","sub.inactive":"Не активна","sub.trial":"Пробный период","sub.until":"до","sub.daysShort":"дн.",
-      "plan.start":"Старт (€100/мес)","plan.pro":"Профи (€200/мес)","plan.network":"Сеть (€300/мес)",
+
+      "auth.title.signin":"Вхід у кабінет","auth.title.signup":"Реєстрація",
+      "auth.hint":"Керуйте номерами та ШІ-ботом свого готелю.",
+      "auth.emailLabel":"Email","auth.passwordLabel":"Пароль","auth.passwordPh":"Мінімум 6 символів",
+      "auth.forgotPassword":"Забули пароль?",
+      "auth.submit.signin":"Увійти","auth.submit.signup":"Зареєструватися",
+      "auth.noAccount":"Ще немає акаунту?","auth.haveAccount":"Вже є акаунт?",
+      "auth.switch.toSignup":"Зареєструватися","auth.switch.toSignin":"Увійти",
+      "auth.err.enterEmailFirst":"Спершу введіть email у полі вище.",
+      "auth.sendingEmail":"Надсилаємо лист...",
+      "auth.resetEmailSent":"Якщо такий акаунт існує — на пошту надіслано лист зі скиданням пароля.",
+      "auth.err.fillBoth":"Заповніть email і пароль.",
+      "auth.err.alreadyRegistered":"Цей email вже зареєстровано. Спробуйте увійти або натисніть \"Забули пароль?\" (перемкніться на вхід, поле з'явиться під паролем).",
+      "auth.confirmEmailSent":"Перевірте пошту — надіслали лист для підтвердження email.",
+      "auth.err.rateLimit":"Забагато листів підряд — вбудована пошта Supabase дозволяє лише кілька листів на годину на весь сайт. Це не помилка вашого акаунта: зачекайте 10-15 хв і спробуйте ще раз, або попросіть розробника підключити власний SMTP чи вимкнути підтвердження email у Supabase.",
+      "auth.err.emailNotConfirmed":"Цей email ще не підтверджено. Перевірте пошту (і \"Спам\") за листом від Supabase, або зверніться до розробника, щоб вимкнути обов'язкове підтвердження email.",
+      "auth.err.invalidCredentials":"Невірний email або пароль.",
+
+      "reset.title":"Новий пароль","reset.hint":"Встановіть новий пароль для входу в кабінет.",
+      "reset.label":"Новий пароль","reset.submit":"Зберегти пароль",
+      "reset.err.tooShort":"Пароль має містити щонайменше 6 символів.",
+      "reset.success":"Пароль оновлено. Заходимо в кабінет...",
+
+      "onboard.title":"Створіть профіль готелю","onboard.lede":"Це займе хвилину. Далі можна буде все змінити.",
+      "onboard.nameLabel":"Назва готелю / апартаментів","onboard.namePh":"Наприклад, Panorama Apart-Hotel",
+      "onboard.addressLabel":"Адреса","onboard.addressPh":"Місто, вулиця, номер будинку",
+      "onboard.trialBtn":"Почати 3 дні безкоштовно","onboard.payBtn":"Оплатити зараз",
+      "onboard.err.nameRequired":"Вкажіть назву готелю.",
+
+      "gate.chooseTariff":"Оберіть тариф",
+      "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.",
+      "gate.payBtn":"Оплатити обраний тариф",
+      "gate.disclosure.default":"Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).",
+      "gate.useTrialBtn":"Скористатися пробним періодом замість цього","gate.signOutBtn":"Вийти з акаунту",
+      "gate.trialCard.title":"Підключіть картку — і почніть безкоштовно",
+      "gate.trialCard.lede":"3 дні повного доступу безкоштовно. Оберіть тариф, який діятиме після пробного періоду, і підключіть картку — списання не відбудеться прямо зараз.",
+      "gate.trialCard.payBtn":"Підключити картку і почати",
+      "gate.trialCard.disclosure":"Перше списання станеться {date} — тільки якщо ви не скасуєте підписку раніше. Скасувати автопродовження можна будь-коли в кабінеті, в картці \"Тариф і підписка\", без жодних додаткових умов.",
+      "gate.trialCard.inDays":"через 3 дні",
+      "gate.title.choosePlan":"Оберіть тариф","gate.title.suspended":"Підписку призупинено",
+      "gate.lede.activeExpired":"Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.",
+      "gate.lede.choosePlan":"Оберіть тариф і оплатіть — доступ відкриється одразу, без обмежень пробного періоду.",
+      "gate.lede.trialEnded":"Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.",
+
+      "common.save":"Зберегти","common.cancel":"Скасувати","common.connect":"Підключити","common.disconnect":"Відключити",
+      "common.loading":"Завантаження…","common.saved":"Збережено.",
+
+      "dash.lede":"Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.",
+      "dash.tab.overview":"Огляд","dash.tab.channels":"Канали",
+
+      "sub.title":"Тариф і підписка","sub.manageBtn":"Змінити тариф / оплатити",
+      "sub.cancelAutoRenewBtn":"Скасувати автопродовження","sub.payBtn":"Оплатити обраний тариф",
+      "sub.notActive":"Підписка не активна.",
+      "sub.activeHint":"Активна підписка: {plan}. Діє до {date}.",
+      "sub.trialHint":"Пробний період — залишилось {days} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.",
+      "sub.autoRenewHint":"Увімкнено автопродовження — наступне списання {date}.",
+      "sub.autoRenewFailed":"Останнє автоматичне списання не пройшло — перевірте картку.",
+      "sub.cancelConfirm":"Скасувати автопродовження підписки? Наступне списання не відбудеться.",
+      "sub.cancelling":"Скасовуємо...","sub.cancelled":"Автопродовження скасовано.",
+      "sub.noPlanSelected":"Спершу оберіть тариф.",
+      "sub.creatingTrialLink":"Створюємо посилання для підключення картки...",
+      "sub.creatingInvoice":"Створюємо рахунок на оплату...",
+      "planCard.start.name":"Старт","planCard.start.price":"€100 / міс",
+      "planCard.pro.name":"Профі","planCard.pro.price":"€200 / міс",
+      "planCard.network.name":"Мережа","planCard.network.price":"€300 / міс",
+
+      "hotel.title":"Дані готелю","hotel.hint":"Це ім'я ШІ-адміністратор називає гостям.",
+      "hotel.nameLabel":"Назва","hotel.addressLabel":"Адреса",
+
+      "hi.title":"Інформація для гостей",
+      "hi.hint":"ШІ-адміністратор відповідає на питання гостей САМЕ на основі цих даних. Якщо поле порожнє, а гість про це спитає — бот чесно скаже, що уточнить, і передасть питання вам (в «Ескалації»), а не вигадає відповідь. Заповніть те, що встигаєте — решту можна дозаповнити пізніше.",
+      "hi.directions.label":"Адреса та як дістатися","hi.directions.ph":"вул. Хрещатик 1, Київ. 5 хв пішки від метро Хрещатик.",
+      "hi.checkin.label":"Час заїзду","hi.checkin.ph":"14:00",
+      "hi.checkout.label":"Час виїзду","hi.checkout.ph":"12:00",
+      "hi.parking.label":"Паркування (наявність, ціна, умови)","hi.parking.ph":"Безкоштовне, на території готелю",
+      "hi.breakfast.label":"Сніданок","hi.breakfast.ph":"Включено, 8:00–11:00, у ресторані на 1 поверсі",
+      "hi.wifi.label":"Wi-Fi","hi.wifi.ph":"Безкоштовний у всіх номерах, пароль видається на рецепції",
+      "hi.pets.label":"Тварини","hi.pets.ph":"Дозволено дрібних тварин за додаткову плату 200 грн/доба",
+      "hi.houseRules.label":"Правила проживання","hi.houseRules.ph":"Тихі години з 22:00 до 8:00, паління заборонено в номерах",
+      "hi.cancellation.label":"Умови скасування та оплати","hi.cancellation.ph":"Безкоштовне скасування за 24 години до заїзду",
+      "hi.payment.label":"Способи оплати","hi.payment.ph":"Картка онлайн, готівка на місці",
+      "hi.amenities.label":"Зручності та послуги","hi.amenities.ph":"Басейн, спортзал, прання, консьєрж",
+      "hi.contacts.label":"Контакти","hi.contacts.ph":"+380 XX XXX XX XX, рецепція цілодобово",
+      "hi.lateCheckout.label":"Пізній виїзд","hi.lateCheckout.ph":"До 15:00 безкоштовно, далі 300 грн",
+      "hi.earlyCheckin.label":"Ранній заїзд","hi.earlyCheckin.ph":"За можливості, безкоштовно",
+      "hi.transfer.label":"Трансфер","hi.transfer.ph":"Трансфер з аеропорту за запитом, 500 грн",
+      "hi.additional.label":"Додатково","hi.additional.ph":"Будь-яка інша інформація для гостей",
+      "hi.saveBtn":"Зберегти інформацію",
+
+      "rooms.title":"Номери",
+      "rooms.hint":"Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. \"Кількість\" — скільки фізичних номерів цього типу є в закладі.",
+      "rooms.addBtn":"+ Додати номер","rooms.bulkBtn":"Завантажити прайс-лист файлом","rooms.templateBtn":"Завантажити шаблон Excel",
+      "rooms.emptyHint":"Ще немає жодного номера — додайте вручну або завантажте файлом.",
+      "rooms.card.meta":"{price} грн/ніч · до {capacity} гостей · {quantity} шт.",
+      "rooms.card.edit":"Редагувати","rooms.card.delete":"Видалити",
+      "rooms.deleteConfirm":"Видалити номер \"{name}\"?",
+      "rooms.deleted":"","rooms.bulkSaved":"Завантажено {count} номер(ів).",
+
+      "rf.titleNew":"Новий номер","rf.titleEdit":"Редагувати номер",
+      "rf.typeLabel":"Тип / назва номера","rf.typePh":"Наприклад, Стандарт",
+      "rf.priceLabel":"Ціна за ніч","rf.capacityLabel":"Місткість","rf.qtyLabel":"Кількість номерів",
+      "rf.descLabel":"Опис","rf.descPh":"Короткий опис номера",
+      "rf.amenitiesLabel":"Зручності (через кому)","rf.amenitiesPh":"Wi-Fi, Кондиціонер, Балкон",
+      "rf.err.type":"Вкажіть тип/назву номера.",
+      "rf.err.price":"Ціна за ніч має бути додатним числом.",
+      "rf.err.capacity":"Місткість має бути цілим додатним числом.",
+      "rf.err.qty":"Кількість номерів має бути цілим додатним числом.",
+
+      "bulk.title":"Завантажити прайс-лист",
+      "bulk.hint":"Підтримуються CSV, Excel (XLSX/XLS), PDF, Word (DOCX) і фото/скан прайс-листа. Максимальний розмір файлу — 10 МБ. Перед збереженням ви зможете перевірити й відредагувати розпізнані дані.",
+      "bulk.dropLabel":"Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)",
+      "bulk.analyzeBtn":"Аналізувати файл","bulk.confirmBtn":"Підтвердити і зберегти всі","bulk.backBtn":"Назад до вибору файлу",
+      "bulk.fileTooLarge":"Файл завеликий ({size} МБ) — максимум 10 МБ.",
+      "bulk.analyzing":"Аналізуємо файл — це може зайняти кілька секунд...",
+      "bulk.noRoomsFound":"У файлі не знайдено жодного номера. Перевірте файл або скористайтесь шаблоном.",
+      "bulk.parseFailed":"Не вдалося розпізнати файл.",
+      "bulk.previewHint":"Розпізнано {count} номер(ів). Перевірте виділені жовтим поля та позначені дублікати перед збереженням — нічого не потрапить у базу, поки ви не натиснете \"Підтвердити\".",
+      "bulk.dupBadge":"Схоже на наявний номер","bulk.newBadge":"Новий номер","bulk.uncertainBadge":"Перевірте: {fields}",
+      "bulk.actionLabel":"Що робити з дублікатом",
+      "bulk.actionUpdate":"Оновити наявний номер \"{name}\"","bulk.actionCreate":"Створити як новий окремий номер",
+      "bulk.removeRow":"Не завантажувати цей рядок",
+      "bulk.validationError":"Перевірте всі рядки — тип, ціна і місткість обов'язкові, а числові поля мають бути додатними.",
+      "bulk.nothingToSave":"Немає жодного рядка для збереження.",
+      "bulk.saving":"Зберігаємо...","bulk.saveFailed":"Не вдалося зберегти: {error}",
+
+      "ch.title":"Канали зв'язку",
+      "ch.hint":"Підключіть один або кілька каналів — ШІ-адміністратор відповідає однаково скрізь, використовуючи одні й ті самі дані про номери й ціни.",
+      "ch.status.connected":"Підключено","ch.status.awaiting":"Очікує верифікації Meta","ch.status.error":"Помилка підключення","ch.status.disconnected":"Не підключено",
+      "ch.secretPh":"•••••• (збережено — введіть новий, щоб змінити)",
+      "ch.disconnectConfirm":"Відключити цей канал? Бот перестане відповідати в ньому, поки ви не підключите знову.",
+      "ch.fillAllFields":"Заповніть усі поля.",
+      "ch.connecting":"Підключаємо і перевіряємо через Meta...",
+      "ch.connectedMsg":"Підключено! Напишіть боту/сторінці, щоб перевірити.",
+      "ch.awaitingMsg":"Збережено. Очікує верифікації Meta Business — активується автоматично, щойно вона завершиться.",
+      "ch.connectFailed":"Не вдалося підключити.",
+      "ch.disconnecting":"Відключаємо...","ch.disconnected":"Відключено.","ch.disconnectFailed":"Не вдалося відключити.",
+      "ch.telegram.name":"Telegram",
+      "ch.telegram.hintHtml":"Створіть власного бота через <a href=\"https://t.me/BotFather\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--accent-text); text-decoration:underline;\">@BotFather</a> у Telegram (2 хвилини) і вставте отриманий токен нижче.",
+      "ch.telegram.tokenLabel":"Токен бота",
+      "ch.viber.name":"Viber",
+      "ch.viber.hintHtml":"Створіть публічний акаунт (бота) на <a href=\"https://partners.viber.com/\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--accent-text); text-decoration:underline;\">partners.viber.com</a> і вставте токен API нижче. Заявку на комерційне схвалення подано — до відповіді Viber бот вже приймає повідомлення в тестовому режимі.",
+      "ch.viber.tokenLabel":"Токен API (auth token)",
+      "ch.website.name":"Сайт готелю","ch.website.status":"Готово до використання",
+      "ch.website.hintHtml":"Не потребує окремого підключення. Вставте цей код перед <code style=\"font-family:'IBM Plex Mono',monospace; background:var(--accent-soft); padding:2px 6px; border-radius:4px;\">&lt;/body&gt;</code> на сайті вашого готелю — з'явиться кнопка чату з ШІ-адміністратором.",
+      "ch.website.copyBtn":"Копіювати","ch.website.copied":"Скопійовано!","ch.website.copyManually":"Виділіть і скопіюйте вручну",
+      "ch.whatsapp.name":"WhatsApp",
+      "ch.whatsapp.hint":"Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.",
+      "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
+      "ch.instagram.name":"Instagram",
+      "ch.instagram.hint":"Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.",
+      "ch.instagram.idLabel":"Instagram Business Account ID","ch.instagram.tokenLabel":"Access Token",
+      "ch.messenger.name":"Facebook Messenger",
+      "ch.messenger.hint":"Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.",
+      "ch.messenger.hintConnected":"Підключено сторінку «{page}». Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.",
+      "ch.messenger.tokenLabel":"Page Access Token",
     },
     en: {
       "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
@@ -692,28 +835,204 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "acct.email":"Email","acct.registered":"Registered on","acct.subscription":"Subscription",
       "acct.forgotPassword":"Forgot password?","acct.sendingEmail":"Sending email...",
       "acct.resetSent":"Check your inbox — we sent a password reset email.",
-      "acct.logout":"Log out",
+      "acct.logout":"Log out","acct.ariaLabel":"Account",
       "sub.active":"Active","sub.inactive":"Inactive","sub.trial":"Trial period","sub.until":"until","sub.daysShort":"d.",
       "plan.start":"Start (€100/mo)","plan.pro":"Pro (€200/mo)","plan.network":"Network (€300/mo)",
+
+      "auth.title.signin":"Log in to your cabinet","auth.title.signup":"Sign up",
+      "auth.hint":"Manage your hotel's rooms and AI bot.",
+      "auth.emailLabel":"Email","auth.passwordLabel":"Password","auth.passwordPh":"At least 6 characters",
+      "auth.forgotPassword":"Forgot password?",
+      "auth.submit.signin":"Log in","auth.submit.signup":"Sign up",
+      "auth.noAccount":"Don't have an account yet?","auth.haveAccount":"Already have an account?",
+      "auth.switch.toSignup":"Sign up","auth.switch.toSignin":"Log in",
+      "auth.err.enterEmailFirst":"Enter your email in the field above first.",
+      "auth.sendingEmail":"Sending email...",
+      "auth.resetEmailSent":"If such an account exists, a password reset email has been sent.",
+      "auth.err.fillBoth":"Fill in your email and password.",
+      "auth.err.alreadyRegistered":"This email is already registered. Try logging in, or click \"Forgot password?\" (switch to log in, the field appears under the password).",
+      "auth.confirmEmailSent":"Check your inbox — we sent an email confirmation link.",
+      "auth.err.rateLimit":"Too many emails sent in a row — Supabase's built-in mail sends only a few emails per hour for the whole site. This isn't an error with your account: wait 10-15 min and try again, or ask the developer to connect a custom SMTP or disable email confirmation in Supabase.",
+      "auth.err.emailNotConfirmed":"This email hasn't been confirmed yet. Check your inbox (and Spam) for an email from Supabase, or contact the developer to disable mandatory email confirmation.",
+      "auth.err.invalidCredentials":"Invalid email or password.",
+
+      "reset.title":"New password","reset.hint":"Set a new password to log in to your cabinet.",
+      "reset.label":"New password","reset.submit":"Save password",
+      "reset.err.tooShort":"The password must be at least 6 characters long.",
+      "reset.success":"Password updated. Logging you in...",
+
+      "onboard.title":"Create your hotel profile","onboard.lede":"This will take a minute. You can change everything later.",
+      "onboard.nameLabel":"Hotel / apartment name","onboard.namePh":"e.g. Panorama Apart-Hotel",
+      "onboard.addressLabel":"Address","onboard.addressPh":"City, street, building number",
+      "onboard.trialBtn":"Start a free 3-day trial","onboard.payBtn":"Pay now",
+      "onboard.err.nameRequired":"Enter your hotel's name.",
+
+      "gate.chooseTariff":"Choose a plan",
+      "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in euros — your bank handles the conversion to hryvnia if your card isn't in euros.",
+      "gate.payBtn":"Pay for selected plan",
+      "gate.disclosure.default":"Payment is handled by WayForPay. Once payment is confirmed, access to the cabinet is restored automatically (usually within a minute).",
+      "gate.useTrialBtn":"Use the trial period instead","gate.signOutBtn":"Log out",
+      "gate.trialCard.title":"Link a card — and start for free",
+      "gate.trialCard.lede":"3 days of full access, free. Choose the plan that will apply after the trial period and link a card — you won't be charged right now.",
+      "gate.trialCard.payBtn":"Link card and start",
+      "gate.trialCard.disclosure":"The first charge will happen on {date} — only if you don't cancel the subscription before then. You can cancel auto-renewal any time in the cabinet, in the \"Plan & subscription\" card, with no extra conditions.",
+      "gate.trialCard.inDays":"in 3 days",
+      "gate.title.choosePlan":"Choose a plan","gate.title.suspended":"Subscription suspended",
+      "gate.lede.activeExpired":"Your last payment has expired. Choose a plan to continue.",
+      "gate.lede.choosePlan":"Choose a plan and pay — access opens immediately, with no trial-period limits.",
+      "gate.lede.trialEnded":"The 3-day trial period has ended. Choose a plan to keep using the cabinet and the bot.",
+
+      "common.save":"Save","common.cancel":"Cancel","common.connect":"Connect","common.disconnect":"Disconnect",
+      "common.loading":"Loading…","common.saved":"Saved.",
+
+      "dash.lede":"Here you manage the data the AI administrator sees and uses across every connected channel.",
+      "dash.tab.overview":"Overview","dash.tab.channels":"Channels",
+
+      "sub.title":"Plan & subscription","sub.manageBtn":"Change plan / pay",
+      "sub.cancelAutoRenewBtn":"Cancel auto-renewal","sub.payBtn":"Pay for selected plan",
+      "sub.notActive":"Subscription is not active.",
+      "sub.activeHint":"Active subscription: {plan}. Valid until {date}.",
+      "sub.trialHint":"Trial period — {days} day(s) left. Choose a plan ahead of time so access doesn't get interrupted.",
+      "sub.autoRenewHint":"Auto-renewal is on — next charge on {date}.",
+      "sub.autoRenewFailed":"The last automatic charge failed — please check your card.",
+      "sub.cancelConfirm":"Cancel subscription auto-renewal? The next charge will not happen.",
+      "sub.cancelling":"Cancelling...","sub.cancelled":"Auto-renewal cancelled.",
+      "sub.noPlanSelected":"Please choose a plan first.",
+      "sub.creatingTrialLink":"Creating a link to link your card...",
+      "sub.creatingInvoice":"Creating a payment invoice...",
+      "planCard.start.name":"Start","planCard.start.price":"€100 / mo",
+      "planCard.pro.name":"Pro","planCard.pro.price":"€200 / mo",
+      "planCard.network.name":"Network","planCard.network.price":"€300 / mo",
+
+      "hotel.title":"Hotel details","hotel.hint":"This is the name the AI administrator gives guests.",
+      "hotel.nameLabel":"Name","hotel.addressLabel":"Address",
+
+      "hi.title":"Guest information",
+      "hi.hint":"The AI administrator answers guest questions using EXACTLY this data. If a field is empty and a guest asks about it, the bot will honestly say it will check and hand the question to you (in \"Escalations\") instead of making something up. Fill in what you can now — the rest can wait.",
+      "hi.directions.label":"Address & how to get there","hi.directions.ph":"1 Khreshchatyk St, Kyiv. 5 min walk from Khreshchatyk metro station.",
+      "hi.checkin.label":"Check-in time","hi.checkin.ph":"14:00",
+      "hi.checkout.label":"Check-out time","hi.checkout.ph":"12:00",
+      "hi.parking.label":"Parking (availability, price, terms)","hi.parking.ph":"Free, on the hotel premises",
+      "hi.breakfast.label":"Breakfast","hi.breakfast.ph":"Included, 8:00–11:00, in the restaurant on the 1st floor",
+      "hi.wifi.label":"Wi-Fi","hi.wifi.ph":"Free in all rooms, password given at the front desk",
+      "hi.pets.label":"Pets","hi.pets.ph":"Small pets allowed for an extra 200 UAH/day",
+      "hi.houseRules.label":"House rules","hi.houseRules.ph":"Quiet hours 22:00–8:00, no smoking in rooms",
+      "hi.cancellation.label":"Cancellation & payment terms","hi.cancellation.ph":"Free cancellation up to 24 hours before check-in",
+      "hi.payment.label":"Payment methods","hi.payment.ph":"Card online, cash on site",
+      "hi.amenities.label":"Amenities & services","hi.amenities.ph":"Pool, gym, laundry, concierge",
+      "hi.contacts.label":"Contacts","hi.contacts.ph":"+380 XX XXX XX XX, front desk 24/7",
+      "hi.lateCheckout.label":"Late check-out","hi.lateCheckout.ph":"Free until 15:00, then 300 UAH",
+      "hi.earlyCheckin.label":"Early check-in","hi.earlyCheckin.ph":"Subject to availability, free of charge",
+      "hi.transfer.label":"Transfer","hi.transfer.ph":"Airport transfer on request, 500 UAH",
+      "hi.additional.label":"Additional","hi.additional.ph":"Any other information for guests",
+      "hi.saveBtn":"Save information",
+
+      "rooms.title":"Rooms",
+      "rooms.hint":"The AI administrator uses this data to answer questions about availability and prices, and to track real occupancy by date. \"Quantity\" is how many physical rooms of this type the property has.",
+      "rooms.addBtn":"+ Add room","rooms.bulkBtn":"Upload a price list file","rooms.templateBtn":"Download Excel template",
+      "rooms.emptyHint":"No rooms yet — add one manually or upload a file.",
+      "rooms.card.meta":"{price} UAH/night · up to {capacity} guests · {quantity} pc.",
+      "rooms.card.edit":"Edit","rooms.card.delete":"Delete",
+      "rooms.deleteConfirm":"Delete room \"{name}\"?",
+      "rooms.deleted":"","rooms.bulkSaved":"Uploaded {count} room(s).",
+
+      "rf.titleNew":"New room","rf.titleEdit":"Edit room",
+      "rf.typeLabel":"Room type / name","rf.typePh":"e.g. Standard",
+      "rf.priceLabel":"Price per night","rf.capacityLabel":"Capacity","rf.qtyLabel":"Number of rooms",
+      "rf.descLabel":"Description","rf.descPh":"A short description of the room",
+      "rf.amenitiesLabel":"Amenities (comma-separated)","rf.amenitiesPh":"Wi-Fi, A/C, Balcony",
+      "rf.err.type":"Enter the room type / name.",
+      "rf.err.price":"Price per night must be a positive number.",
+      "rf.err.capacity":"Capacity must be a positive whole number.",
+      "rf.err.qty":"Number of rooms must be a positive whole number.",
+
+      "bulk.title":"Upload a price list",
+      "bulk.hint":"CSV, Excel (XLSX/XLS), PDF, Word (DOCX) and a photo/scan of a price list are all supported. Maximum file size — 10 MB. You'll be able to review and edit the recognized data before saving.",
+      "bulk.dropLabel":"Click to choose a file (CSV, XLSX, PDF, DOCX, JPG, PNG)",
+      "bulk.analyzeBtn":"Analyze file","bulk.confirmBtn":"Confirm and save all","bulk.backBtn":"Back to file selection",
+      "bulk.fileTooLarge":"File is too large ({size} MB) — maximum is 10 MB.",
+      "bulk.analyzing":"Analyzing the file — this can take a few seconds...",
+      "bulk.noRoomsFound":"No rooms were found in this file. Check the file or use the template.",
+      "bulk.parseFailed":"Could not parse the file.",
+      "bulk.previewHint":"Recognized {count} room(s). Check the fields highlighted in yellow and any marked duplicates before saving — nothing is written to the database until you press \"Confirm\".",
+      "bulk.dupBadge":"Looks like an existing room","bulk.newBadge":"New room","bulk.uncertainBadge":"Please check: {fields}",
+      "bulk.actionLabel":"What to do with the duplicate",
+      "bulk.actionUpdate":"Update existing room \"{name}\"","bulk.actionCreate":"Create as a new separate room",
+      "bulk.removeRow":"Don't upload this row",
+      "bulk.validationError":"Check every row — type, price and capacity are required, and numeric fields must be positive.",
+      "bulk.nothingToSave":"There's nothing to save.",
+      "bulk.saving":"Saving...","bulk.saveFailed":"Could not save: {error}",
+
+      "ch.title":"Channels",
+      "ch.hint":"Connect one or more channels — the AI administrator answers the same way everywhere, using the same room and price data.",
+      "ch.status.connected":"Connected","ch.status.awaiting":"Awaiting Meta verification","ch.status.error":"Connection error","ch.status.disconnected":"Not connected",
+      "ch.secretPh":"•••••• (saved — enter a new one to change it)",
+      "ch.disconnectConfirm":"Disconnect this channel? The bot will stop replying there until you connect it again.",
+      "ch.fillAllFields":"Fill in all fields.",
+      "ch.connecting":"Connecting and verifying with Meta...",
+      "ch.connectedMsg":"Connected! Message the bot/page to test it.",
+      "ch.awaitingMsg":"Saved. Awaiting Meta Business verification — it will activate automatically once that's done.",
+      "ch.connectFailed":"Could not connect.",
+      "ch.disconnecting":"Disconnecting...","ch.disconnected":"Disconnected.","ch.disconnectFailed":"Could not disconnect.",
+      "ch.telegram.name":"Telegram",
+      "ch.telegram.hintHtml":"Create your own bot via <a href=\"https://t.me/BotFather\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--accent-text); text-decoration:underline;\">@BotFather</a> on Telegram (2 minutes) and paste the token you get below.",
+      "ch.telegram.tokenLabel":"Bot token",
+      "ch.viber.name":"Viber",
+      "ch.viber.hintHtml":"Create a public account (bot) at <a href=\"https://partners.viber.com/\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--accent-text); text-decoration:underline;\">partners.viber.com</a> and paste the API token below. A commercial approval request has been submitted — until Viber responds, the bot already accepts messages in test mode.",
+      "ch.viber.tokenLabel":"API token (auth token)",
+      "ch.website.name":"Hotel website","ch.website.status":"Ready to use",
+      "ch.website.hintHtml":"No separate connection needed. Paste this snippet before <code style=\"font-family:'IBM Plex Mono',monospace; background:var(--accent-soft); padding:2px 6px; border-radius:4px;\">&lt;/body&gt;</code> on your hotel's website — a chat button with the AI administrator will appear.",
+      "ch.website.copyBtn":"Copy","ch.website.copied":"Copied!","ch.website.copyManually":"Select and copy manually",
+      "ch.whatsapp.name":"WhatsApp",
+      "ch.whatsapp.hint":"Connect via WhatsApp Cloud API (Meta). Paste the Phone Number ID and Access Token from your Meta for Developers app — we'll verify them with a real request to Meta right away.",
+      "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
+      "ch.instagram.name":"Instagram",
+      "ch.instagram.hint":"Instagram Direct connects through the same Meta app as WhatsApp/Messenger. Paste the Instagram Business Account ID and Access Token.",
+      "ch.instagram.idLabel":"Instagram Business Account ID","ch.instagram.tokenLabel":"Access Token",
+      "ch.messenger.name":"Facebook Messenger",
+      "ch.messenger.hint":"Paste the Page Access Token of your hotel's page from Meta for Developers — the page ID will be detected automatically.",
+      "ch.messenger.hintConnected":"Connected to page «{page}». Paste the Page Access Token of your hotel's page from Meta for Developers — the page ID will be detected automatically.",
+      "ch.messenger.tokenLabel":"Page Access Token",
     },
   };
-  function t(key, lang) {
+  function t(key, lang, vars) {
     const dict = CAB_I18N[lang] || CAB_I18N.uk;
-    return dict[key] !== undefined ? dict[key] : (CAB_I18N.uk[key] !== undefined ? CAB_I18N.uk[key] : key);
+    let str = dict[key] !== undefined ? dict[key] : (CAB_I18N.uk[key] !== undefined ? CAB_I18N.uk[key] : key);
+    if (vars) {
+      Object.entries(vars).forEach(([k, v]) => { str = str.replace('{' + k + '}', v); });
+    }
+    return str;
   }
   function getLang() {
     let saved = null;
     try { saved = localStorage.getItem('stayMateLang'); } catch (e) {}
+    // 'ru' був варіантом мови раніше — прибрано з сайту; повертаємо на uk
+    // для будь-кого, у кого це ще лежить у localStorage з попереднього візиту.
+    if (saved === 'ru') saved = 'uk';
     return saved || 'uk';
   }
   function applyI18n(lang) {
     document.documentElement.setAttribute('lang', lang);
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n'), lang); });
+    document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n-html'), lang); });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'), lang)); });
     document.querySelectorAll('[data-i18n-aria]').forEach(el => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'), lang)); });
     document.querySelectorAll('.lang-menu button').forEach(b => { b.classList.toggle('active', b.dataset.lang === lang); });
     const label = document.getElementById('langBtnLabel');
     if (label) label.textContent = lang.toUpperCase();
     renderAccountStatus();
+    // Дашборд будує номери/канали/попередній перегляд файлу динамічно
+    // (innerHTML з JS-рядками, а не статичними data-i18n елементами) —
+    // без цього перемикання мови залишало б їх старою мовою до наступного
+    // reload. Рендер-функції самі читають getLang() і мовчки не роблять
+    // нічого, якщо дашборд ще не завантажено (rooms/channelsByType порожні
+    // до першого afterLogin) чи модалка не відкрита.
+    if (typeof renderRooms === 'function' && currentProperty) renderRooms();
+    if (typeof renderChannelsUI === 'function' && currentProperty) renderChannelsUI();
+    if (typeof renderSubscriptionCard === 'function' && currentProperty) renderSubscriptionCard();
+    if (typeof renderBulkPreview === 'function' && bulkPreviewRows && bulkPreviewRows.length) renderBulkPreview();
+    if (typeof applyAuthMode === 'function') applyAuthMode();
+    if (typeof showGate === 'function' && currentGateReason && gateScreen && !gateScreen.classList.contains('hidden')) showGate(currentGateReason);
   }
   function setLang(lang) {
     try { localStorage.setItem('stayMateLang', lang); } catch (e) {}
@@ -734,15 +1053,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // а не в реальну проблему з акаунтом.
   function translateAuthError(message) {
     const m = String(message || '');
-    if (/rate limit/i.test(m)) {
-      return 'Забагато листів підряд — вбудована пошта Supabase дозволяє лише кілька листів на годину на весь сайт. Це не помилка вашого акаунта: зачекайте 10-15 хв і спробуйте ще раз, або попросіть розробника підключити власний SMTP чи вимкнути підтвердження email у Supabase.';
-    }
-    if (/email not confirmed/i.test(m)) {
-      return 'Цей email ще не підтверджено. Перевірте пошту (і "Спам") за листом від Supabase, або зверніться до розробника, щоб вимкнути обов\'язкове підтвердження email.';
-    }
-    if (/invalid login credentials/i.test(m)) {
-      return 'Невірний email або пароль.';
-    }
+    if (/rate limit/i.test(m)) return t('auth.err.rateLimit', getLang());
+    if (/email not confirmed/i.test(m)) return t('auth.err.emailNotConfirmed', getLang());
+    if (/invalid login credentials/i.test(m)) return t('auth.err.invalidCredentials', getLang());
     return m;
   }
 
@@ -794,7 +1107,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   function formatDate(iso) {
     if (!iso) return '—';
     const lang = getLang();
-    const locale = lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-RU' : 'uk-UA';
+    const locale = lang === 'en' ? 'en-GB' : 'uk-UA';
     return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
@@ -868,7 +1181,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     accountStatus.classList.remove('hidden');
     accountStatus.innerHTML = `
-      <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="Акаунт" title="${currentUser.email}">
+      <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="${t('acct.ariaLabel', getLang())}" title="${currentUser.email}">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
       <div class="account-dropdown" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
@@ -893,13 +1206,17 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   });
 
   // ---- Автентифікація ----
+  function applyAuthMode() {
+    const lang = getLang();
+    document.getElementById('authTitle').textContent = mode === 'signin' ? t('auth.title.signin', lang) : t('auth.title.signup', lang);
+    document.getElementById('authSubmit').textContent = mode === 'signin' ? t('auth.submit.signin', lang) : t('auth.submit.signup', lang);
+    document.getElementById('switcherText').textContent = mode === 'signin' ? t('auth.noAccount', lang) : t('auth.haveAccount', lang);
+    document.getElementById('switcherBtn').textContent = mode === 'signin' ? t('auth.switch.toSignup', lang) : t('auth.switch.toSignin', lang);
+    document.getElementById('forgotRow').classList.toggle('hidden', mode !== 'signin');
+  }
   document.getElementById('switcherBtn').addEventListener('click', () => {
     mode = mode === 'signin' ? 'signup' : 'signin';
-    document.getElementById('authTitle').textContent = mode === 'signin' ? 'Вхід у кабінет' : 'Реєстрація';
-    document.getElementById('authSubmit').textContent = mode === 'signin' ? 'Увійти' : 'Зареєструватися';
-    document.getElementById('switcherText').textContent = mode === 'signin' ? 'Ще немає акаунту?' : 'Вже є акаунт?';
-    document.getElementById('switcherBtn').textContent = mode === 'signin' ? 'Зареєструватися' : 'Увійти';
-    document.getElementById('forgotRow').classList.toggle('hidden', mode !== 'signin');
+    applyAuthMode();
     document.getElementById('authMsg').textContent = '';
   });
 
@@ -908,11 +1225,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const msg = document.getElementById('authMsg');
     if (!email) {
       msg.className = 'msg error';
-      msg.textContent = 'Спершу введіть email у полі вище.';
+      msg.textContent = t('auth.err.enterEmailFirst', getLang());
       return;
     }
     msg.className = 'msg';
-    msg.textContent = 'Надсилаємо лист...';
+    msg.textContent = t('auth.sendingEmail', getLang());
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
     if (error) {
       msg.className = 'msg error';
@@ -920,7 +1237,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
     msg.className = 'msg ok';
-    msg.textContent = 'Якщо такий акаунт існує — на пошту надіслано лист зі скиданням пароля.';
+    msg.textContent = t('auth.resetEmailSent', getLang());
   });
 
   document.getElementById('authSubmit').addEventListener('click', async () => {
@@ -933,7 +1250,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (!email || !password) {
       msg.className = 'msg error';
-      msg.textContent = 'Заповніть email і пароль.';
+      msg.textContent = t('auth.err.fillBoth', getLang());
       return;
     }
 
@@ -962,12 +1279,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         const identities = data && data.user && data.user.identities;
         if (Array.isArray(identities) && identities.length === 0) {
           msg.className = 'msg error';
-          msg.textContent = 'Цей email вже зареєстровано. Спробуйте увійти або натисніть "Забули пароль?" (перемкніться на вхід, поле з\'явиться під паролем).';
+          msg.textContent = t('auth.err.alreadyRegistered', getLang());
           return;
         }
         if (!data.session) {
           msg.className = 'msg ok';
-          msg.textContent = 'Перевірте пошту — надіслали лист для підтвердження email.';
+          msg.textContent = t('auth.confirmEmailSent', getLang());
           return;
         }
 
@@ -1013,7 +1330,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     msg.className = 'msg';
     if (!newPassword || newPassword.length < 6) {
       msg.className = 'msg error';
-      msg.textContent = 'Пароль має містити щонайменше 6 символів.';
+      msg.textContent = t('reset.err.tooShort', getLang());
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -1023,7 +1340,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
     msg.className = 'msg ok';
-    msg.textContent = 'Пароль оновлено. Заходимо в кабінет...';
+    msg.textContent = t('reset.success', getLang());
     setTimeout(afterLogin, 800);
   });
 
@@ -1069,7 +1386,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (!name) {
       msg.className = 'msg error';
-      msg.textContent = 'Вкажіть назву готелю.';
+      msg.textContent = t('onboard.err.nameRequired', getLang());
       return null;
     }
 
@@ -1129,23 +1446,24 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function showGate(reason) {
     currentGateReason = reason;
+    const lang = getLang();
     const payBtn = document.getElementById('gatePayBtn');
     const disclosure = document.getElementById('gateDisclosure');
     if (reason === 'trial_card') {
-      document.getElementById('gateTitle').textContent = 'Підключіть картку — і почніть безкоштовно';
-      document.getElementById('gateLede').textContent = '3 дні повного доступу безкоштовно. Оберіть тариф, який діятиме після пробного періоду, і підключіть картку — списання не відбудеться прямо зараз.';
-      payBtn.textContent = 'Підключити картку і почати';
-      const trialEndDate = currentProperty && currentProperty.trial_ends_at ? formatDate(currentProperty.trial_ends_at) : 'через 3 дні';
-      disclosure.textContent = `Перше списання станеться ${trialEndDate} — тільки якщо ви не скасуєте підписку раніше. Скасувати автопродовження можна будь-коли в кабінеті, в картці "Тариф і підписка", без жодних додаткових умов.`;
+      document.getElementById('gateTitle').textContent = t('gate.trialCard.title', lang);
+      document.getElementById('gateLede').textContent = t('gate.trialCard.lede', lang);
+      payBtn.textContent = t('gate.trialCard.payBtn', lang);
+      const trialEndDate = currentProperty && currentProperty.trial_ends_at ? formatDate(currentProperty.trial_ends_at) : t('gate.trialCard.inDays', lang);
+      disclosure.textContent = t('gate.trialCard.disclosure', lang, { date: trialEndDate });
     } else {
-      payBtn.textContent = 'Оплатити обраний тариф';
-      disclosure.textContent = 'Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).';
-      document.getElementById('gateTitle').textContent = reason === 'choose_plan' ? 'Оберіть тариф' : 'Підписку призупинено';
+      payBtn.textContent = t('gate.payBtn', lang);
+      disclosure.textContent = t('gate.disclosure.default', lang);
+      document.getElementById('gateTitle').textContent = reason === 'choose_plan' ? t('gate.title.choosePlan', lang) : t('gate.title.suspended', lang);
       document.getElementById('gateLede').textContent = reason === 'active_expired'
-        ? 'Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.'
+        ? t('gate.lede.activeExpired', lang)
         : reason === 'choose_plan'
-        ? 'Оберіть тариф і оплатіть — доступ відкриється одразу, без обмежень пробного періоду.'
-        : 'Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.';
+        ? t('gate.lede.choosePlan', lang)
+        : t('gate.lede.trialEnded', lang);
     }
     document.getElementById('gateUseTrialBtn').classList.toggle('hidden', reason !== 'choose_plan');
     setupPlanPicker(document.getElementById('gatePlanRow'));
@@ -1185,11 +1503,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   async function createInvoiceAndRedirect(plan, msgEl, isTrial) {
     if (!plan) {
       msgEl.className = 'msg error';
-      msgEl.textContent = 'Спершу оберіть тариф.';
+      msgEl.textContent = t('sub.noPlanSelected', getLang());
       return;
     }
     msgEl.className = 'msg';
-    msgEl.textContent = isTrial ? 'Створюємо посилання для підключення картки...' : 'Створюємо рахунок на оплату...';
+    msgEl.textContent = isTrial ? t('sub.creatingTrialLink', getLang()) : t('sub.creatingInvoice', getLang());
     try {
       const endpoint = isTrial ? '/api/create-trial-invoice' : '/api/create-subscription-invoice';
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -1225,20 +1543,23 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const autoRenewHint = document.getElementById('subAutoRenewHint');
     const cancelBtn = document.getElementById('cancelAutoRenewBtn');
     const p = currentProperty;
+    const lang = getLang();
+    const locale = lang === 'en' ? 'en-GB' : 'uk-UA';
     if (p.subscription_status === 'active') {
-      const until = p.subscription_active_until ? new Date(p.subscription_active_until).toLocaleDateString('uk-UA') : '—';
-      hint.textContent = `Активна підписка: ${CAB_I18N.uk['plan.' + p.subscription_plan] || p.subscription_plan || '—'}. Діє до ${until}.`;
+      const until = p.subscription_active_until ? new Date(p.subscription_active_until).toLocaleDateString(locale) : '—';
+      const planLabel = t('plan.' + p.subscription_plan, lang) !== ('plan.' + p.subscription_plan) ? t('plan.' + p.subscription_plan, lang) : (p.subscription_plan || '—');
+      hint.textContent = t('sub.activeHint', lang, { plan: planLabel, date: until });
     } else if (p.trial_ends_at && new Date(p.trial_ends_at) > new Date()) {
       const daysLeft = Math.max(1, Math.ceil((new Date(p.trial_ends_at) - new Date()) / 86400000));
-      hint.textContent = `Пробний період — залишилось ${daysLeft} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.`;
+      hint.textContent = t('sub.trialHint', lang, { days: daysLeft });
     } else {
-      hint.textContent = 'Підписка не активна.';
+      hint.textContent = t('sub.notActive', lang);
     }
     if (p.auto_renew) {
       const chargeDate = p.subscription_active_until
-        ? new Date(p.subscription_active_until).toLocaleDateString('uk-UA')
-        : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString('uk-UA') : '—');
-      autoRenewHint.textContent = `Увімкнено автопродовження — наступне списання ${chargeDate}. ${p.last_auto_charge_failed ? 'Останнє автоматичне списання не пройшло — перевірте картку.' : ''}`;
+        ? new Date(p.subscription_active_until).toLocaleDateString(locale)
+        : (p.trial_ends_at ? new Date(p.trial_ends_at).toLocaleDateString(locale) : '—');
+      autoRenewHint.textContent = t('sub.autoRenewHint', lang, { date: chargeDate }) + (p.last_auto_charge_failed ? ' ' + t('sub.autoRenewFailed', lang) : '');
       autoRenewHint.classList.remove('hidden');
       cancelBtn.classList.remove('hidden');
     } else {
@@ -1254,9 +1575,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   onClickGuarded(document.getElementById('cancelAutoRenewBtn'), async () => {
     const msg = document.getElementById('cancelAutoRenewMsg');
-    if (!confirm('Скасувати автопродовження підписки? Наступне списання не відбудеться.')) return;
+    if (!confirm(t('sub.cancelConfirm', getLang()))) return;
     msg.className = 'msg';
-    msg.textContent = 'Скасовуємо...';
+    msg.textContent = t('sub.cancelling', getLang());
     try {
       const res = await fetch(`${API_BASE_URL}/api/cancel-auto-renew`, {
         method: 'POST',
@@ -1267,7 +1588,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       if (!res.ok) throw new Error(data.error || 'Не вдалося скасувати.');
       currentProperty.auto_renew = false;
       msg.className = 'msg ok';
-      msg.textContent = 'Автопродовження скасовано.';
+      msg.textContent = t('sub.cancelled', getLang());
       renderSubscriptionCard();
     } catch (e) {
       msg.className = 'msg error';
@@ -1284,7 +1605,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     await reloadRooms();
     await loadHotelInfo();
-    await loadChannels();
+    await fetchChannels();
     dashScreen.classList.remove('hidden');
   }
 
@@ -1322,7 +1643,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
     msg.className = 'msg ok';
-    msg.textContent = 'Збережено.';
+    msg.textContent = t('common.saved', getLang());
     setTimeout(() => { msg.textContent = ''; }, 2500);
   });
 
@@ -1344,18 +1665,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     return `<script src="${SITE_ORIGIN}/widget/widget.js" data-property="${currentProperty.property_id}" data-api="${API_BASE_URL}" data-title="${title}" async><\/script>`;
   }
 
-  const CHANNEL_STATUS_LABELS = {
-    connected: 'Підключено',
-    awaiting_verification: 'Очікує верифікації Meta',
-    error: 'Помилка підключення',
-    disconnected: 'Не підключено',
-  };
-
   function setPill(channel, status) {
     const pill = document.getElementById('pill-' + channel);
     if (!pill) return;
     pill.classList.remove('off', 'awaiting', 'error');
-    pill.textContent = CHANNEL_STATUS_LABELS[status] || CHANNEL_STATUS_LABELS.disconnected;
+    pill.textContent = t('ch.status.' + (status === 'awaiting_verification' ? 'awaiting' : status), getLang());
     if (status === 'connected') return;
     if (status === 'awaiting_verification') { pill.classList.add('awaiting'); return; }
     if (status === 'error') { pill.classList.add('error'); return; }
@@ -1367,14 +1681,23 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (btn) btn.classList.toggle('hidden', !visible);
   }
 
-  async function loadChannels() {
+  // fetchChannels() робить мережевий запит і зберігає стан; renderChannelsUI()
+  // тільки малює цей стан і нічого не запитує — так перемикання мови (яке
+  // мусить одразу перемалювати пілюлі/підказки статусів каналів) не робить
+  // зайвий похід у Supabase щоразу.
+  async function fetchChannels() {
     const { data } = await supabase
       .from('channels')
       .select('*')
       .eq('property_id', currentProperty.property_id);
-
     channelsByType = {};
     (data || []).forEach(c => { channelsByType[c.channel_type] = c; });
+    renderChannelsUI();
+  }
+
+  function renderChannelsUI() {
+    const lang = getLang();
+    const secretPh = t('ch.secretPh', lang);
 
     const tg = channelsByType.telegram;
     const tgStatus = (tg && tg.status) || ((tg && tg.connected) || currentProperty.webhook_connected ? 'connected' : 'disconnected');
@@ -1389,39 +1712,39 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     // після збереження (зберігаються зашифрованими, розшифровуються лише
     // на бекенді для самого запиту до Telegram/Viber/Meta) — тому інпути
     // токенів завжди порожні, з підказкою в плейсхолдері, а не префілом.
-    document.getElementById('tokenTelegram').placeholder = tgStatus === 'connected' ? '•••••• (збережено — введіть новий, щоб змінити)' : '123456789:AAG...';
-    document.getElementById('tokenViber').placeholder = (vb && vb.connected) ? '•••••• (збережено — введіть новий, щоб змінити)' : '45f679as...';
+    document.getElementById('tokenTelegram').placeholder = tgStatus === 'connected' ? secretPh : '123456789:AAG...';
+    document.getElementById('tokenViber').placeholder = (vb && vb.connected) ? secretPh : '45f679as...';
 
     const wa = channelsByType.whatsapp;
     const waStatus = (wa && wa.status) || 'disconnected';
     setPill('whatsapp', waStatus);
     setDisconnectVisible('whatsapp', waStatus !== 'disconnected');
     document.getElementById('waPhoneId').value = (wa && wa.credentials && wa.credentials.phone_number_id) || '';
-    document.getElementById('waToken').placeholder = waStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
-    document.getElementById('hintWhatsapp').textContent = wa && wa.status_detail
-      ? wa.status_detail
-      : 'Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.';
+    document.getElementById('waToken').placeholder = waStatus !== 'disconnected' ? secretPh : 'EAAG...';
+    document.getElementById('hintWhatsapp').textContent = waStatus === 'awaiting_verification'
+      ? t('ch.awaitingMsg', lang)
+      : t('ch.whatsapp.hint', lang);
 
     const ig = channelsByType.instagram;
     const igStatus = (ig && ig.status) || 'disconnected';
     setPill('instagram', igStatus);
     setDisconnectVisible('instagram', igStatus !== 'disconnected');
     document.getElementById('igAccountId').value = (ig && ig.credentials && ig.credentials.instagram_account_id) || '';
-    document.getElementById('igToken').placeholder = igStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
-    document.getElementById('hintInstagram').textContent = ig && ig.status_detail
-      ? ig.status_detail
-      : 'Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.';
+    document.getElementById('igToken').placeholder = igStatus !== 'disconnected' ? secretPh : 'EAAG...';
+    document.getElementById('hintInstagram').textContent = igStatus === 'awaiting_verification'
+      ? t('ch.awaitingMsg', lang)
+      : t('ch.instagram.hint', lang);
 
     const fb = channelsByType.messenger;
     const fbStatus = (fb && fb.status) || 'disconnected';
     setPill('messenger', fbStatus);
     setDisconnectVisible('messenger', fbStatus !== 'disconnected');
-    document.getElementById('fbToken').placeholder = fbStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
-    document.getElementById('hintMessenger').textContent = fb && fb.status_detail
-      ? fb.status_detail
+    document.getElementById('fbToken').placeholder = fbStatus !== 'disconnected' ? secretPh : 'EAAG...';
+    document.getElementById('hintMessenger').textContent = fbStatus === 'awaiting_verification'
+      ? t('ch.awaitingMsg', lang)
       : (fb && fb.credentials && fb.credentials.page_name)
-        ? `Підключено сторінку «${fb.credentials.page_name}». Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.`
-        : 'Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.';
+        ? t('ch.messenger.hintConnected', lang, { page: fb.credentials.page_name })
+        : t('ch.messenger.hint', lang);
 
     document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
   }
@@ -1437,11 +1760,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     for (const field of requiredFields) {
       if (!credentials[field]) {
         msg.className = 'msg error';
-        msg.textContent = 'Заповніть усі поля.';
+        msg.textContent = t('ch.fillAllFields', getLang());
         return;
       }
     }
-    msg.textContent = 'Підключаємо і перевіряємо через Meta...';
+    msg.textContent = t('ch.connecting', getLang());
     try {
       const res = await fetch(`${API_BASE_URL}/api/connect-channel`, {
         method: 'POST',
@@ -1449,12 +1772,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         body: JSON.stringify({ propertyId: currentProperty.property_id, channelType, credentials }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Не вдалося підключити.');
+      if (!res.ok) throw new Error(data.error || t('ch.connectFailed', getLang()));
       msg.className = 'msg ok';
-      msg.textContent = data.status === 'connected'
-        ? 'Підключено! Напишіть боту/сторінці, щоб перевірити.'
-        : 'Збережено. Очікує верифікації Meta Business — активується автоматично, щойно вона завершиться.';
-      await loadChannels();
+      msg.textContent = data.status === 'connected' ? t('ch.connectedMsg', getLang()) : t('ch.awaitingMsg', getLang());
+      await fetchChannels();
     } catch (e) {
       msg.className = 'msg error';
       msg.textContent = e.message;
@@ -1463,9 +1784,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   async function disconnectChannel(channelType, msgId) {
     const msg = document.getElementById(msgId);
-    if (!confirm('Відключити цей канал? Бот перестане відповідати в ньому, поки ви не підключите знову.')) return;
+    if (!confirm(t('ch.disconnectConfirm', getLang()))) return;
     msg.className = 'msg';
-    msg.textContent = 'Відключаємо...';
+    msg.textContent = t('ch.disconnecting', getLang());
     try {
       const res = await fetch(`${API_BASE_URL}/api/disconnect-channel`, {
         method: 'POST',
@@ -1473,10 +1794,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         body: JSON.stringify({ propertyId: currentProperty.property_id, channelType }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Не вдалося відключити.');
+      if (!res.ok) throw new Error(data.error || t('ch.disconnectFailed', getLang()));
       msg.className = 'msg ok';
-      msg.textContent = 'Відключено.';
-      await loadChannels();
+      msg.textContent = t('ch.disconnected', getLang());
+      await fetchChannels();
     } catch (e) {
       msg.className = 'msg error';
       msg.textContent = e.message;
@@ -1513,10 +1834,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const btn = document.getElementById('copyWidget');
     navigator.clipboard.writeText(text).then(() => {
       const old = btn.textContent;
-      btn.textContent = 'Скопійовано!';
+      btn.textContent = t('ch.website.copied', getLang());
       setTimeout(() => { btn.textContent = old; }, 1500);
     }).catch(() => {
-      btn.textContent = 'Виділіть і скопіюйте вручну';
+      btn.textContent = t('ch.website.copyManually', getLang());
     });
   });
 
@@ -1541,7 +1862,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('dashHotelName').textContent = name;
     document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
     msg.className = 'msg ok';
-    msg.textContent = 'Збережено.';
+    msg.textContent = t('common.saved', getLang());
     setTimeout(() => { msg.textContent = ''; }, 2500);
   });
 
@@ -1569,18 +1890,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
     emptyHint.classList.add('hidden');
+    const lang = getLang();
     list.innerHTML = rooms.map((room) => {
       const amenities = Array.isArray(room.amenities) ? room.amenities : [];
+      const meta = t('rooms.card.meta', lang, { price: room.price_per_night, capacity: room.capacity, quantity: room.quantity ?? 1 });
       return `
         <div class="room-card" data-id="${room.id}">
           <div class="room-card-head">
             <div>
               <div class="room-card-title">${escapeHtml(room.room_type)}</div>
-              <div class="room-card-meta">${room.price_per_night} грн/ніч · до ${room.capacity} гостей · ${room.quantity ?? 1} шт.</div>
+              <div class="room-card-meta">${escapeHtml(meta)}</div>
             </div>
             <div class="room-card-actions">
-              <button type="button" class="icon-btn edit-room" title="Редагувати" aria-label="Редагувати">✎</button>
-              <button type="button" class="icon-btn danger delete-room" title="Видалити" aria-label="Видалити">×</button>
+              <button type="button" class="icon-btn edit-room" title="${t('rooms.card.edit', lang)}" aria-label="${t('rooms.card.edit', lang)}">✎</button>
+              <button type="button" class="icon-btn danger delete-room" title="${t('rooms.card.delete', lang)}" aria-label="${t('rooms.card.delete', lang)}">×</button>
             </div>
           </div>
           ${room.description ? `<p class="room-card-desc">${escapeHtml(room.description)}</p>` : ''}
@@ -1599,7 +1922,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       btn.addEventListener('click', async () => {
         const id = btn.closest('.room-card').dataset.id;
         const room = rooms.find((r) => String(r.id) === id);
-        if (!confirm(`Видалити номер "${room ? room.room_type : ''}"?`)) return;
+        if (!confirm(t('rooms.deleteConfirm', getLang(), { name: room ? room.room_type : '' }))) return;
         const { error } = await supabase.from('rooms').delete().eq('id', id).eq('property_id', currentProperty.property_id);
         const msg = document.getElementById('roomsMsg');
         if (error) {
@@ -1618,7 +1941,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function openRoomForm(room) {
     editingRoomId = room ? room.id : null;
-    document.getElementById('roomFormTitle').textContent = room ? 'Редагувати номер' : 'Новий номер';
+    document.getElementById('roomFormTitle').textContent = room ? t('rf.titleEdit', getLang()) : t('rf.titleNew', getLang());
     document.getElementById('rfType').value = room ? room.room_type : '';
     document.getElementById('rfPrice').value = room ? room.price_per_night : '';
     document.getElementById('rfCapacity').value = room ? room.capacity : '';
@@ -1650,10 +1973,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const description = document.getElementById('rfDesc').value.trim();
     const amenities = document.getElementById('rfAmenities').value.split(',').map((s) => s.trim()).filter(Boolean);
 
-    if (!roomType) { msg.className = 'msg error'; msg.textContent = 'Вкажіть тип/назву номера.'; return; }
-    if (!(price > 0)) { msg.className = 'msg error'; msg.textContent = 'Ціна за ніч має бути додатним числом.'; return; }
-    if (!(capacity > 0) || !Number.isInteger(capacity)) { msg.className = 'msg error'; msg.textContent = 'Місткість має бути цілим додатним числом.'; return; }
-    if (!(quantity > 0) || !Number.isInteger(quantity)) { msg.className = 'msg error'; msg.textContent = 'Кількість номерів має бути цілим додатним числом.'; return; }
+    if (!roomType) { msg.className = 'msg error'; msg.textContent = t('rf.err.type', getLang()); return; }
+    if (!(price > 0)) { msg.className = 'msg error'; msg.textContent = t('rf.err.price', getLang()); return; }
+    if (!(capacity > 0) || !Number.isInteger(capacity)) { msg.className = 'msg error'; msg.textContent = t('rf.err.capacity', getLang()); return; }
+    if (!(quantity > 0) || !Number.isInteger(quantity)) { msg.className = 'msg error'; msg.textContent = t('rf.err.qty', getLang()); return; }
 
     const payload = { room_type: roomType, price_per_night: price, capacity, quantity, description, amenities };
     const { error } = editingRoomId
@@ -1677,7 +2000,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('bulkStepPick').classList.remove('hidden');
     document.getElementById('bulkStepPreview').classList.add('hidden');
     document.getElementById('bulkFileInput').value = '';
-    document.getElementById('bulkDropLabel').textContent = 'Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)';
+    document.getElementById('bulkDropLabel').textContent = t('bulk.dropLabel', getLang());
     document.getElementById('bulkAnalyzeBtn').disabled = true;
     document.getElementById('bulkPickMsg').textContent = '';
     document.getElementById('bulkPreviewMsg').textContent = '';
@@ -1704,7 +2027,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (!file) { document.getElementById('bulkAnalyzeBtn').disabled = true; return; }
     if (file.size > BULK_MAX_FILE_SIZE) {
       pickMsg.className = 'msg error';
-      pickMsg.textContent = `Файл завеликий (${(file.size / 1024 / 1024).toFixed(1)} МБ) — максимум 10 МБ.`;
+      pickMsg.textContent = t('bulk.fileTooLarge', getLang(), { size: (file.size / 1024 / 1024).toFixed(1) });
       document.getElementById('bulkAnalyzeBtn').disabled = true;
       return;
     }
@@ -1714,35 +2037,36 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function renderBulkPreview() {
     const list = document.getElementById('bulkPreviewList');
+    const lang = getLang();
     list.innerHTML = bulkPreviewRows.map((row, idx) => {
       const uncertain = row.uncertain_fields || [];
       const badges = [
-        row.is_duplicate ? `<span class="preview-badge dup">Схоже на наявний номер</span>` : `<span class="preview-badge new">Новий номер</span>`,
-        uncertain.length ? `<span class="preview-badge uncertain">Перевірте: ${uncertain.map(escapeHtml).join(', ')}</span>` : '',
+        row.is_duplicate ? `<span class="preview-badge dup">${t('bulk.dupBadge', lang)}</span>` : `<span class="preview-badge new">${t('bulk.newBadge', lang)}</span>`,
+        uncertain.length ? `<span class="preview-badge uncertain">${escapeHtml(t('bulk.uncertainBadge', lang, { fields: uncertain.join(', ') }))}</span>` : '',
       ].join('');
       return `
         <div class="preview-card ${row.is_duplicate ? 'is-duplicate' : ''} ${uncertain.length ? 'is-uncertain' : ''}" data-idx="${idx}">
           ${badges}
-          <label>Тип / назва номера</label>
+          <label>${t('rf.typeLabel', lang)}</label>
           <input class="pv-type" value="${escapeHtml(row.room_type)}">
           <div class="row">
-            <div><label>Ціна/ніч</label><input class="pv-price" type="number" value="${row.price_per_night}"></div>
-            <div><label>Місткість</label><input class="pv-capacity" type="number" value="${row.capacity}"></div>
-            <div><label>Кількість</label><input class="pv-qty" type="number" value="${row.quantity}"></div>
+            <div><label>${t('rf.priceLabel', lang)}</label><input class="pv-price" type="number" value="${row.price_per_night}"></div>
+            <div><label>${t('rf.capacityLabel', lang)}</label><input class="pv-capacity" type="number" value="${row.capacity}"></div>
+            <div><label>${t('rf.qtyLabel', lang)}</label><input class="pv-qty" type="number" value="${row.quantity}"></div>
           </div>
-          <label>Опис</label>
+          <label>${t('rf.descLabel', lang)}</label>
           <input class="pv-desc" value="${escapeHtml(row.description || '')}">
-          <label>Зручності (через кому)</label>
+          <label>${t('rf.amenitiesLabel', lang)}</label>
           <input class="pv-amenities" value="${escapeHtml((row.amenities || []).join(', '))}">
           ${row.is_duplicate ? `
-            <label>Що робити з дублікатом</label>
+            <label>${t('bulk.actionLabel', lang)}</label>
             <select class="pv-action">
-              <option value="update" ${row.action !== 'create' ? 'selected' : ''}>Оновити наявний номер "${escapeHtml(row.room_type)}"</option>
-              <option value="create" ${row.action === 'create' ? 'selected' : ''}>Створити як новий окремий номер</option>
+              <option value="update" ${row.action !== 'create' ? 'selected' : ''}>${escapeHtml(t('bulk.actionUpdate', lang, { name: row.room_type }))}</option>
+              <option value="create" ${row.action === 'create' ? 'selected' : ''}>${t('bulk.actionCreate', lang)}</option>
             </select>
           ` : ''}
           <div class="actions">
-            <button type="button" class="btn-secondary pv-remove">Не завантажувати цей рядок</button>
+            <button type="button" class="btn-secondary pv-remove">${t('bulk.removeRow', lang)}</button>
           </div>
         </div>
       `;
@@ -1762,7 +2086,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const pickMsg = document.getElementById('bulkPickMsg');
     if (!file) return;
     pickMsg.className = 'msg';
-    pickMsg.textContent = 'Аналізуємо файл — це може зайняти кілька секунд...';
+    pickMsg.textContent = t('bulk.analyzing', getLang());
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1776,17 +2100,16 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Не вдалося розпізнати файл.');
+      if (!res.ok) throw new Error(data.error || t('bulk.parseFailed', getLang()));
 
       if (!data.rooms || !data.rooms.length) {
         pickMsg.className = 'msg error';
-        pickMsg.textContent = data.warning || 'У файлі не знайдено жодного номера. Перевірте файл або скористайтесь шаблоном.';
+        pickMsg.textContent = data.warning || t('bulk.noRoomsFound', getLang());
         return;
       }
 
       bulkPreviewRows = data.rooms.map((r) => ({ ...r, action: r.is_duplicate ? 'update' : 'create' }));
-      document.getElementById('bulkPreviewHint').textContent =
-        `Розпізнано ${bulkPreviewRows.length} номер(ів). Перевірте виділені жовтим поля та позначені дублікати перед збереженням — нічого не потрапить у базу, поки ви не натиснете "Підтвердити".`;
+      document.getElementById('bulkPreviewHint').textContent = t('bulk.previewHint', getLang(), { count: bulkPreviewRows.length });
       renderBulkPreview();
       document.getElementById('bulkStepPick').classList.add('hidden');
       document.getElementById('bulkStepPreview').classList.remove('hidden');
@@ -1825,16 +2148,16 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (!valid) {
       msg.className = 'msg error';
-      msg.textContent = 'Перевірте всі рядки — тип, ціна і місткість обов\'язкові, а числові поля мають бути додатними.';
+      msg.textContent = t('bulk.validationError', getLang());
       return;
     }
     if (!finalRows.length) {
       msg.className = 'msg error';
-      msg.textContent = 'Немає жодного рядка для збереження.';
+      msg.textContent = t('bulk.nothingToSave', getLang());
       return;
     }
 
-    msg.textContent = 'Зберігаємо...';
+    msg.textContent = t('bulk.saving', getLang());
     // Один виклик БД-функції — записується або все, або нічого (Блок 2: атомарність).
     const { error } = await supabase.rpc('commit_room_bulk_upload', {
       p_property_id: currentProperty.property_id,
@@ -1843,14 +2166,14 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     if (error) {
       msg.className = 'msg error';
-      msg.textContent = 'Не вдалося зберегти: ' + error.message;
+      msg.textContent = t('bulk.saveFailed', getLang(), { error: error.message });
       return;
     }
 
     document.getElementById('bulkUploadModal').classList.add('hidden');
     const roomsMsg = document.getElementById('roomsMsg');
     roomsMsg.className = 'msg ok';
-    roomsMsg.textContent = `Завантажено ${finalRows.length} номер(ів).`;
+    roomsMsg.textContent = t('rooms.bulkSaved', getLang(), { count: finalRows.length });
     await reloadRooms();
     setTimeout(() => { roomsMsg.textContent = ''; }, 4000);
   });

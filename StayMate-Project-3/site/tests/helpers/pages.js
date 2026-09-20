@@ -15,6 +15,6 @@ const REDIRECT_STUBS = ['login.html', 'register.html', 'account.html', 'connect.
 
 const ALL_SITE_PAGES = [...MARKETING_PAGES, ...REDIRECT_STUBS, 'checkout.html'];
 
-const LANGS = ['uk', 'ru', 'en'];
+const LANGS = ['uk', 'en'];
 
 module.exports = { MARKETING_PAGES, REDIRECT_STUBS, ALL_SITE_PAGES, LANGS };

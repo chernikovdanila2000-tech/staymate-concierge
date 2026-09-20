@@ -350,3 +350,87 @@ test.describe('Dashboard — gated access after trial ends', () => {
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
   });
 });
+
+const CYRILLIC = /[Ѐ-ӿ]/;
+
+test.describe('Dashboard — switching language translates the whole cabinet, not just the header (regression)', () => {
+  async function switchToEnglish(page) {
+    await page.click('#langBtn');
+    await page.click('#langMenu button[data-lang="en"]');
+    await page.waitForTimeout(150);
+  }
+
+  test('EN: subscription/hotel/guest-info/rooms cards and the Канали tab all switch language together', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+      rooms: [
+        { id: 'room-1', property_id: 'p1', room_type: 'Стандарт', price_per_night: 1500, capacity: 2, quantity: 5, description: 'Опис', amenities: [] },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+
+    await switchToEnglish(page);
+
+    // Overview tab: every card title, not just the header nav.
+    await expect(page.locator('#tabOverview h2').nth(0)).toHaveText('Plan & subscription');
+    await expect(page.locator('#tabOverview h2').nth(1)).toHaveText('Hotel details');
+    await expect(page.locator('#tabOverview h2').nth(2)).toHaveText('Guest information');
+    await expect(page.locator('#tabOverview h2').nth(3)).toHaveText('Rooms');
+    await expect(page.locator('#dashScreen .lede').first()).toHaveText(/AI administrator sees and uses/);
+
+    // Dynamically-rendered room card must also be in English, not stuck in Ukrainian.
+    await expect(page.locator('.room-card-meta')).toContainText('UAH/night');
+    await expect(page.locator('.room-card-meta')).not.toHaveText(CYRILLIC);
+
+    // Канали tab.
+    await page.click('.dash-tab[data-tab="channels"]');
+    await expect(page.locator('#tabChannels h2').first()).toHaveText('Channels');
+    await expect(page.locator('#pill-telegram')).toHaveText('Not connected');
+    await expect(page.locator('label[for="tokenTelegram"]')).toHaveText('Bot token');
+  });
+
+  test('EN: no leftover Cyrillic text anywhere in the visible dashboard after switching', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+      rooms: [
+        { id: 'room-1', property_id: 'p1', room_type: 'Стандарт', price_per_night: 1500, capacity: 2, quantity: 5, description: 'Опис', amenities: ['Wi-Fi'] },
+      ],
+      channels: [
+        { property_id: 'p1', channel_type: 'whatsapp', credentials: { phone_number_id: '1' }, connected: false, status: 'awaiting_verification', status_detail: 'awaiting' },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await switchToEnglish(page);
+    await page.click('.dash-tab[data-tab="channels"]');
+    await page.waitForTimeout(200);
+
+    const leftover = await page.$$eval('#dashScreen [data-i18n], #dashScreen .room-card-meta, #dashScreen .status-pill, #dashScreen #hintWhatsapp', (els) =>
+      els
+        .filter((el) => /[Ѐ-ӿ]/.test(el.textContent || ''))
+        .map((el) => ({ id: el.id, key: el.getAttribute('data-i18n'), text: el.textContent.trim() }))
+    );
+    expect(leftover, 'dashboard elements still showing Cyrillic after switching to EN').toEqual([]);
+  });
+
+  test('reset/onboard/gate screens also translate (not just the post-login dashboard)', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: null,
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#onboardScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await switchToEnglish(page);
+    await expect(page.locator('#onboardScreen h1')).toHaveText('Create your hotel profile');
+    await expect(page.locator('#obSubmitTrial')).toHaveText('Start a free 3-day trial');
+  });
+});
