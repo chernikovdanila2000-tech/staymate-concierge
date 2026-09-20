@@ -546,3 +546,32 @@ test.describe('Dashboard — themed form fields (regression)', () => {
     expect(bg).not.toBe('rgb(255, 255, 255)');
   });
 });
+
+test.describe('Dashboard — login/reload loads rooms, hotel info and channels in parallel (regression)', () => {
+  // Reported: logging in (or reloading with a stored session) into the
+  // cabinet felt slow. Root cause: showDashboard() awaited reloadRooms(),
+  // loadHotelInfo() and fetchChannels() one after another — three
+  // independent Supabase queries paying their network round-trip
+  // sequentially — plus afterLogin() made its own separate getUser() call
+  // even when the caller already had a fresh user object in hand. Fixed by
+  // running the three independent queries via Promise.all and reusing the
+  // already-known user instead of re-fetching it.
+  test('dashboard appears in roughly one query round-trip, not the sum of three', async ({ page }) => {
+    await installBackendMock(page, {
+      queryDelayMs: 400,
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
+        subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+      },
+    });
+    const start = Date.now();
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    const elapsed = Date.now() - start;
+    // Sequential (rooms -> hotel_info -> channels, 400ms each) would need
+    // at least 1200ms just for those three queries, on top of page load and
+    // the properties fetch. Parallel needs roughly one 400ms delay.
+    expect(elapsed).toBeLessThan(1100);
+  });
+});

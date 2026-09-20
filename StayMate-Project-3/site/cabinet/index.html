@@ -1381,7 +1381,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         }).catch(() => {});
       }
 
-      await afterLogin();
+      await afterLogin(data.user);
     } finally {
       submitBtn.disabled = false;
     }
@@ -1415,8 +1415,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     setTimeout(afterLogin, 800);
   });
 
-  async function afterLogin() {
-    const { data: { user } } = await supabase.auth.getUser();
+  // knownUser: коли викликач щойно отримав користувача від Supabase сам
+  // (відповідь signIn/signUp, чи вже перевірену локальну сесію) — пропускаємо
+  // окремий мережевий запит getUser(), який лише повторно питав би те саме і
+  // додавав зайвий round-trip до кожного входу в кабінет.
+  async function afterLogin(knownUser) {
+    const user = knownUser || (await supabase.auth.getUser()).data.user;
     currentUser = user;
     if (!user) return;
 
@@ -1681,9 +1685,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('dashAddress').value = currentProperty.address || '';
     renderSubscriptionCard();
 
-    await reloadRooms();
-    await loadHotelInfo();
-    await fetchChannels();
+    // Три незалежні запити (номери/інформація для гостей/канали) — раніше
+    // йшли послідовно, один за одним чекаючи мережевого round-trip
+    // попереднього, що й було основною причиною повільного входу в кабінет.
+    // Незалежні один від одного, тож запускаємо паралельно.
+    await Promise.all([reloadRooms(), loadHotelInfo(), fetchChannels()]);
     dashScreen.classList.remove('hidden');
   }
 
@@ -2280,7 +2286,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       window.location.href = window.location.origin + '/';
       return;
     }
-    await afterLogin();
+    await afterLogin(session.user);
   })();
 </script>
 

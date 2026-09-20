@@ -17,6 +17,7 @@ const DEFAULT_STATE = {
   failNextRequest: null, // url substring to fail once
   requireEmailConfirmation: false, // mirrors Supabase's "Confirm email" toggle
   signInDelayMs: 0, // artificial latency, for testing in-flight/double-submit UI states
+  queryDelayMs: 0, // artificial latency on rooms/channels/hotel_info selects, for testing parallel vs sequential loading
 };
 
 function buildClientSource() {
@@ -114,8 +115,17 @@ function buildClientSource() {
         }
 
         return {
-          select: () => makeQuery((filters) => {
+          select: () => makeQuery(async (filters) => {
             const st = __qaGetState();
+            // Artificial per-query latency (opt-in via st.queryDelayMs) so tests
+            // can tell a parallel Promise.all from a sequential await chain: with
+            // 3 independent delayed queries, parallel finishes in ~1 delay,
+            // sequential takes ~3.
+            if (st.queryDelayMs && ['rooms', 'channels', 'hotel_info'].includes(table)) {
+              window.__qaQueryStarts = window.__qaQueryStarts || {};
+              window.__qaQueryStarts[table] = Date.now();
+              await new Promise((r) => setTimeout(r, st.queryDelayMs));
+            }
             if (table === 'properties') return { data: st.property, error: null };
             if (table === 'rooms') return { data: (st.rooms || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'channels') return { data: (st.channels || []).filter((r) => rowMatches(r, filters)), error: null };
