@@ -122,6 +122,23 @@ test.describe('i18n — account dropdown re-translates on language switch (regre
     const rows = page.locator('#accountDropdown .acct-row');
     await expect(rows).toHaveCount(3); // Email, Дата реєстрації, Підписка
   });
+
+  // Reported: the "Forgot password?" (a <button>) and "Personal cabinet"
+  // (an <a>) dropdown actions looked mismatched in size — same padding in
+  // CSS, but a plain <button> doesn't inherit the page's line-height the
+  // way an <a> does, so the button rendered visibly shorter.
+  test('Forgot password? and Personal cabinet dropdown buttons render at the same size', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro', subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString() },
+    });
+    await page.goto('/index.html');
+    await page.click('#accountMenuBtn');
+    const pw = await page.locator('.acct-forgot-pw').boundingBox();
+    const cab = await page.locator('.acct-cabinet-link').boundingBox();
+    expect(Math.abs(pw.width - cab.width)).toBeLessThan(1);
+    expect(Math.abs(pw.height - cab.height)).toBeLessThan(1);
+  });
 });
 
 test.describe('i18n — browser tab title follows the language switcher (regression)', () => {
