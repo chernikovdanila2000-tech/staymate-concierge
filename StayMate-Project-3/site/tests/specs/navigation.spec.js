@@ -42,9 +42,25 @@ test.describe('Navigation — favicon (regression)', () => {
   test('index.html declares the same favicon <link> tags as the other pages', async ({ page }) => {
     await installBackendMock(page);
     await page.goto('/index.html');
-    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', 'favicon.svg');
-    const res = await page.request.get('/favicon.svg');
+    const href = await page.locator('link[rel="icon"][type="image/svg+xml"]').getAttribute('href');
+    expect(href).toMatch(/^favicon\.svg(\?.*)?$/);
+    const res = await page.request.get('/' + href);
     expect(res.status()).toBe(200);
+  });
+
+  // The explicit <link> favicons carry a ?v= query string so browsers/CDNs
+  // that cached the old (broken/missing) favicon under the un-versioned URL
+  // are forced to fetch fresh instead of reusing a stale cache entry tied
+  // to the bare filename.
+  test('favicon <link> hrefs are cache-busted with a version query string', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/index.html');
+    for (const rel of ['icon', 'apple-touch-icon']) {
+      const hrefs = await page.locator(`link[rel="${rel}"]`).evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+      for (const href of hrefs) {
+        expect(href, `${rel} href should be cache-busted: ${href}`).toMatch(/\?v=\d+$/);
+      }
+    }
   });
 });
 
