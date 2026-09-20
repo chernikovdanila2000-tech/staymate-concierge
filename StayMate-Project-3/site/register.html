@@ -182,8 +182,11 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 @media (prefers-reduced-motion: reduce){.account-dropdown{transition:none;}}
 .account-dropdown .acct-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-size:13px; padding-bottom:12px; margin-bottom:12px; border-bottom:1px solid var(--line);}
 .account-dropdown .acct-row:last-of-type{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+.account-dropdown .acct-row--stack{flex-direction:column; align-items:flex-start; gap:4px;}
 .account-dropdown .acct-label{color:var(--muted); flex-shrink:0;}
 .account-dropdown .acct-value{font-weight:600; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:190px;}
+.account-dropdown .acct-row--stack .acct-value{text-align:left; width:100%; max-width:none;}
+.account-dropdown .acct-value--sub{font-weight:500; font-size:12px; color:var(--muted);}
 .account-dropdown .acct-forgot-pw{width:100%; justify-content:center; padding:9px;}
 .account-dropdown .acct-pw-msg{display:block; font-size:12px; margin-top:8px; min-height:14px;}
 .account-dropdown .acct-pw-msg.error{color:var(--warn);}
@@ -891,17 +894,32 @@ const ACCT_I18N = {
     'acct.sendingEmail':'Надсилаємо лист...','acct.resetSent':'Перевірте пошту — надіслали лист для скидання пароля.',
     'sub.active':'Активна','sub.inactive':'Не активна','sub.trial':'Пробний період','sub.until':'до','sub.daysShort':'дн.',
     'plan.start':'Старт (€100/міс)','plan.pro':'Профі (€200/міс)','plan.network':'Мережа (€300/міс)',
+    'sub.countdown.days':'{days} дн.','sub.countdown.hoursMinutes':'{hours} год {minutes} хв','sub.countdown.minutes':'{minutes} хв',
   },
   en: {
     'acct.subscription':'Subscription','acct.forgotPassword':'Forgot password?',
     'acct.sendingEmail':'Sending email...','acct.resetSent':'Check your inbox — we sent a password reset email.',
     'sub.active':'Active','sub.inactive':'Inactive','sub.trial':'Trial period','sub.until':'until','sub.daysShort':'d.',
     'plan.start':'Start (€100/mo)','plan.pro':'Pro (€200/mo)','plan.network':'Network (€300/mo)',
+    'sub.countdown.days':'{days}d','sub.countdown.hoursMinutes':'{hours}h {minutes}m','sub.countdown.minutes':'{minutes}m',
   },
 };
-function acctT(key, lang){
+function acctT(key, lang, vars){
   const dict = ACCT_I18N[lang] || ACCT_I18N.uk;
-  return dict[key] !== undefined ? dict[key] : (ACCT_I18N.uk[key] !== undefined ? ACCT_I18N.uk[key] : key);
+  let str = dict[key] !== undefined ? dict[key] : (ACCT_I18N.uk[key] !== undefined ? ACCT_I18N.uk[key] : key);
+  if (vars) { Object.entries(vars).forEach(([k, v]) => { str = str.replace('{' + k + '}', v); }); }
+  return str;
+}
+function acctFormatCountdown(untilIso, lang){
+  const msLeft = new Date(untilIso) - new Date();
+  if (!(msLeft > 0)) return null;
+  const totalMinutes = Math.max(1, Math.ceil(msLeft / 60000));
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days >= 1) return acctT('sub.countdown.days', lang, { days });
+  if (hours >= 1) return acctT('sub.countdown.hoursMinutes', lang, { hours, minutes });
+  return acctT('sub.countdown.minutes', lang, { minutes });
 }
 function acctFormatDate(iso){
   if(!iso) return '—';
@@ -909,29 +927,33 @@ function acctFormatDate(iso){
   const locale = lang === 'en' ? 'en-GB' : 'uk-UA';
   return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 }
-function acctSubscriptionStatusText(property){
-  if(!property) return '—';
+function acctSubscriptionStatusParts(property){
   const lang = getLang();
+  if(!property) return { main: '—', detail: null };
   if(property.subscription_status === 'active'){
     const planKey = 'plan.' + property.subscription_plan;
     const planLabel = acctT(planKey, lang) !== planKey ? acctT(planKey, lang) : (property.subscription_plan || acctT('sub.active', lang));
-    if(property.subscription_active_until && new Date(property.subscription_active_until) > new Date()){
-      const daysLeft = Math.max(1, Math.ceil((new Date(property.subscription_active_until) - new Date()) / 86400000));
-      return `${planLabel} · ${daysLeft} ${acctT('sub.daysShort', lang)} (${acctT('sub.until', lang)} ${acctFormatDate(property.subscription_active_until)})`;
+    const countdown = property.subscription_active_until && acctFormatCountdown(property.subscription_active_until, lang);
+    if(countdown){
+      return {
+        main: `${planLabel} · ${countdown}`,
+        detail: `(${acctT('sub.until', lang)} ${acctFormatDate(property.subscription_active_until)})`,
+      };
     }
-    return planLabel;
+    return { main: planLabel, detail: null };
   }
-  if(property.trial_ends_at && new Date(property.trial_ends_at) > new Date()){
-    const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
-    return `${acctT('sub.trial', lang)} · ${daysLeft} ${acctT('sub.daysShort', lang)}`;
+  const trialCountdown = property.trial_ends_at && acctFormatCountdown(property.trial_ends_at, lang);
+  if(trialCountdown){
+    return { main: `${acctT('sub.trial', lang)} · ${trialCountdown}`, detail: null };
   }
-  return acctT('sub.inactive', lang);
+  return { main: acctT('sub.inactive', lang), detail: null };
 }
 function buildAcctDropdownHTML(session, property){
   const lang = getLang();
+  const sub = acctSubscriptionStatusParts(property);
   return `
-    <div class="acct-row"><span class="acct-label">Email</span><span class="acct-value" title="${session.user.email}">${session.user.email}</span></div>
-    <div class="acct-row"><span class="acct-label">${acctT('acct.subscription', lang)}</span><span class="acct-value">${acctSubscriptionStatusText(property)}</span></div>
+    <div class="acct-row acct-row--stack"><span class="acct-label">Email</span><span class="acct-value" title="${session.user.email}">${session.user.email}</span></div>
+    <div class="acct-row acct-row--stack"><span class="acct-label">${acctT('acct.subscription', lang)}</span><span class="acct-value">${sub.main}</span>${sub.detail ? `<span class="acct-value acct-value--sub">${sub.detail}</span>` : ''}</div>
     <div class="acct-pw">
       <button type="button" class="btn-secondary acct-forgot-pw" id="acctForgotPwNav" data-email="${session.user.email}">${acctT('acct.forgotPassword', lang)}</button>
       <span class="msg acct-pw-msg" id="acctPwMsgNav"></span>
