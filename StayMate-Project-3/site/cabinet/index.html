@@ -114,10 +114,12 @@ button:disabled{opacity:.5; cursor:default;}
 
 label{display:block; font-size:13px; font-weight:600; color:var(--ink-soft); margin-bottom:7px; margin-top:16px;}
 label:first-of-type{margin-top:0;}
-input, select{width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'Inter',sans-serif; background:var(--input-bg); color:var(--ink); transition:border-color .2s ease;}
-input:focus, select:focus, button:focus-visible{outline:none; border-color:var(--accent);}
+input, select, textarea{width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'Inter',sans-serif; background:var(--input-bg); color:var(--ink); transition:border-color .2s ease, background .2s ease;}
+input:focus, select:focus, textarea:focus, button:focus-visible{outline:none; border-color:var(--accent);}
 button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 input.field-error{border-color:var(--warn); background:color-mix(in srgb, var(--warn) 8%, var(--input-bg));}
+textarea{resize:vertical; min-height:68px; line-height:1.5;}
+textarea::placeholder, input::placeholder{color:var(--muted); opacity:1;}
 
 /* ---------- layout ---------- */
 main{padding:48px 0 96px;}
@@ -183,7 +185,6 @@ td.del-col button{background:none; border:none; color:var(--warn); font-size:18p
 .modal-overlay.hidden{display:none;}
 .modal-box{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:26px; max-width:620px; width:100%; margin:auto;}
 .modal-box h2{margin-bottom:6px;}
-.modal-box textarea{width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'Inter',sans-serif; background:var(--input-bg); color:var(--ink); resize:vertical; min-height:70px;}
 
 /* ---------- масове завантаження: preview-картки ---------- */
 .preview-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:14px 16px; margin-bottom:10px;}
@@ -725,8 +726,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "sub.title":"Тариф і підписка","sub.manageBtn":"Змінити тариф / оплатити",
       "sub.cancelAutoRenewBtn":"Скасувати автопродовження","sub.payBtn":"Оплатити обраний тариф",
       "sub.notActive":"Підписка не активна.",
-      "sub.activeHint":"Активна підписка: {plan}. Діє до {date}.",
-      "sub.trialHint":"Пробний період — залишилось {days} дн. Оберіть тариф заздалегідь, щоб доступ не перервався.",
+      "sub.activeHint":"Активна підписка: {plan}. Залишилось {countdown} (до {date}).",
+      "sub.trialHint":"Пробний період — залишилось {countdown}. Оберіть тариф заздалегідь, щоб доступ не перервався.",
+      "sub.countdown.days":"{days} дн.",
+      "sub.countdown.hoursMinutes":"{hours} год {minutes} хв",
+      "sub.countdown.minutes":"{minutes} хв",
       "sub.autoRenewHint":"Увімкнено автопродовження — наступне списання {date}.",
       "sub.autoRenewFailed":"Останнє автоматичне списання не пройшло — перевірте картку.",
       "sub.cancelConfirm":"Скасувати автопродовження підписки? Наступне списання не відбудеться.",
@@ -891,8 +895,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "sub.title":"Plan & subscription","sub.manageBtn":"Change plan / pay",
       "sub.cancelAutoRenewBtn":"Cancel auto-renewal","sub.payBtn":"Pay for selected plan",
       "sub.notActive":"Subscription is not active.",
-      "sub.activeHint":"Active subscription: {plan}. Valid until {date}.",
-      "sub.trialHint":"Trial period — {days} day(s) left. Choose a plan ahead of time so access doesn't get interrupted.",
+      "sub.activeHint":"Active subscription: {plan}. {countdown} left (until {date}).",
+      "sub.trialHint":"Trial period — {countdown} left. Choose a plan ahead of time so access doesn't get interrupted.",
+      "sub.countdown.days":"{days}d",
+      "sub.countdown.hoursMinutes":"{hours}h {minutes}m",
+      "sub.countdown.minutes":"{minutes}m",
       "sub.autoRenewHint":"Auto-renewal is on — next charge on {date}.",
       "sub.autoRenewFailed":"The last automatic charge failed — please check your card.",
       "sub.cancelConfirm":"Cancel subscription auto-renewal? The next charge will not happen.",
@@ -1111,22 +1118,43 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     return new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  // Показує залишок часу до subscription_active_until/trial_ends_at
+  // (обидва — точні timestamptz, момент оплати зафіксований бекендом з
+  // точністю до секунди) з деталізацією, яка звужується разом із самим
+  // залишком: дні, поки їх ціле число і більше; години+хвилини — коли
+  // лишився останній день; тільки хвилини — коли лишилась остання година.
+  function formatCountdown(untilIso, lang) {
+    const msLeft = new Date(untilIso) - new Date();
+    if (!(msLeft > 0)) return null;
+    const totalMinutes = Math.max(1, Math.ceil(msLeft / 60000));
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    if (days >= 1) return t('sub.countdown.days', lang, { days });
+    if (hours >= 1) return t('sub.countdown.hoursMinutes', lang, { hours, minutes });
+    return t('sub.countdown.minutes', lang, { minutes });
+  }
+
+  function getPlanLabel(property, lang) {
+    const plan = property.subscription_plan;
+    if (plan && t('plan.' + plan, lang) !== ('plan.' + plan)) return t('plan.' + plan, lang);
+    return plan || t('sub.active', lang);
+  }
+
   function subscriptionStatusText(property) {
     if (!property) return '—';
     const lang = getLang();
     if (property.subscription_status === 'active') {
-      const planLabel = (property.subscription_plan && t('plan.' + property.subscription_plan, lang) !== ('plan.' + property.subscription_plan))
-        ? t('plan.' + property.subscription_plan, lang)
-        : (property.subscription_plan || t('sub.active', lang));
-      if (property.subscription_active_until && new Date(property.subscription_active_until) > new Date()) {
-        const daysLeft = Math.max(1, Math.ceil((new Date(property.subscription_active_until) - new Date()) / 86400000));
-        return `${planLabel} · ${daysLeft} ${t('sub.daysShort', lang)} (${t('sub.until', lang)} ${formatDate(property.subscription_active_until)})`;
+      const planLabel = getPlanLabel(property, lang);
+      const countdown = property.subscription_active_until && formatCountdown(property.subscription_active_until, lang);
+      if (countdown) {
+        return `${planLabel} · ${countdown} (${t('sub.until', lang)} ${formatDate(property.subscription_active_until)})`;
       }
       return planLabel;
     }
-    if (property.trial_ends_at && new Date(property.trial_ends_at) > new Date()) {
-      const daysLeft = Math.max(1, Math.ceil((new Date(property.trial_ends_at) - new Date()) / 86400000));
-      return `${t('sub.trial', lang)} · ${daysLeft} ${t('sub.daysShort', lang)}`;
+    const trialCountdown = property.trial_ends_at && formatCountdown(property.trial_ends_at, lang);
+    if (trialCountdown) {
+      return `${t('sub.trial', lang)} · ${trialCountdown}`;
     }
     return t('sub.inactive', lang);
   }
@@ -1179,12 +1207,18 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       return;
     }
 
+    // Періодичне оновлення (startCountdownRefresh) перемальовує це кожну
+    // хвилину, щоб лічильник днів/годин/хвилин лишався живим — без цього
+    // rebuild скидав би клас .open і закривав випадайку прямо під час
+    // читання, якщо вона була відкрита в момент оновлення.
+    const wasOpen = document.getElementById('accountDropdown')?.classList.contains('open');
+
     accountStatus.classList.remove('hidden');
     accountStatus.innerHTML = `
       <button class="account-icon-btn" id="accountMenuBtn" type="button" aria-label="${t('acct.ariaLabel', getLang())}" title="${currentUser.email}">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.6" stroke="currentColor" stroke-width="1.6"/><path d="M4.5 19.5c1.6-3.4 4.4-5.2 7.5-5.2s5.9 1.8 7.5 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
       </button>
-      <div class="account-dropdown" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
+      <div class="account-dropdown${wasOpen ? ' open' : ''}" id="accountDropdown">${buildAccountInfoHTML('Desktop')}</div>
     `;
     wireAccountInfoEvents(accountStatus);
     document.getElementById('accountMenuBtn').addEventListener('click', (e) => {
@@ -1195,6 +1229,19 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     accountStatusMobile.classList.remove('hidden');
     accountStatusMobile.innerHTML = buildAccountInfoHTML('Mobile');
     wireAccountInfoEvents(accountStatusMobile);
+  }
+
+  // Тримає лічильник "залишилось N дн./год/хв" живим без перезавантаження
+  // сторінки — раз на хвилину досить: мінімальна одиниця, яку показує
+  // formatCountdown, теж хвилини, тож частіше оновлювати нема сенсу.
+  let countdownRefreshTimer = null;
+  function startCountdownRefresh() {
+    if (countdownRefreshTimer) return;
+    countdownRefreshTimer = setInterval(() => {
+      if (!currentProperty) return;
+      renderAccountStatus();
+      if (dashScreen && !dashScreen.classList.contains('hidden')) renderSubscriptionCard();
+    }, 60000);
   }
 
   document.addEventListener('click', (e) => {
@@ -1365,6 +1412,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
 
     currentProperty = property;
+    // Перший виклик renderAccountStatus() вище стався ДО того, як
+    // currentProperty був відомий (щоб email у випадайці з'явився
+    // одразу, не чекаючи запиту властивості) — тому підписка там завжди
+    // показувала "—". Перемальовуємо ще раз, коли дані вже є.
+    renderAccountStatus();
+    startCountdownRefresh();
     const access = computeAccess(currentProperty);
     if (!access.allowed) {
       showGate(access.reason);
@@ -1545,13 +1598,14 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const p = currentProperty;
     const lang = getLang();
     const locale = lang === 'en' ? 'en-GB' : 'uk-UA';
-    if (p.subscription_status === 'active') {
-      const until = p.subscription_active_until ? new Date(p.subscription_active_until).toLocaleDateString(locale) : '—';
-      const planLabel = t('plan.' + p.subscription_plan, lang) !== ('plan.' + p.subscription_plan) ? t('plan.' + p.subscription_plan, lang) : (p.subscription_plan || '—');
-      hint.textContent = t('sub.activeHint', lang, { plan: planLabel, date: until });
+    const activeCountdown = p.subscription_status === 'active' && p.subscription_active_until && formatCountdown(p.subscription_active_until, lang);
+    if (p.subscription_status === 'active' && activeCountdown) {
+      const until = new Date(p.subscription_active_until).toLocaleDateString(locale);
+      hint.textContent = t('sub.activeHint', lang, { plan: getPlanLabel(p, lang), date: until, countdown: activeCountdown });
+    } else if (p.subscription_status === 'active') {
+      hint.textContent = getPlanLabel(p, lang);
     } else if (p.trial_ends_at && new Date(p.trial_ends_at) > new Date()) {
-      const daysLeft = Math.max(1, Math.ceil((new Date(p.trial_ends_at) - new Date()) / 86400000));
-      hint.textContent = t('sub.trialHint', lang, { days: daysLeft });
+      hint.textContent = t('sub.trialHint', lang, { countdown: formatCountdown(p.trial_ends_at, lang) });
     } else {
       hint.textContent = t('sub.notActive', lang);
     }

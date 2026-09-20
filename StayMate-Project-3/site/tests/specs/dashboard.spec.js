@@ -434,3 +434,75 @@ test.describe('Dashboard — switching language translates the whole cabinet, no
     await expect(page.locator('#obSubmitTrial')).toHaveText('Start a free 3-day trial');
   });
 });
+
+test.describe('Dashboard — account dropdown subscription countdown (regression)', () => {
+  // Reported bug: the account-icon dropdown showed a bare "—" for
+  // Підписка forever, because renderAccountStatus() was only ever called
+  // once, before currentProperty was fetched — while the main "Тариф і
+  // підписка" card (rendered later, once currentProperty was known) showed
+  // the real date. Also covers the days -> hours+minutes countdown
+  // granularity as the subscription gets close to expiring.
+
+  test('shows a real day countdown, not a stuck "—", once the property loads', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'start',
+        subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('#accountMenuBtn');
+    const subRow = page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value');
+    await expect(subRow).not.toHaveText('—');
+    await expect(subRow).toContainText(/\d+ дн\./);
+  });
+
+  test('switches to hours+minutes once less than a day remains', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
+        subscription_active_until: new Date(Date.now() + 5 * 3600000 + 20 * 60000).toISOString(),
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#subHint')).toContainText(/5 год \d{1,2} хв/);
+    await page.click('#accountMenuBtn');
+    await expect(page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value')).toContainText(/5 год \d{1,2} хв/);
+  });
+
+  test('a missing subscription_plan falls back to a readable label, not a bare dash', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: null,
+        subscription_active_until: new Date(Date.now() + 10 * 86400000).toISOString(),
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#subHint')).toContainText('Активна підписка: Активна.');
+  });
+});
+
+test.describe('Dashboard — themed form fields (regression)', () => {
+  test('hotel-info textareas match the dark input theme instead of rendering as plain white boxes', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    const bg = await page.locator('#hiParking').evaluate((el) => getComputedStyle(el).backgroundColor);
+    // input-bg in dark mode is #1D1E22 = rgb(29, 30, 34) — the point is just
+    // that it isn't left at the browser default white/transparent.
+    expect(bg).not.toBe('rgba(0, 0, 0, 0)');
+    expect(bg).not.toBe('rgb(255, 255, 255)');
+  });
+});
