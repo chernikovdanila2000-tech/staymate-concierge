@@ -23,6 +23,11 @@ const {
   parseInstagramEvents,
   sendInstagramMessage,
 } = require('./instagram');
+const {
+  verifyWhatsAppSignature,
+  parseWhatsAppEvents,
+  sendWhatsAppMessage,
+} = require('./whatsapp');
 const { serveLegalPage } = require('./legal-pages');
 const {
   getTelegramToken,
@@ -90,6 +95,18 @@ const META_INSTAGRAM_ACCOUNT_ID =
 
 const META_INSTAGRAM_PROPERTY_ID =
   process.env.META_INSTAGRAM_PROPERTY_ID || '';
+
+const META_WHATSAPP_VERIFY_TOKEN =
+  process.env.META_WHATSAPP_VERIFY_TOKEN || '';
+
+const META_WHATSAPP_ACCESS_TOKEN =
+  process.env.META_WHATSAPP_ACCESS_TOKEN || '';
+
+const META_WHATSAPP_PHONE_NUMBER_ID =
+  process.env.META_WHATSAPP_PHONE_NUMBER_ID || '';
+
+const META_WHATSAPP_PROPERTY_ID =
+  process.env.META_WHATSAPP_PROPERTY_ID || '';
 
 const PORT = process.env.PORT || 3000;
 
@@ -427,6 +444,49 @@ async function resolveInstagramConnection(
       instagramAccountId:
         accountId,
     };
+  }
+
+  return null;
+}
+
+async function resolveWhatsAppConnection(phoneNumberId) {
+  const id = String(phoneNumberId || '').trim();
+  if (!id) return null;
+
+  const { data, error } = await supabase
+    .from('channels')
+    .select('property_id, credentials, connected')
+    .eq('channel_type', 'whatsapp')
+    .eq('connected', true)
+    .contains('credentials', { phone_number_id: id })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error('[whatsapp] Channel lookup error:', error);
+  }
+
+  if (data && data.credentials && data.credentials.access_token) {
+    let propertyId = String(data.property_id || '').trim();
+    if (!propertyId || !(await getProperty(propertyId))) {
+      propertyId = await resolveMessengerPropertyId('');
+    }
+    if (!propertyId) return null;
+    return {
+      propertyId,
+      accessToken: String(data.credentials.access_token),
+      phoneNumberId: id,
+    };
+  }
+
+  if (META_WHATSAPP_ACCESS_TOKEN && META_WHATSAPP_PHONE_NUMBER_ID &&
+      String(META_WHATSAPP_PHONE_NUMBER_ID) === id) {
+    let propertyId = String(META_WHATSAPP_PROPERTY_ID ||
+      META_MESSENGER_PROPERTY_ID || PROPERTY_ID || '').trim();
+    if (!propertyId || !(await getProperty(propertyId))) {
+      propertyId = await resolveMessengerPropertyId('');
+    }
+    if (!propertyId) return null;
+    return { propertyId, accessToken: META_WHATSAPP_ACCESS_TOKEN, phoneNumberId: id };
   }
 
   return null;
@@ -1288,6 +1348,120 @@ const server =
               );
             }
           );
+
+        return;
+      }
+
+      // =========================
+      // WHATSAPP VERIFY
+      // =========================
+
+      if (
+        requestUrl.pathname === '/webhook/whatsapp' &&
+        req.method === 'GET'
+      ) {
+        const mode = requestUrl.searchParams.get('hub.mode');
+        const token = requestUrl.searchParams.get('hub.verify_token');
+        const challenge = requestUrl.searchParams.get('hub.challenge');
+
+        if (mode === 'subscribe' && challenge &&
+            META_WHATSAPP_VERIFY_TOKEN &&
+            safeEqual(token, META_WHATSAPP_VERIFY_TOKEN)) {
+          res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+          return res.end(challenge);
+        }
+
+        return sendJson(res, 403, { error: 'WhatsApp webhook verification failed.' });
+      }
+
+      // =========================
+      // WHATSAPP MESSAGE
+      // =========================
+      if (
+        requestUrl.pathname === '/webhook/whatsapp' &&
+        req.method === 'POST'
+      ) {
+        readBody(req).then(rawBody => {
+          if (!verifyWhatsAppSignature(
+            rawBody,
+            req.headers['x-hub-signature-256'],
+            META_MESSENGER_APP_SECRET
+          )) {
+            return sendJson(res, 401, { error: 'Invalid WhatsApp signature.' });
+          }
+
+          let payload;
+          try {
+            payload = JSON.parse(rawBody || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Invalid JSON.' });
+          }
+
+          const events = parseWhatsAppEvents(payload);
+          sendJson(res, 200, { ok: true });
+          if (events.length === 0) return;
+
+          setImmediate(async () => {
+            for (const event of events) {
+              try {
+                const connection = await resolveWhatsAppConnection(event.phoneNumberId);
+                if (!connection) {
+                  console.error('[whatsapp] No channel for phone number id');
+                  continue;
+                }
+                const property = await getProperty(connection.propertyId);
+                if (!property) {
+                  console.error('[whatsapp] Property not found');
+                  continue;
+                }
+
+                const access = computeAccess(property);
+                if (!access.allowed) {
+                  await sendWhatsAppMessage(
+                    connection.accessToken,
+                    connection.phoneNumberId,
+                    event.senderId,
+                    PAUSED_MESSAGE,
+                    META_GRAPH_VERSION
+                  );
+                  continue;
+                }
+
+                const history = await getHistory(
+                  connection.propertyId,
+                  'whatsapp',
+                  event.senderId
+                );
+                history.push({ role: 'user', content: event.text });
+
+                const { replyText, updatedHistory } = await runConciergeTurn(
+                  history,
+                  { propertyId: connection.propertyId, propertyName: property.hotel_name }
+                );
+
+                await saveHistory(
+                  connection.propertyId,
+                  'whatsapp',
+                  event.senderId,
+                  updatedHistory
+                );
+
+                await sendWhatsAppMessage(
+                  connection.accessToken,
+                  connection.phoneNumberId,
+                  event.senderId,
+                  replyText,
+                  META_GRAPH_VERSION
+                );
+              } catch (error) {
+                console.error('[whatsapp] EVENT ERROR:', error && error.stack ? error.stack : error);
+              }
+            }
+          });
+        }).catch(error => {
+          console.error('[whatsapp] WEBHOOK ERROR:', error && error.stack ? error.stack : error);
+          if (!res.headersSent) sendJson(res, 500, { error: error.message });
+        });
 
         return;
       }
@@ -2970,6 +3144,16 @@ server.listen(
         propertyId:
           META_MESSENGER_PROPERTY_ID ||
           'not_set',
+      }
+    );
+
+    console.log(
+      '[whatsapp] Configured:',
+      {
+        phoneNumberId: META_WHATSAPP_PHONE_NUMBER_ID || 'not_set',
+        propertyId: META_WHATSAPP_PROPERTY_ID || 'not_set',
+        hasAccessToken: !!META_WHATSAPP_ACCESS_TOKEN,
+        hasVerifyToken: !!META_WHATSAPP_VERIFY_TOKEN,
       }
     );
 
