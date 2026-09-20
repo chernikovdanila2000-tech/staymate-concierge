@@ -106,4 +106,55 @@ test.describe('i18n — account dropdown re-translates on language switch (regre
     const stillUkrainian = await page.locator('#accountDropdown').evaluate((el) => /[Ѐ-ӿ]/.test(el.textContent || ''));
     expect(stillUkrainian, 'account dropdown should have no Ukrainian text left after switching to EN').toBe(false);
   });
+
+  // Reported bug: the marketing-site header dropdown only ever showed
+  // Email + Subscription, unlike the cabinet's dropdown which also shows
+  // "Дата реєстрації" — the registration date was effectively only visible
+  // to someone who opened the dropdown from inside the cabinet.
+  test('marketing-site header dropdown shows the registration date row too (parity with cabinet)', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date(Date.now() - 5 * 86400000).toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro', subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString() },
+    });
+    await page.goto('/index.html');
+    await page.click('#accountMenuBtn');
+    await expect(page.locator('#accountDropdown')).toContainText('Дата реєстрації');
+    const rows = page.locator('#accountDropdown .acct-row');
+    await expect(rows).toHaveCount(3); // Email, Дата реєстрації, Підписка
+  });
+});
+
+test.describe('i18n — browser tab title follows the language switcher (regression)', () => {
+  // Reported bug: the <title> tag was hardcoded Ukrainian and never touched
+  // by applyI18n(), so switching the on-page language to EN left the browser
+  // tab showing the Ukrainian title.
+  test('index.html: tab title switches to English, and back to Ukrainian', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/index.html');
+    await expect(page).toHaveTitle(/ІІ-адміністратор/);
+    await switchLang(page, 'en');
+    await expect(page).toHaveTitle('StayAI — AI front-desk for apartments');
+    const stillCyrillic = await page.title();
+    expect(CYRILLIC.test(stillCyrillic), `tab title still has Cyrillic after switching to EN: "${stillCyrillic}"`).toBe(false);
+    await switchLang(page, 'uk');
+    await expect(page).toHaveTitle('StayAI — ІІ-адміністратор для апартаментів');
+  });
+
+  test('pricing.html: tab title switches with the language too, not just index.html', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/pricing.html');
+    await switchLang(page, 'en');
+    await expect(page).toHaveTitle('StayAI — Pricing');
+  });
+
+  test('cabinet: tab title switches to English', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await switchLang(page, 'en');
+    await expect(page).toHaveTitle('StayAI — hotel dashboard');
+  });
 });

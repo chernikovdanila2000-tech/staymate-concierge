@@ -20,6 +20,34 @@ test.describe('Navigation — every page loads', () => {
   });
 });
 
+test.describe('Navigation — favicon (regression)', () => {
+  // Reported: the tab icon showed up on most pages but not on the home
+  // page. The <link rel="icon"> tags are identical on every page, but
+  // some browsers (especially pinned/bookmarked tabs) probe /favicon.ico
+  // at the domain root directly, bypassing the page's <link> tags — so a
+  // missing root-level favicon.ico could leave exactly the home page (or
+  // any page reached as a bare bookmark) without an icon.
+  test('favicon.ico exists at the domain root and decodes as an image', async ({ page, baseURL }) => {
+    const res = await page.request.get(baseURL + '/favicon.ico');
+    expect(res.status()).toBe(200);
+    const decoded = await page.evaluate((url) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    }), baseURL + '/favicon.ico');
+    expect(decoded).toBe(true);
+  });
+
+  test('index.html declares the same favicon <link> tags as the other pages', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/index.html');
+    await expect(page.locator('link[rel="icon"][type="image/svg+xml"]')).toHaveAttribute('href', 'favicon.svg');
+    const res = await page.request.get('/favicon.svg');
+    expect(res.status()).toBe(200);
+  });
+});
+
 test.describe('Navigation — internal links resolve (no dead links)', () => {
   for (const pagePath of ALL_SITE_PAGES) {
     test(`${pagePath}: internal <a href> links all resolve`, async ({ page, request }) => {

@@ -479,6 +479,7 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 /* ============ StayAI — i18n ============ */
 const I18N = {
 uk: {
+  "meta.title":"StayAI — Реєстрація",
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити",
   "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
@@ -609,6 +610,7 @@ uk: {
   "form.submit":"Надіслати повідомлення"
 },
 en: {
+  "meta.title":"StayAI — Sign Up",
   "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected",
   "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
@@ -747,6 +749,7 @@ function t(key, lang){
 
 function applyI18n(lang){
   document.documentElement.setAttribute('lang', lang);
+  document.title = t('meta.title', lang);
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n'), lang); });
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = t(el.getAttribute('data-i18n-html'), lang); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'), lang)); });
@@ -890,14 +893,14 @@ function translateAuthError(message){
    компонент, що й у кабінеті) ---------- */
 const ACCT_I18N = {
   uk: {
-    'acct.subscription':'Підписка','acct.forgotPassword':'Забули пароль?',
+    'acct.subscription':'Підписка','acct.registered':'Дата реєстрації','acct.forgotPassword':'Забули пароль?',
     'acct.sendingEmail':'Надсилаємо лист...','acct.resetSent':'Перевірте пошту — надіслали лист для скидання пароля.',
     'sub.active':'Активна','sub.inactive':'Не активна','sub.trial':'Пробний період','sub.until':'до','sub.daysShort':'дн.',
     'plan.start':'Старт (€100/міс)','plan.pro':'Профі (€200/міс)','plan.network':'Мережа (€300/міс)',
     'sub.countdown.days':'{days} дн.','sub.countdown.hoursMinutes':'{hours} год {minutes} хв','sub.countdown.minutes':'{minutes} хв',
   },
   en: {
-    'acct.subscription':'Subscription','acct.forgotPassword':'Forgot password?',
+    'acct.subscription':'Subscription','acct.registered':'Registered on','acct.forgotPassword':'Forgot password?',
     'acct.sendingEmail':'Sending email...','acct.resetSent':'Check your inbox — we sent a password reset email.',
     'sub.active':'Active','sub.inactive':'Inactive','sub.trial':'Trial period','sub.until':'until','sub.daysShort':'d.',
     'plan.start':'Start (€100/mo)','plan.pro':'Pro (€200/mo)','plan.network':'Network (€300/mo)',
@@ -953,6 +956,7 @@ function buildAcctDropdownHTML(session, property){
   const sub = acctSubscriptionStatusParts(property);
   return `
     <div class="acct-row acct-row--stack"><span class="acct-label">Email</span><span class="acct-value" title="${session.user.email}">${session.user.email}</span></div>
+    <div class="acct-row acct-row--stack"><span class="acct-label">${acctT('acct.registered', lang)}</span><span class="acct-value">${acctFormatDate(session.user.created_at)}</span></div>
     <div class="acct-row acct-row--stack"><span class="acct-label">${acctT('acct.subscription', lang)}</span><span class="acct-value">${sub.main}</span>${sub.detail ? `<span class="acct-value acct-value--sub">${sub.detail}</span>` : ''}</div>
     <div class="acct-pw">
       <button type="button" class="btn-secondary acct-forgot-pw" id="acctForgotPwNav" data-email="${session.user.email}">${acctT('acct.forgotPassword', lang)}</button>

@@ -670,6 +670,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // про помилки/успіх — перекладається разом з рештою сайту.
   const CAB_I18N = {
     uk: {
+      "meta.title":"StayAI — кабінет готелю",
       "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
       "nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cabinet":"Особистий кабінет",
       "theme.toggleLabel":"Змінити тему","burger.label":"Меню",
@@ -840,6 +841,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.messenger.tokenLabel":"Page Access Token",
     },
     en: {
+      "meta.title":"StayAI — hotel dashboard",
       "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
       "nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cabinet":"Personal cabinet",
       "theme.toggleLabel":"Toggle theme","burger.label":"Menu",
@@ -1028,6 +1030,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   }
   function applyI18n(lang) {
     document.documentElement.setAttribute('lang', lang);
+    document.title = t('meta.title', lang);
     document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n'), lang); });
     document.querySelectorAll('[data-i18n-html]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n-html'), lang); });
     document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-ph'), lang)); });
