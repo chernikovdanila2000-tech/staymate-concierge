@@ -241,6 +241,83 @@ test.describe('Dashboard — hotel info for the AI agent (Block 3)', () => {
   });
 });
 
+test.describe('Dashboard — Каналы tab: real connect/disconnect (Block 4)', () => {
+  async function loginBasic(page) {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+  }
+
+  test('Канали tab is hidden by default, switching tabs shows it and hides Огляд', async ({ page }) => {
+    await loginBasic(page);
+    await expect(page.locator('#tabOverview')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#tabChannels')).toHaveClass(/hidden/);
+
+    await page.click('.dash-tab[data-tab="channels"]');
+    await expect(page.locator('#tabChannels')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#tabOverview')).toHaveClass(/hidden/);
+    await expect(page.locator('.dash-tab[data-tab="channels"]')).toHaveClass(/active/);
+  });
+
+  test('connecting WhatsApp with valid credentials shows "Підключено" and a Відключити button', async ({ page }) => {
+    await loginBasic(page);
+    await page.click('.dash-tab[data-tab="channels"]');
+    await page.fill('#waPhoneId', '10293847');
+    await page.fill('#waToken', 'EAAtest');
+    await page.click('#connectWhatsapp');
+    await expect(page.locator('#msgWhatsapp')).toContainText(/Підключено/i, { timeout: 5000 });
+    await expect(page.locator('#pill-whatsapp')).toHaveText('Підключено');
+    await expect(page.locator('#pill-whatsapp')).not.toHaveClass(/off|awaiting|error/);
+    await expect(page.locator('#disconnectWhatsapp')).toBeVisible();
+  });
+
+  test('connecting WhatsApp with a missing field shows an error and does not connect', async ({ page }) => {
+    await loginBasic(page);
+    await page.click('.dash-tab[data-tab="channels"]');
+    await page.fill('#waPhoneId', '10293847');
+    await page.click('#connectWhatsapp');
+    await expect(page.locator('#msgWhatsapp')).toContainText(/Заповніть/i, { timeout: 5000 });
+    await expect(page.locator('#pill-whatsapp')).toHaveText(/Не підключено/);
+  });
+
+  test('disconnecting a connected channel asks for confirmation and reverts the pill', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+      channels: [
+        { property_id: 'p1', channel_type: 'instagram', credentials: { instagram_account_id: 'ig1' }, connected: true, status: 'connected' },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="channels"]');
+    await expect(page.locator('#pill-instagram')).toHaveText('Підключено');
+
+    page.once('dialog', (d) => d.accept());
+    await page.click('#disconnectInstagram');
+    await expect(page.locator('#msgInstagram')).toContainText(/Відключено/i, { timeout: 5000 });
+    await expect(page.locator('#pill-instagram')).toHaveText(/Не підключено/);
+  });
+
+  test('connecting Messenger with just a Page Access Token works (no manual page ID field)', async ({ page }) => {
+    await loginBasic(page);
+    await page.click('.dash-tab[data-tab="channels"]');
+    await page.fill('#fbToken', 'EAAfbtest');
+    await page.click('#connectMessenger');
+    await expect(page.locator('#msgMessenger')).toContainText(/Підключено/i, { timeout: 5000 });
+    await expect(page.locator('#pill-messenger')).toHaveText('Підключено');
+  });
+});
+
 test.describe('Dashboard — gated access after trial ends', () => {
   test('expired trial + no subscription shows the payment gate, not the dashboard', async ({ page }) => {
     await installBackendMock(page, {

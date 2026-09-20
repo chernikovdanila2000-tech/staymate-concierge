@@ -12,6 +12,11 @@ function verifyMessengerSignature(rawBody, signatureHeader, appSecret) {
   return safeEqual(signatureHeader, expected);
 }
 
+// expectedPageId, коли передано, звужує розбір до однієї сторінки (старий
+// однотенантний режим). Без нього повертає події з УСІХ сторінок у payload,
+// кожну з власним pageId — так виклик може роутити кожну подію на
+// правильного готеля через resolveMessengerConnection(event.pageId),
+// а не припускати, що весь payload належить одному й тому самому готелю.
 function parseMessengerEvents(payload, expectedPageId) {
   if (!payload || payload.object !== 'page' || !Array.isArray(payload.entry)) return [];
   const events = [];
@@ -21,7 +26,7 @@ function parseMessengerEvents(payload, expectedPageId) {
       if (item.message?.is_echo || !item.sender?.id) continue;
       const text = item.message?.text || item.postback?.title || item.postback?.payload;
       if (typeof text !== 'string' || !text.trim()) continue;
-      events.push({ senderId: String(item.sender.id), text: text.trim() });
+      events.push({ senderId: String(item.sender.id), text: text.trim(), pageId: String(entry.id) });
     }
   }
   return events;

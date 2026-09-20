@@ -7,6 +7,7 @@
    ============================================================ */
 
 const { createClient } = require('@supabase/supabase-js');
+const { decryptCredentials } = require('./channel-crypto');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
@@ -30,6 +31,15 @@ async function getChannel(propertyId, channelType) {
   if (error) {
     console.error('[getChannel] Supabase error:', error);
     return null;
+  }
+
+  if (data && data.credentials) {
+    try {
+      data.credentials = decryptCredentials(data.credentials);
+    } catch (decErr) {
+      console.error('[getChannel] Failed to decrypt credentials:', decErr.message);
+      return null;
+    }
   }
 
   channelCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });

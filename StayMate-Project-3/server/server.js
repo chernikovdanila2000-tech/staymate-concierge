@@ -45,6 +45,17 @@ const {
   MAX_FILE_SIZE_BYTES: ROOMS_MAX_FILE_SIZE_BYTES,
 } = require('./rooms-import');
 const busboy = require('busboy');
+const {
+  encryptCredentials,
+  decryptCredentials,
+  encryptCredentialsPartial,
+  decryptCredentialsPartial,
+} = require('./channel-crypto');
+const {
+  verifyWhatsAppCredentials,
+  verifyInstagramCredentials,
+  verifyMessengerCredentials,
+} = require('./meta-verify');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -413,6 +424,10 @@ async function resolveInstagramConnection(
     );
   }
 
+  if (data && data.credentials) {
+    data.credentials = decryptCredentialsPartial(data.credentials, 'access_token');
+  }
+
   if (
     data &&
     data.credentials &&
@@ -517,6 +532,10 @@ async function resolveWhatsAppConnection(phoneNumberId) {
     console.error('[whatsapp] Channel lookup error:', error);
   }
 
+  if (data && data.credentials) {
+    data.credentials = decryptCredentialsPartial(data.credentials, 'access_token');
+  }
+
   if (data && data.credentials && data.credentials.access_token) {
     let propertyId = String(data.property_id || '').trim();
     if (!propertyId || !(await getProperty(propertyId))) {
@@ -539,6 +558,53 @@ async function resolveWhatsAppConnection(phoneNumberId) {
     }
     if (!propertyId) return null;
     return { propertyId, accessToken: META_WHATSAPP_ACCESS_TOKEN, phoneNumberId: id };
+  }
+
+  return null;
+}
+
+/**
+ * Per-tenant пошук Facebook Page Access Token за page_id (Блок 4) — той
+ * самий патерн, що й resolveInstagramConnection/resolveWhatsAppConnection.
+ * Раніше Messenger надсилав відповіді ЛИШЕ через один спільний
+ * META_MESSENGER_PAGE_ACCESS_TOKEN незалежно від того, якому готелю
+ * належить сторінка — це працювало тільки для одного готелю одразу.
+ */
+async function resolveMessengerConnection(pageId) {
+  const id = String(pageId || '').trim();
+  if (!id) return null;
+
+  const { data, error } = await supabase
+    .from('channels')
+    .select('property_id, credentials, connected')
+    .eq('channel_type', 'messenger')
+    .eq('connected', true)
+    .contains('credentials', { page_id: id })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error('[messenger] Channel lookup error:', error);
+  }
+
+  if (data && data.credentials) {
+    data.credentials = decryptCredentialsPartial(data.credentials, 'access_token');
+  }
+
+  if (data && data.credentials && data.credentials.access_token) {
+    let propertyId = String(data.property_id || '').trim();
+    if (!propertyId || !(await getProperty(propertyId))) {
+      propertyId = await resolveMessengerPropertyId(id);
+    }
+    if (!propertyId) return null;
+    return { propertyId, accessToken: String(data.credentials.access_token), pageId: id };
+  }
+
+  // Резерв: старий однотенантний шлях через env vars (лишається робочим,
+  // поки хоча б один готель підключений тільки так).
+  if (META_MESSENGER_PAGE_ACCESS_TOKEN) {
+    const propertyId = await resolveMessengerPropertyId(id);
+    if (!propertyId) return null;
+    return { propertyId, accessToken: META_MESSENGER_PAGE_ACCESS_TOKEN, pageId: id };
   }
 
   return null;
@@ -845,11 +911,12 @@ const server =
               );
             }
 
+            // Без expectedPageId — payload може містити повідомлення для
+            // кількох готелів одразу (кожен зі своєю Facebook-сторінкою),
+            // тому кожна подія несе власний pageId і роутиться окремо
+            // нижче через resolveMessengerConnection (Блок 4: multi-tenant).
             const events =
-              parseMessengerEvents(
-                payload,
-                META_MESSENGER_PAGE_ID
-              );
+              parseMessengerEvents(payload);
 
             sendJson(
               res,
@@ -861,55 +928,33 @@ const server =
 
             setImmediate(
               async () => {
-                if (
-                  !META_MESSENGER_PAGE_ACCESS_TOKEN
-                ) {
-                  console.error(
-                    '[messenger] Missing access token'
-                  );
-
-                  return;
-                }
-
-                const pageId =
-                  Array.isArray(
-                    payload.entry
-                  ) &&
-                  payload.entry[0]
-                    ? payload
-                        .entry[0]
-                        .id
-                    : '';
-
-                const propertyId =
-                  await resolveMessengerPropertyId(
-                    pageId
-                  );
-
-                if (!propertyId) {
-                  console.error(
-                    '[messenger] Property not resolved'
-                  );
-
-                  return;
-                }
-
-                const property =
-                  await getProperty(
-                    propertyId
-                  );
-
-                if (!property) {
-                  return;
-                }
-
                 for (
                   const event of events
                 ) {
                   try {
+                    const connection =
+                      await resolveMessengerConnection(
+                        event.pageId
+                      );
+
+                    if (!connection) {
+                      console.error(
+                        '[messenger] No channel connected for page',
+                        event.pageId
+                      );
+                      continue;
+                    }
+
+                    const property =
+                      await getProperty(
+                        connection.propertyId
+                      );
+
+                    if (!property) continue;
+
                     const history =
                       await getHistory(
-                        propertyId,
+                        connection.propertyId,
                         'messenger',
                         event.senderId
                       );
@@ -927,21 +972,21 @@ const server =
                       await runConciergeTurn(
                         history,
                         {
-                          propertyId,
+                          propertyId: connection.propertyId,
                           propertyName:
                             property.hotel_name,
                         }
                       );
 
                     await saveHistory(
-                      propertyId,
+                      connection.propertyId,
                       'messenger',
                       event.senderId,
                       updatedHistory
                     );
 
                     await sendMessengerMessage(
-                      META_MESSENGER_PAGE_ACCESS_TOKEN,
+                      connection.accessToken,
                       event.senderId,
                       replyText,
                       META_GRAPH_VERSION
@@ -1554,6 +1599,7 @@ const server =
           '/api/create-trial-invoice',
           '/api/cancel-auto-renew',
           '/api/rooms/parse-upload',
+          '/api/disconnect-channel',
         ].includes(req.url)
       ) {
         res.writeHead(
@@ -3001,157 +3047,240 @@ const server =
               credentials,
             } = parsed;
 
-            if (
-              !propertyId ||
-              !channelType ||
-              !credentials ||
-              !credentials.bot_token
-            ) {
+            if (!propertyId || !channelType || !credentials) {
               return sendJson(
                 res,
                 400,
-                {
-                  error:
-                    'Потрібні propertyId, channelType, credentials.bot_token.',
-                },
-                corsHeaders
-              );
-            }
-
-            if (
-              channelType !==
-                'telegram' &&
-              channelType !==
-                'viber'
-            ) {
-              return sendJson(
-                res,
-                400,
-                {
-                  error:
-                    'Цей канал підключається інакше.',
-                },
-                corsHeaders
-              );
-            }
-
-            const property =
-              await getProperty(
-                propertyId
-              );
-
-            if (!property) {
-              return sendJson(
-                res,
-                404,
-                {
-                  error:
-                    'Готель не знайдено.',
-                },
+                { error: 'Потрібні propertyId, channelType, credentials.' },
                 corsHeaders
               );
             }
 
             try {
-              if (
-                channelType ===
-                'telegram'
-              ) {
-                const result =
-                  await setTelegramWebhook(
+              await requireOwnedProperty(req, propertyId);
+            } catch (authError) {
+              return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+            }
+
+            // ---- Telegram / Viber: webhook свого бота реєструється прямо
+            // тут, credentials.bot_token — секрет, шифрується цілим об'єктом.
+            if (channelType === 'telegram' || channelType === 'viber') {
+              if (!credentials.bot_token) {
+                return sendJson(res, 400, { error: 'Потрібен credentials.bot_token.' }, corsHeaders);
+              }
+
+              try {
+                if (channelType === 'telegram') {
+                  const result = await setTelegramWebhook(
                     credentials.bot_token,
                     `${API_BASE_URL}/webhook/telegram/${propertyId}`
                   );
-
-                if (!result.ok) {
-                  throw new Error(
-                    result.description ||
-                      'Telegram error'
-                  );
-                }
-              } else {
-                const result =
-                  await setViberWebhook(
+                  if (!result.ok) throw new Error(result.description || 'Telegram error');
+                } else {
+                  const result = await setViberWebhook(
                     credentials.bot_token,
                     `${API_BASE_URL}/webhook/viber/${propertyId}`
                   );
-
-                if (
-                  result.status !==
-                  0
-                ) {
-                  throw new Error(
-                    result.status_message ||
-                      'Viber error'
-                  );
+                  if (result.status !== 0) throw new Error(result.status_message || 'Viber error');
                 }
+              } catch (error) {
+                return sendJson(res, 400, { error: error.message }, corsHeaders);
               }
-            } catch (error) {
-              return sendJson(
-                res,
-                400,
-                {
-                  error:
-                    error.message,
-                },
-                corsHeaders
-              );
-            }
 
-            const {
-              error,
-            } =
-              await supabase
+              const { error } = await supabase
                 .from('channels')
                 .upsert(
                   {
-                    property_id:
-                      propertyId,
-
-                    channel_type:
-                      channelType,
-
-                    credentials,
-
-                    connected:
-                      true,
-
-                    connected_at:
-                      new Date().toISOString(),
+                    property_id: propertyId,
+                    channel_type: channelType,
+                    credentials: encryptCredentials(credentials),
+                    connected: true,
+                    status: 'connected',
+                    status_detail: null,
+                    connected_at: new Date().toISOString(),
                   },
-                  {
-                    onConflict:
-                      'property_id,channel_type',
-                  }
+                  { onConflict: 'property_id,channel_type' }
                 );
 
-            if (error) {
-              return sendJson(
-                res,
-                500,
-                {
-                  error:
-                    'Не вдалося зберегти канал.',
-                },
-                corsHeaders
-              );
+              if (error) {
+                return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              }
+              invalidateChannel(propertyId, channelType);
+              return sendJson(res, 200, { ok: true, status: 'connected' }, corsHeaders);
             }
 
-            invalidateChannel(
-              propertyId,
-              channelType
-            );
+            // ---- WhatsApp / Instagram / Messenger: перевіряємо токен
+            // живим запитом до Meta Graph API, а не просто зберігаємо
+            // сліпо (Блок 4 — кнопка має РЕАЛЬНО підключати, не бути
+            // заглушкою). access_token шифрується окремо від
+            // ідентифікатора (phone_number_id/ig_account_id/page_id),
+            // який лишається відкритим — за ним шукає resolve*Connection
+            // при вхідному вебхуці.
+            if (channelType === 'whatsapp') {
+              if (!credentials.phone_number_id || !credentials.access_token) {
+                return sendJson(res, 400, { error: 'Потрібні credentials.phone_number_id і credentials.access_token.' }, corsHeaders);
+              }
+              const check = await verifyWhatsAppCredentials(credentials.access_token, credentials.phone_number_id, META_GRAPH_VERSION);
+              if (check.status === 'error') {
+                return sendJson(res, 400, { error: (check.details && check.details.error && check.details.error.message) || 'Не вдалося перевірити WhatsApp Phone Number ID / токен.' }, corsHeaders);
+              }
+              const stored = encryptCredentialsPartial({ phone_number_id: credentials.phone_number_id, access_token: credentials.access_token }, 'access_token');
+              const { error } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'whatsapp',
+                    credentials: stored,
+                    connected: check.status === 'connected',
+                    status: check.status,
+                    status_detail: check.status === 'awaiting_verification' ? 'Очікує верифікації Meta Business. Активується автоматично, щойно Meta підтвердить бізнес-акаунт.' : null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (error) return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              invalidateChannel(propertyId, 'whatsapp');
+              return sendJson(res, 200, { ok: true, status: check.status }, corsHeaders);
+            }
 
-            return sendJson(
-              res,
-              200,
-              {
-                ok: true,
-              },
-              corsHeaders
-            );
+            if (channelType === 'instagram') {
+              if (!credentials.instagram_account_id || !credentials.access_token) {
+                return sendJson(res, 400, { error: 'Потрібні credentials.instagram_account_id і credentials.access_token.' }, corsHeaders);
+              }
+              const check = await verifyInstagramCredentials(credentials.access_token, credentials.instagram_account_id, META_GRAPH_VERSION);
+              if (check.status === 'error') {
+                return sendJson(res, 400, { error: (check.details && check.details.error && check.details.error.message) || 'Не вдалося перевірити Instagram Account ID / токен.' }, corsHeaders);
+              }
+              const stored = encryptCredentialsPartial({ instagram_account_id: credentials.instagram_account_id, access_token: credentials.access_token }, 'access_token');
+              const { error } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'instagram',
+                    credentials: stored,
+                    connected: check.status === 'connected',
+                    status: check.status,
+                    status_detail: check.status === 'awaiting_verification' ? 'Очікує верифікації Meta Business. Активується автоматично, щойно Meta підтвердить бізнес-акаунт.' : null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (error) return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              invalidateChannel(propertyId, 'instagram');
+              return sendJson(res, 200, { ok: true, status: check.status }, corsHeaders);
+            }
+
+            if (channelType === 'messenger') {
+              if (!credentials.access_token) {
+                return sendJson(res, 400, { error: 'Потрібен credentials.access_token (Page Access Token).' }, corsHeaders);
+              }
+              const check = await verifyMessengerCredentials(credentials.access_token, META_GRAPH_VERSION);
+              if (check.status === 'error') {
+                return sendJson(res, 400, { error: (check.details && check.details.error && check.details.error.message) || 'Не вдалося перевірити Page Access Token.' }, corsHeaders);
+              }
+              const pageId = check.details && check.details.id;
+              if (check.status === 'connected' && !pageId) {
+                return sendJson(res, 400, { error: 'Meta не повернула ID сторінки — перевірте токен.' }, corsHeaders);
+              }
+              const stored = encryptCredentialsPartial(
+                { page_id: pageId || credentials.page_id || '', page_name: (check.details && check.details.name) || '', access_token: credentials.access_token },
+                'access_token'
+              );
+              const { error } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'messenger',
+                    credentials: stored,
+                    connected: check.status === 'connected',
+                    status: check.status,
+                    status_detail: check.status === 'awaiting_verification' ? 'Очікує верифікації Meta Business. Активується автоматично, щойно Meta підтвердить бізнес-акаунт.' : null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (error) return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              invalidateChannel(propertyId, 'messenger');
+              return sendJson(res, 200, { ok: true, status: check.status }, corsHeaders);
+            }
+
+            return sendJson(res, 400, { error: `Невідомий тип каналу: ${channelType}.` }, corsHeaders);
           }
         );
+
+        return;
+      }
+
+      if (
+        req.method === 'POST' &&
+        req.url === '/api/disconnect-channel'
+      ) {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, channelType } = parsed;
+          if (!propertyId || !channelType) {
+            return sendJson(res, 400, { error: 'Потрібні propertyId, channelType.' }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          // Telegram/Viber тримають вебхук на боці самого месенджера —
+          // відключення не просто прапорець у БД, а реальне видалення
+          // підписки, інакше бот і далі надсилатиме апдейти в нікуди.
+          if (channelType === 'telegram' || channelType === 'viber') {
+            const { data: channel } = await supabase
+              .from('channels')
+              .select('credentials')
+              .eq('property_id', propertyId)
+              .eq('channel_type', channelType)
+              .maybeSingle();
+
+            const botToken = channel && channel.credentials && decryptCredentials(channel.credentials).bot_token;
+            if (botToken) {
+              try {
+                if (channelType === 'telegram') await setTelegramWebhook(botToken, '');
+                else await setViberWebhook(botToken, '');
+              } catch (error) {
+                console.error(`[disconnect-channel] Failed to unset ${channelType} webhook:`, error.message);
+              }
+            }
+          }
+
+          const { error } = await supabase
+            .from('channels')
+            .upsert(
+              {
+                property_id: propertyId,
+                channel_type: channelType,
+                credentials: {},
+                connected: false,
+                status: 'disconnected',
+                status_detail: null,
+              },
+              { onConflict: 'property_id,channel_type' }
+            );
+
+          if (error) {
+            return sendJson(res, 500, { error: 'Не вдалося відключити канал.' }, corsHeaders);
+          }
+          invalidateChannel(propertyId, channelType);
+          return sendJson(res, 200, { ok: true }, corsHeaders);
+        });
 
         return;
       }

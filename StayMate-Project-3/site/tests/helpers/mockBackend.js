@@ -197,6 +197,57 @@ function buildClientSource() {
     };
   }
 
+  // Intercepts the cabinet's plain window.fetch() calls to the Railway
+  // backend's channel-connect endpoints (Block 4) — these aren't Supabase
+  // calls, so they can't go through __qaClient() above. Short-circuiting
+  // fetch() here (instead of a Playwright page.route) lets the mock persist
+  // the resulting channel row into __qaState, so a later loadChannels()
+  // (a real Supabase-mock read) sees the effect of the connect/disconnect,
+  // the same way the real backend would leave a row a later read picks up.
+  if (!window.__qaFetchPatched) {
+    window.__qaFetchPatched = true;
+    var __qaOrigFetch = window.fetch.bind(window);
+    window.fetch = function (url, opts) {
+      var urlStr = String(url);
+      var method = (opts && opts.method) || 'GET';
+
+      if (urlStr.indexOf('/api/connect-channel') !== -1 && method === 'POST') {
+        var st = __qaGetState();
+        var body = JSON.parse((opts && opts.body) || '{}');
+        var status = 'connected';
+        if (body.channelType === 'whatsapp' && (!body.credentials || !body.credentials.phone_number_id || !body.credentials.access_token)) status = 'error';
+        if (body.channelType === 'instagram' && (!body.credentials || !body.credentials.instagram_account_id || !body.credentials.access_token)) status = 'error';
+        if (body.channelType === 'messenger' && (!body.credentials || !body.credentials.access_token)) status = 'error';
+        var respBody = { ok: status !== 'error', status: status };
+        if (status !== 'error') {
+          st.channels = st.channels || [];
+          var idx = st.channels.findIndex(function (c) { return c.channel_type === body.channelType; });
+          var row = { property_id: body.propertyId, channel_type: body.channelType, credentials: body.credentials, connected: true, status: 'connected', status_detail: null };
+          if (idx >= 0) st.channels[idx] = Object.assign({}, st.channels[idx], row);
+          else st.channels.push(row);
+          __qaPersist();
+        } else {
+          respBody.error = 'Заповніть усі поля.';
+        }
+        return Promise.resolve(new Response(JSON.stringify(respBody), { status: status === 'error' ? 400 : 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+
+      if (urlStr.indexOf('/api/disconnect-channel') !== -1 && method === 'POST') {
+        var st2 = __qaGetState();
+        var body2 = JSON.parse((opts && opts.body) || '{}');
+        st2.channels = st2.channels || [];
+        var idx2 = st2.channels.findIndex(function (c) { return c.channel_type === body2.channelType; });
+        var row2 = { property_id: body2.propertyId, channel_type: body2.channelType, credentials: {}, connected: false, status: 'disconnected', status_detail: null };
+        if (idx2 >= 0) st2.channels[idx2] = Object.assign({}, st2.channels[idx2], row2);
+        else st2.channels.push(row2);
+        __qaPersist();
+        return Promise.resolve(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      }
+
+      return __qaOrigFetch(url, opts);
+    };
+  }
+
   window.__qaInstallClient = __qaClient;
   `;
 }
@@ -249,7 +300,11 @@ async function installBackendMock(page, initialState = {}) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, wayforpayConfirmed: false }) })
   );
   await page.route('**/api/notify-signin', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
-  await page.route('**/api/connect-channel', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
+  // /api/connect-channel and /api/disconnect-channel are handled by the
+  // in-page window.fetch() override in buildClientSource() instead of a
+  // page.route here — they need to mutate __qaState (so a later
+  // loadChannels() sees the new status), which a static route.fulfill()
+  // can't do since it runs outside the page's own JS context.
   await page.route('**/api/rooms/parse-upload', (route) =>
     route.fulfill({
       status: 200,

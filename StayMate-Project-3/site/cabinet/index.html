@@ -155,6 +155,14 @@ td.del-col button{background:none; border:none; color:var(--warn); font-size:18p
 /* ---------- pills / status ---------- */
 .status-pill{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:500; padding:4px 11px; border-radius:100px; background:var(--accent-soft); color:var(--accent-text);}
 .status-pill.off{background:var(--gold-soft); color:var(--gold);}
+.status-pill.awaiting{background:var(--gold-soft); color:var(--gold);}
+.status-pill.error{background:var(--warn-soft); color:var(--warn);}
+
+/* ---------- вкладки дашборду (Огляд / Канали, Блок 4) ---------- */
+.dash-tabs{display:flex; gap:8px; margin-bottom:28px; border-bottom:1px solid var(--line);}
+.dash-tab{background:none; border:none; padding:10px 4px 12px; margin-right:20px; font-size:14.5px; font-weight:500; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px;}
+.dash-tab:hover{color:var(--ink);}
+.dash-tab.active{color:var(--ink); border-bottom-color:var(--accent);}
 
 /* ---------- номери: картки замість таблиці (mobile-first, Блок 2) ---------- */
 .room-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:16px 18px; margin-bottom:12px;}
@@ -347,6 +355,12 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <h1 class="page-title" id="dashHotelName">Ваш готель</h1>
     <p class="lede">Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.</p>
 
+    <div class="dash-tabs">
+      <button class="dash-tab active" type="button" data-tab="overview">Огляд</button>
+      <button class="dash-tab" type="button" data-tab="channels">Канали</button>
+    </div>
+
+    <div id="tabOverview">
     <div class="card">
       <h2>Тариф і підписка</h2>
       <p class="hint" id="subHint">Завантаження…</p>
@@ -504,6 +518,9 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       </div>
     </div>
 
+    </div><!-- /tabOverview -->
+
+    <div id="tabChannels" class="hidden">
     <div class="card">
       <h2>Канали зв'язку</h2>
       <p class="hint">Підключіть один або кілька каналів — ШІ-адміністратор відповідає однаково скрізь, використовуючи одні й ті самі дані про номери й ціни.</p>
@@ -518,6 +535,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         <input id="tokenTelegram" type="text" placeholder="123456789:AAG...">
         <div class="actions">
           <button class="btn-primary" id="connectTelegram">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectTelegram">Відключити</button>
           <span class="msg" id="msgTelegram"></span>
         </div>
       </div>
@@ -527,11 +545,12 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="channel-name">Viber</span>
           <span class="status-pill off" id="pill-viber">Не підключено</span>
         </div>
-        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">partners.viber.com</a> і вставте токен API нижче. Повноцінна робота бота залежить від комерційного схвалення заявки з боку Viber.</p>
+        <p class="hint">Створіть публічний акаунт (бота) на <a href="https://partners.viber.com/" target="_blank" rel="noopener" style="color:var(--accent-text); text-decoration:underline;">partners.viber.com</a> і вставте токен API нижче. Заявку на комерційне схвалення подано — до відповіді Viber бот вже приймає повідомлення в тестовому режимі.</p>
         <label for="tokenViber">Токен API (auth token)</label>
         <input id="tokenViber" type="text" placeholder="45f679as...">
         <div class="actions">
           <button class="btn-primary" id="connectViber">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectViber">Відключити</button>
           <span class="msg" id="msgViber"></span>
         </div>
       </div>
@@ -551,15 +570,16 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <div class="channel-card" data-channel="whatsapp">
         <div class="channel-head">
           <span class="channel-name">WhatsApp</span>
-          <span class="status-pill off">Очікує верифікації Meta</span>
+          <span class="status-pill off" id="pill-whatsapp">Не підключено</span>
         </div>
-        <p class="hint">Підключення відбувається через Meta Business Platform і стане активним після верифікації бізнесу StayAI. Поля нижче можна заповнити заздалегідь — вони автоматично активуються, щойно верифікація завершиться.</p>
+        <p class="hint" id="hintWhatsapp">Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.</p>
         <label for="waPhoneId">Phone Number ID</label>
         <input id="waPhoneId" type="text" placeholder="1029384756...">
         <label for="waToken">Access Token</label>
         <input id="waToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="btn-secondary" id="saveWhatsapp">Зберегти на потім</button>
+          <button class="btn-primary" id="connectWhatsapp">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectWhatsapp">Відключити</button>
           <span class="msg" id="msgWhatsapp"></span>
         </div>
       </div>
@@ -567,19 +587,36 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <div class="channel-card" data-channel="instagram">
         <div class="channel-head">
           <span class="channel-name">Instagram</span>
-          <span class="status-pill off">Очікує верифікації Meta</span>
+          <span class="status-pill off" id="pill-instagram">Не підключено</span>
         </div>
-        <p class="hint">Директ Instagram підключається через той самий Meta Business Platform, що й WhatsApp. Поля нижче можна заповнити заздалегідь.</p>
+        <p class="hint" id="hintInstagram">Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.</p>
         <label for="igAccountId">Instagram Business Account ID</label>
         <input id="igAccountId" type="text" placeholder="1789...">
         <label for="igToken">Access Token</label>
         <input id="igToken" type="password" placeholder="EAAG...">
         <div class="actions">
-          <button class="btn-secondary" id="saveInstagram">Зберегти на потім</button>
+          <button class="btn-primary" id="connectInstagram">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectInstagram">Відключити</button>
           <span class="msg" id="msgInstagram"></span>
         </div>
       </div>
+
+      <div class="channel-card" data-channel="messenger">
+        <div class="channel-head">
+          <span class="channel-name">Facebook Messenger</span>
+          <span class="status-pill off" id="pill-messenger">Не підключено</span>
+        </div>
+        <p class="hint" id="hintMessenger">Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.</p>
+        <label for="fbToken">Page Access Token</label>
+        <input id="fbToken" type="password" placeholder="EAAG...">
+        <div class="actions">
+          <button class="btn-primary" id="connectMessenger">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectMessenger">Відключити</button>
+          <span class="msg" id="msgMessenger"></span>
+        </div>
+      </div>
     </div>
+    </div><!-- /tabChannels -->
 
   </div>
 
@@ -1289,22 +1326,45 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     setTimeout(() => { msg.textContent = ''; }, 2500);
   });
 
-  // ---- Канали зв'язку ----
+  // ---- Вкладки дашборду (Огляд / Канали, Блок 4) ----
+  document.querySelectorAll('.dash-tab').forEach((tabBtn) => {
+    tabBtn.addEventListener('click', () => {
+      document.querySelectorAll('.dash-tab').forEach((b) => b.classList.remove('active'));
+      tabBtn.classList.add('active');
+      const tab = tabBtn.dataset.tab;
+      document.getElementById('tabOverview').classList.toggle('hidden', tab !== 'overview');
+      document.getElementById('tabChannels').classList.toggle('hidden', tab !== 'channels');
+    });
+  });
+
+  // ---- Канали зв'язку (Блок 4: реальне підключення WhatsApp/Instagram/
+  // Messenger через Meta Graph API, шифрування токенів, відключення) ----
   function buildWidgetSnippet() {
     const title = (currentProperty.hotel_name || 'Готель').replace(/"/g, '');
     return `<script src="${SITE_ORIGIN}/widget/widget.js" data-property="${currentProperty.property_id}" data-api="${API_BASE_URL}" data-title="${title}" async><\/script>`;
   }
 
-  function setPill(channel, connected, connectedLabel, offLabel) {
+  const CHANNEL_STATUS_LABELS = {
+    connected: 'Підключено',
+    awaiting_verification: 'Очікує верифікації Meta',
+    error: 'Помилка підключення',
+    disconnected: 'Не підключено',
+  };
+
+  function setPill(channel, status) {
     const pill = document.getElementById('pill-' + channel);
     if (!pill) return;
-    if (connected) {
-      pill.textContent = connectedLabel || 'Підключено';
-      pill.classList.remove('off');
-    } else {
-      pill.textContent = offLabel || 'Не підключено';
-      pill.classList.add('off');
-    }
+    pill.classList.remove('off', 'awaiting', 'error');
+    pill.textContent = CHANNEL_STATUS_LABELS[status] || CHANNEL_STATUS_LABELS.disconnected;
+    if (status === 'connected') return;
+    if (status === 'awaiting_verification') { pill.classList.add('awaiting'); return; }
+    if (status === 'error') { pill.classList.add('error'); return; }
+    pill.classList.add('off');
+  }
+
+  function setDisconnectVisible(channel, visible) {
+    const btn = document.getElementById('disconnect' + channel.charAt(0).toUpperCase() + channel.slice(1));
+    if (btn) btn.classList.toggle('hidden', !visible);
   }
 
   async function loadChannels() {
@@ -1317,44 +1377,83 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     (data || []).forEach(c => { channelsByType[c.channel_type] = c; });
 
     const tg = channelsByType.telegram;
-    const tgConnected = (tg && tg.connected) || !!currentProperty.webhook_connected;
-    setPill('telegram', tgConnected);
-    document.getElementById('tokenTelegram').value = (tg && tg.credentials && tg.credentials.bot_token) || currentProperty.telegram_bot_token || '';
+    const tgStatus = (tg && tg.status) || ((tg && tg.connected) || currentProperty.webhook_connected ? 'connected' : 'disconnected');
+    setPill('telegram', tgStatus);
+    setDisconnectVisible('telegram', tgStatus === 'connected');
 
     const vb = channelsByType.viber;
-    setPill('viber', vb && vb.connected);
-    document.getElementById('tokenViber').value = (vb && vb.credentials && vb.credentials.bot_token) || '';
+    setPill('viber', (vb && vb.status) || (vb && vb.connected ? 'connected' : 'disconnected'));
+    setDisconnectVisible('viber', !!(vb && vb.connected));
+
+    // Секретні поля (токени) НІКОЛИ не повертаються у відкритому вигляді
+    // після збереження (зберігаються зашифрованими, розшифровуються лише
+    // на бекенді для самого запиту до Telegram/Viber/Meta) — тому інпути
+    // токенів завжди порожні, з підказкою в плейсхолдері, а не префілом.
+    document.getElementById('tokenTelegram').placeholder = tgStatus === 'connected' ? '•••••• (збережено — введіть новий, щоб змінити)' : '123456789:AAG...';
+    document.getElementById('tokenViber').placeholder = (vb && vb.connected) ? '•••••• (збережено — введіть новий, щоб змінити)' : '45f679as...';
 
     const wa = channelsByType.whatsapp;
+    const waStatus = (wa && wa.status) || 'disconnected';
+    setPill('whatsapp', waStatus);
+    setDisconnectVisible('whatsapp', waStatus !== 'disconnected');
     document.getElementById('waPhoneId').value = (wa && wa.credentials && wa.credentials.phone_number_id) || '';
-    document.getElementById('waToken').value = (wa && wa.credentials && wa.credentials.access_token) || '';
+    document.getElementById('waToken').placeholder = waStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
+    document.getElementById('hintWhatsapp').textContent = wa && wa.status_detail
+      ? wa.status_detail
+      : 'Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.';
 
     const ig = channelsByType.instagram;
-    document.getElementById('igAccountId').value = (ig && ig.credentials && ig.credentials.ig_account_id) || '';
-    document.getElementById('igToken').value = (ig && ig.credentials && ig.credentials.access_token) || '';
+    const igStatus = (ig && ig.status) || 'disconnected';
+    setPill('instagram', igStatus);
+    setDisconnectVisible('instagram', igStatus !== 'disconnected');
+    document.getElementById('igAccountId').value = (ig && ig.credentials && ig.credentials.instagram_account_id) || '';
+    document.getElementById('igToken').placeholder = igStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
+    document.getElementById('hintInstagram').textContent = ig && ig.status_detail
+      ? ig.status_detail
+      : 'Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.';
+
+    const fb = channelsByType.messenger;
+    const fbStatus = (fb && fb.status) || 'disconnected';
+    setPill('messenger', fbStatus);
+    setDisconnectVisible('messenger', fbStatus !== 'disconnected');
+    document.getElementById('fbToken').placeholder = fbStatus !== 'disconnected' ? '•••••• (збережено — введіть новий, щоб змінити)' : 'EAAG...';
+    document.getElementById('hintMessenger').textContent = fb && fb.status_detail
+      ? fb.status_detail
+      : (fb && fb.credentials && fb.credentials.page_name)
+        ? `Підключено сторінку «${fb.credentials.page_name}». Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.`
+        : 'Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.';
 
     document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
   }
 
-  async function connectChannel(channelType, credentials, msgId) {
+  async function authHeader() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return { Authorization: `Bearer ${session && session.access_token}` };
+  }
+
+  async function connectChannel(channelType, credentials, msgId, requiredFields) {
     const msg = document.getElementById(msgId);
     msg.className = 'msg';
-    if (!credentials.bot_token) {
-      msg.className = 'msg error';
-      msg.textContent = 'Вставте токен.';
-      return;
+    for (const field of requiredFields) {
+      if (!credentials[field]) {
+        msg.className = 'msg error';
+        msg.textContent = 'Заповніть усі поля.';
+        return;
+      }
     }
-    msg.textContent = 'Підключаємо...';
+    msg.textContent = 'Підключаємо і перевіряємо через Meta...';
     try {
       const res = await fetch(`${API_BASE_URL}/api/connect-channel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ propertyId: currentProperty.property_id, channelType, credentials }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Не вдалося підключити.');
       msg.className = 'msg ok';
-      msg.textContent = 'Підключено! Напишіть боту, щоб перевірити.';
+      msg.textContent = data.status === 'connected'
+        ? 'Підключено! Напишіть боту/сторінці, щоб перевірити.'
+        : 'Збережено. Очікує верифікації Meta Business — активується автоматично, щойно вона завершиться.';
       await loadChannels();
     } catch (e) {
       msg.className = 'msg error';
@@ -1362,12 +1461,52 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  document.getElementById('connectTelegram').addEventListener('click', () => {
-    connectChannel('telegram', { bot_token: document.getElementById('tokenTelegram').value.trim() }, 'msgTelegram');
-  });
-  document.getElementById('connectViber').addEventListener('click', () => {
-    connectChannel('viber', { bot_token: document.getElementById('tokenViber').value.trim() }, 'msgViber');
-  });
+  async function disconnectChannel(channelType, msgId) {
+    const msg = document.getElementById(msgId);
+    if (!confirm('Відключити цей канал? Бот перестане відповідати в ньому, поки ви не підключите знову.')) return;
+    msg.className = 'msg';
+    msg.textContent = 'Відключаємо...';
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/disconnect-channel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ propertyId: currentProperty.property_id, channelType }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося відключити.');
+      msg.className = 'msg ok';
+      msg.textContent = 'Відключено.';
+      await loadChannels();
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
+  }
+
+  onClickGuarded(document.getElementById('connectTelegram'), () =>
+    connectChannel('telegram', { bot_token: document.getElementById('tokenTelegram').value.trim() }, 'msgTelegram', ['bot_token']));
+  onClickGuarded(document.getElementById('connectViber'), () =>
+    connectChannel('viber', { bot_token: document.getElementById('tokenViber').value.trim() }, 'msgViber', ['bot_token']));
+  onClickGuarded(document.getElementById('connectWhatsapp'), () =>
+    connectChannel('whatsapp', {
+      phone_number_id: document.getElementById('waPhoneId').value.trim(),
+      access_token: document.getElementById('waToken').value.trim(),
+    }, 'msgWhatsapp', ['phone_number_id', 'access_token']));
+  onClickGuarded(document.getElementById('connectInstagram'), () =>
+    connectChannel('instagram', {
+      instagram_account_id: document.getElementById('igAccountId').value.trim(),
+      access_token: document.getElementById('igToken').value.trim(),
+    }, 'msgInstagram', ['instagram_account_id', 'access_token']));
+  onClickGuarded(document.getElementById('connectMessenger'), () =>
+    connectChannel('messenger', {
+      access_token: document.getElementById('fbToken').value.trim(),
+    }, 'msgMessenger', ['access_token']));
+
+  onClickGuarded(document.getElementById('disconnectTelegram'), () => disconnectChannel('telegram', 'msgTelegram'));
+  onClickGuarded(document.getElementById('disconnectViber'), () => disconnectChannel('viber', 'msgViber'));
+  onClickGuarded(document.getElementById('disconnectWhatsapp'), () => disconnectChannel('whatsapp', 'msgWhatsapp'));
+  onClickGuarded(document.getElementById('disconnectInstagram'), () => disconnectChannel('instagram', 'msgInstagram'));
+  onClickGuarded(document.getElementById('disconnectMessenger'), () => disconnectChannel('messenger', 'msgMessenger'));
 
   document.getElementById('copyWidget').addEventListener('click', () => {
     const text = document.getElementById('widgetSnippet').textContent;
@@ -1379,38 +1518,6 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }).catch(() => {
       btn.textContent = 'Виділіть і скопіюйте вручну';
     });
-  });
-
-  async function saveChannelCredentials(channelType, credentials, msgId) {
-    const msg = document.getElementById(msgId);
-    msg.className = 'msg';
-    const { error } = await supabase
-      .from('channels')
-      .upsert(
-        { property_id: currentProperty.property_id, channel_type: channelType, credentials, connected: false },
-        { onConflict: 'property_id,channel_type' }
-      );
-    if (error) {
-      msg.className = 'msg error';
-      msg.textContent = translateAuthError(error.message);
-      return;
-    }
-    msg.className = 'msg ok';
-    msg.textContent = 'Збережено. Активується автоматично після верифікації Meta Business (Фаза 4 плану).';
-    await loadChannels();
-  }
-
-  document.getElementById('saveWhatsapp').addEventListener('click', () => {
-    saveChannelCredentials('whatsapp', {
-      phone_number_id: document.getElementById('waPhoneId').value.trim(),
-      access_token: document.getElementById('waToken').value.trim(),
-    }, 'msgWhatsapp');
-  });
-  document.getElementById('saveInstagram').addEventListener('click', () => {
-    saveChannelCredentials('instagram', {
-      ig_account_id: document.getElementById('igAccountId').value.trim(),
-      access_token: document.getElementById('igToken').value.trim(),
-    }, 'msgInstagram');
   });
 
   onClickGuarded(document.getElementById('dashSaveInfo'), async () => {
