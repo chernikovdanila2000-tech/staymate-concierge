@@ -9,6 +9,9 @@
 const DEFAULT_STATE = {
   session: null, // { user: { id, email, created_at } }
   property: null, // { property_id, hotel_name, ... } | null
+  rooms: [], // rows from the `rooms` table for the current property
+  channels: [], // rows from the `channels` table for the current property
+  hotelInfo: null, // row from the `hotel_info` table for the current property
   users: {}, // email -> { password, user }
   signInError: null,
   failNextRequest: null, // url substring to fail once
@@ -84,30 +87,83 @@ function buildClientSource() {
           return { error: null };
         },
       },
-      from: (table) => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => {
-              const st = __qaGetState();
-              if (table === 'properties') return { data: st.property, error: null };
-              return { data: null, error: null };
-            },
-            order: () => ({ then: (r) => r([]) , maybeSingle: async () => ({data:null,error:null}) }),
+      from: (table) => {
+        // Thin thenable query-builder stand-in: every chain method returns
+        // itself so any combination of .eq()/.order()/.select() the app
+        // code happens to call keeps working, and the chain resolves via
+        // .then()/.maybeSingle()/.single() to whatever resolveFn() returns —
+        // matching how real supabase-js query builders are themselves
+        // thenable (the app frequently awaits a chain directly without a
+        // trailing .select()).
+        function makeQuery(resolveFn) {
+          const q = {
+            eq: () => q,
+            order: () => q,
+            select: () => q,
+            limit: () => q,
+            single: async () => resolveFn(),
+            maybeSingle: async () => resolveFn(),
+            then: (resolve, reject) => Promise.resolve(resolveFn()).then(resolve, reject),
+          };
+          return q;
+        }
+
+        return {
+          select: () => makeQuery(() => {
+            const st = __qaGetState();
+            if (table === 'properties') return { data: st.property, error: null };
+            if (table === 'rooms') return { data: st.rooms || [], error: null };
+            if (table === 'channels') return { data: st.channels || [], error: null };
+            if (table === 'hotel_info') return { data: st.hotelInfo || null, error: null };
+            return { data: null, error: null };
           }),
-        }),
-        insert: (row) => ({
-          select: () => ({
-            single: async () => {
+          insert: (row) => {
+            const doInsert = () => {
               const st = __qaGetState();
-              const prop = Array.isArray(row) ? row[0] : row;
-              st.property = { ...prop, subscription_status: 'inactive', trial_ends_at: new Date(Date.now()+3*86400000).toISOString() };
+              const arr = Array.isArray(row) ? row : [row];
+              if (table === 'rooms') {
+                const withIds = arr.map((r) => ({ id: 'r_' + Math.random().toString(36).slice(2, 9), ...r }));
+                st.rooms = (st.rooms || []).concat(withIds);
+                __qaPersist();
+                return { data: withIds, error: null };
+              }
+              if (table === 'properties') {
+                st.property = { ...arr[0], subscription_status: 'inactive', trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString() };
+                __qaPersist();
+                return { data: st.property, error: null };
+              }
+              return { data: arr, error: null };
+            };
+            return {
+              select: () => ({ single: async () => doInsert() }),
+              then: (resolve, reject) => Promise.resolve(doInsert()).then(resolve, reject),
+            };
+          },
+          delete: () => makeQuery(() => {
+            const st = __qaGetState();
+            if (table === 'rooms') { st.rooms = []; __qaPersist(); }
+            return { error: null };
+          }),
+          update: (patch) => makeQuery(() => {
+            const st = __qaGetState();
+            if (table === 'properties' && st.property) { Object.assign(st.property, patch); __qaPersist(); }
+            if (table === 'hotel_info') { st.hotelInfo = { ...(st.hotelInfo || {}), ...patch }; __qaPersist(); }
+            return { error: null };
+          }),
+          upsert: (row) => makeQuery(() => {
+            const st = __qaGetState();
+            if (table === 'channels') {
+              st.channels = st.channels || [];
+              const idx = st.channels.findIndex((c) => c.channel_type === row.channel_type);
+              if (idx >= 0) st.channels[idx] = { ...st.channels[idx], ...row };
+              else st.channels.push(row);
               __qaPersist();
-              return { data: st.property, error: null };
-            },
+            }
+            if (table === 'hotel_info') { st.hotelInfo = { ...(st.hotelInfo || {}), ...row }; __qaPersist(); }
+            return { error: null };
           }),
-        }),
-        update: () => ({ eq: async () => ({ error: null }) }),
-      }),
+        };
+      },
     };
   }
 

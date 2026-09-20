@@ -601,6 +601,22 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     dashScreen.classList.add('hidden');
   }
 
+  // Guards a button's click handler against double-submit (fast double
+  // click, or an impatient repeat click while the first request is still
+  // in flight) — the same fix already applied to #authSubmit, generalised
+  // so every button that does an async write gets it too.
+  function onClickGuarded(btn, handler) {
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try {
+        await handler();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
   // Supabase, з міркувань безпеки, ніколи не повертає і не зберігає пароль у
   // відкритому вигляді — його неможливо "показати" в жодній системі, тільки
   // встановити новий. Тому замість "показати пароль" тут — зміна пароля.
@@ -820,7 +836,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   });
 
-  document.getElementById('resetSubmit').addEventListener('click', async () => {
+  onClickGuarded(document.getElementById('resetSubmit'), async () => {
     const newPassword = document.getElementById('newPassword').value;
     const msg = document.getElementById('resetMsg');
     msg.className = 'msg';
@@ -908,7 +924,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     return data;
   }
 
-  document.getElementById('obSubmitTrial').addEventListener('click', async () => {
+  onClickGuarded(document.getElementById('obSubmitTrial'), async () => {
     const data = await createPropertyFromOnboarding();
     if (!data) return;
     currentProperty = data;
@@ -916,7 +932,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     showGate('trial_card');
   });
 
-  document.getElementById('obSubmitPay').addEventListener('click', async () => {
+  onClickGuarded(document.getElementById('obSubmitPay'), async () => {
     const data = await createPropertyFromOnboarding();
     if (!data) return;
     currentProperty = data;
@@ -1021,11 +1037,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   let currentGateReason = null;
 
-  document.getElementById('gatePayBtn').addEventListener('click', () => {
-    createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), currentGateReason === 'trial_card');
+  onClickGuarded(document.getElementById('gatePayBtn'), () => {
+    return createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), currentGateReason === 'trial_card');
   });
-  document.getElementById('subPayBtn').addEventListener('click', () => {
-    createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'));
+  onClickGuarded(document.getElementById('subPayBtn'), () => {
+    return createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'));
   });
   document.getElementById('manageSubBtn').addEventListener('click', () => {
     const picker = document.getElementById('subPlanPicker');
@@ -1065,7 +1081,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  document.getElementById('cancelAutoRenewBtn').addEventListener('click', async () => {
+  onClickGuarded(document.getElementById('cancelAutoRenewBtn'), async () => {
     const msg = document.getElementById('cancelAutoRenewMsg');
     if (!confirm('Скасувати автопродовження підписки? Наступне списання не відбудеться.')) return;
     msg.className = 'msg';
@@ -1231,7 +1247,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }, 'msgInstagram');
   });
 
-  document.getElementById('dashSaveInfo').addEventListener('click', async () => {
+  onClickGuarded(document.getElementById('dashSaveInfo'), async () => {
     const name = document.getElementById('dashName').value.trim();
     const address = document.getElementById('dashAddress').value.trim();
     const msg = document.getElementById('infoMsg');
