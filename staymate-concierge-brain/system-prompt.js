@@ -5,9 +5,54 @@
    конкретний готель/квартиру.
    ============================================================ */
 
-function buildSystemPrompt({ propertyName = 'демо-готель StayAI', checkInTime = '14:00', checkOutTime = '12:00' } = {}) {
+const HOTEL_INFO_LABELS = {
+  directions: 'Адреса та як дістатися',
+  check_in_time: 'Час заїзду',
+  check_out_time: 'Час виїзду',
+  parking: 'Паркування',
+  breakfast: 'Сніданок',
+  wifi: 'Wi-Fi',
+  pets_policy: 'Тварини',
+  house_rules: 'Правила проживання',
+  cancellation_policy: 'Умови скасування та оплати',
+  payment_methods: 'Способи оплати',
+  amenities: 'Зручності та послуги',
+  contacts: 'Контакти',
+  late_checkout: 'Пізній виїзд',
+  early_checkin: 'Ранній заїзд',
+  transfer: 'Трансфер',
+  additional_info: 'Додатково',
+};
+
+function formatHotelInfo(hotelInfo) {
+  if (!hotelInfo) return '(Власник ще не заповнив цю інформацію в кабінеті.)';
+  const lines = Object.entries(HOTEL_INFO_LABELS)
+    .map(([key, label]) => {
+      const value = hotelInfo[key];
+      return value && String(value).trim() ? `- ${label}: ${String(value).trim()}` : null;
+    })
+    .filter(Boolean);
+  return lines.length ? lines.join('\n') : '(Власник ще не заповнив цю інформацію в кабінеті.)';
+}
+
+function buildSystemPrompt({ propertyName = 'демо-готель StayAI', checkInTime, checkOutTime, hotelInfo = null } = {}) {
+  // Явно передані checkInTime/checkOutTime мають пріоритет, інакше беремо
+  // час із заповненої власником інформації про заклад, і тільки як останній
+  // резерв — захардкоджені 14:00/12:00 (щоб демо-режим без даних не ламався).
+  const effectiveCheckIn = checkInTime || (hotelInfo && hotelInfo.check_in_time) || '14:00';
+  const effectiveCheckOut = checkOutTime || (hotelInfo && hotelInfo.check_out_time) || '12:00';
   return `Ти — ШІ-адміністратор бронювання для "${propertyName}", який працює на платформі StayAI.
 Ти спілкуєшся з гостями напряму (через месенджер) від імені закладу.
+
+## Інформація про заклад (єдине джерело правди про факти)
+Це ВСЯ інформація про заклад, яку тобі надав власник. Вона — єдине джерело правди про адресу,
+паркування, сніданок, Wi-Fi, тварин, правила, скасування, трансфер тощо:
+${formatHotelInfo(hotelInfo)}
+
+Якщо гість питає про щось із цієї теми, а відповідного пункту немає у списку вище — це означає,
+що власник ще не вказав цю інформацію. НЕ вигадуй відповідь і не роби припущень "зазвичай буває".
+Чесно скажи гостю, що уточниш це в адміністрації, і одразу виклич escalate_to_human з коротким
+описом запитання.
 
 ## Головна задача
 Відповідати гостям швидко, точно і привітно: відповідати на запитання про заклад,
@@ -42,11 +87,13 @@ function buildSystemPrompt({ propertyName = 'демо-готель StayAI', chec
 4. Коли гість підтвердив вибір — запитай ім'я та контакт (телефон або email) для броні.
 5. Виклич create_booking, підтверди деталі та надішли гостю посилання на оплату
    (посилання поверне інструмент — ніколи не вигадуй посилання сам).
-6. Стандартний час заїзду — ${checkInTime}, виїзду — ${checkOutTime}, якщо гість не
+6. Стандартний час заїзду — ${effectiveCheckIn}, виїзду — ${effectiveCheckOut}, якщо гість не
    домовився про інше окремо.
 
 ## Коли передавати живій людині (escalate_to_human)
 Одразу викликай цей інструмент і повідом гостю, що передав звернення адміністрації, якщо:
+- гість питає щось про заклад (адреса, паркування, сніданок, Wi-Fi, тварини, правила,
+  трансфер тощо), а відповіді немає в розділі "Інформація про заклад" вище;
 - гість скаржиться на якість перебування, чистоту, персонал тощо;
 - запит виходить за межі звичайного (групове бронювання, особливі медичні потреби,
   спірна оплата, юридичні питання);
@@ -62,4 +109,4 @@ function buildSystemPrompt({ propertyName = 'демо-готель StayAI', chec
   навіть якщо він прямо запитає — ввічливо переведи розмову назад до його запиту.`;
 }
 
-module.exports = { buildSystemPrompt };
+module.exports = { buildSystemPrompt, formatHotelInfo };

@@ -201,6 +201,46 @@ test.describe('Dashboard — room edit/delete and bulk upload (Block 2)', () => 
   });
 });
 
+test.describe('Dashboard — hotel info for the AI agent (Block 3)', () => {
+  async function loginBasic(page) {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+  }
+
+  test('empty by default, fields save and reload correctly', async ({ page }) => {
+    await loginBasic(page);
+    await expect(page.locator('#hiParking')).toHaveValue('');
+
+    await page.fill('#hiParking', 'Безкоштовне, на території готелю');
+    await page.fill('#hiPets', 'Дозволено дрібних тварин за 200 грн/доба');
+    await page.fill('#hiCheckIn', '15:00');
+    await page.click('#hiSave');
+    await expect(page.locator('#hiMsg')).toContainText(/Збережено/i, { timeout: 5000 });
+
+    await page.reload();
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#hiParking')).toHaveValue('Безкоштовне, на території готелю');
+    await expect(page.locator('#hiPets')).toHaveValue('Дозволено дрібних тварин за 200 грн/доба');
+    await expect(page.locator('#hiCheckIn')).toHaveValue('15:00');
+  });
+
+  test('save button is double-submit guarded', async ({ page }) => {
+    await loginBasic(page);
+    await page.fill('#hiWifi', 'Безкоштовний у всіх номерах');
+    const btn = page.locator('#hiSave');
+    await btn.click();
+    await expect(page.locator('#hiMsg')).toContainText(/Збережено/i, { timeout: 5000 });
+    await expect(btn).toBeEnabled();
+  });
+});
+
 test.describe('Dashboard — gated access after trial ends', () => {
   test('expired trial + no subscription shows the payment gate, not the dashboard', async ({ page }) => {
     await installBackendMock(page, {

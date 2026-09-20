@@ -383,6 +383,62 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     </div>
 
     <div class="card">
+      <h2>Інформація для гостей</h2>
+      <p class="hint">ШІ-адміністратор відповідає на питання гостей САМЕ на основі цих даних. Якщо поле порожнє, а гість про це спитає — бот чесно скаже, що уточнить, і передасть питання вам (в «Ескалації»), а не вигадає відповідь. Заповніть те, що встигаєте — решту можна дозаповнити пізніше.</p>
+
+      <label for="hiDirections">Адреса та як дістатися</label>
+      <textarea id="hiDirections" placeholder="вул. Хрещатик 1, Київ. 5 хв пішки від метро Хрещатик."></textarea>
+
+      <div class="row">
+        <div><label for="hiCheckIn">Час заїзду</label><input id="hiCheckIn" type="text" placeholder="14:00"></div>
+        <div><label for="hiCheckOut">Час виїзду</label><input id="hiCheckOut" type="text" placeholder="12:00"></div>
+      </div>
+
+      <label for="hiParking">Паркування (наявність, ціна, умови)</label>
+      <textarea id="hiParking" placeholder="Безкоштовне, на території готелю"></textarea>
+
+      <label for="hiBreakfast">Сніданок</label>
+      <textarea id="hiBreakfast" placeholder="Включено, 8:00–11:00, у ресторані на 1 поверсі"></textarea>
+
+      <label for="hiWifi">Wi-Fi</label>
+      <textarea id="hiWifi" placeholder="Безкоштовний у всіх номерах, пароль видається на рецепції"></textarea>
+
+      <label for="hiPets">Тварини</label>
+      <textarea id="hiPets" placeholder="Дозволено дрібних тварин за додаткову плату 200 грн/доба"></textarea>
+
+      <label for="hiHouseRules">Правила проживання</label>
+      <textarea id="hiHouseRules" placeholder="Тихі години з 22:00 до 8:00, паління заборонено в номерах"></textarea>
+
+      <label for="hiCancellation">Умови скасування та оплати</label>
+      <textarea id="hiCancellation" placeholder="Безкоштовне скасування за 24 години до заїзду"></textarea>
+
+      <label for="hiPayment">Способи оплати</label>
+      <textarea id="hiPayment" placeholder="Картка онлайн, готівка на місці"></textarea>
+
+      <label for="hiAmenities">Зручності та послуги</label>
+      <textarea id="hiAmenities" placeholder="Басейн, спортзал, прання, консьєрж"></textarea>
+
+      <label for="hiContacts">Контакти</label>
+      <textarea id="hiContacts" placeholder="+380 XX XXX XX XX, recepція цілодобово"></textarea>
+
+      <div class="row">
+        <div><label for="hiLateCheckout">Пізній виїзд</label><input id="hiLateCheckout" type="text" placeholder="До 15:00 безкоштовно, далі 300 грн"></div>
+        <div><label for="hiEarlyCheckin">Ранній заїзд</label><input id="hiEarlyCheckin" type="text" placeholder="За можливості, безкоштовно"></div>
+      </div>
+
+      <label for="hiTransfer">Трансфер</label>
+      <textarea id="hiTransfer" placeholder="Трансфер з аеропорту за запитом, 500 грн"></textarea>
+
+      <label for="hiAdditional">Додатково</label>
+      <textarea id="hiAdditional" placeholder="Будь-яка інша інформація для гостей"></textarea>
+
+      <div class="actions">
+        <button class="btn-primary" id="hiSave">Зберегти інформацію</button>
+        <span class="msg" id="hiMsg"></span>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Номери</h2>
       <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
       <div class="actions" style="margin-bottom:18px;">
@@ -1190,9 +1246,48 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     renderSubscriptionCard();
 
     await reloadRooms();
+    await loadHotelInfo();
     await loadChannels();
     dashScreen.classList.remove('hidden');
   }
+
+  // ---- Інформація для гостей (Блок 3) ----
+  const HOTEL_INFO_FIELDS = [
+    ['hiDirections', 'directions'], ['hiCheckIn', 'check_in_time'], ['hiCheckOut', 'check_out_time'],
+    ['hiParking', 'parking'], ['hiBreakfast', 'breakfast'], ['hiWifi', 'wifi'], ['hiPets', 'pets_policy'],
+    ['hiHouseRules', 'house_rules'], ['hiCancellation', 'cancellation_policy'], ['hiPayment', 'payment_methods'],
+    ['hiAmenities', 'amenities'], ['hiContacts', 'contacts'], ['hiLateCheckout', 'late_checkout'],
+    ['hiEarlyCheckin', 'early_checkin'], ['hiTransfer', 'transfer'], ['hiAdditional', 'additional_info'],
+  ];
+
+  async function loadHotelInfo() {
+    const { data } = await supabase
+      .from('hotel_info')
+      .select('*')
+      .eq('property_id', currentProperty.property_id)
+      .maybeSingle();
+    HOTEL_INFO_FIELDS.forEach(([elId, field]) => {
+      document.getElementById(elId).value = (data && data[field]) || '';
+    });
+  }
+
+  onClickGuarded(document.getElementById('hiSave'), async () => {
+    const msg = document.getElementById('hiMsg');
+    msg.className = 'msg';
+    const payload = { property_id: currentProperty.property_id };
+    HOTEL_INFO_FIELDS.forEach(([elId, field]) => {
+      payload[field] = document.getElementById(elId).value.trim();
+    });
+    const { error } = await supabase.from('hotel_info').upsert(payload, { onConflict: 'property_id' });
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = 'Збережено.';
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  });
 
   // ---- Канали зв'язку ----
   function buildWidgetSnippet() {

@@ -7,12 +7,13 @@
 
 const { buildSystemPrompt } = require('./system-prompt');
 const { toolDefinitions, createTools } = require('./tools');
+const { getHotelInfo } = require('./hotel-info');
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOOL_ROUNDS = 5; // запобіжник від нескінченного циклу викликів інструментів
 
-async function callClaude(messages, propertyName) {
+async function callClaude(messages, propertyName, hotelInfo) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY не встановлено в змінних середовища.');
@@ -28,7 +29,7 @@ async function callClaude(messages, propertyName) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt({ propertyName }),
+      system: buildSystemPrompt({ propertyName, hotelInfo }),
       tools: toolDefinitions,
       messages,
     }),
@@ -52,10 +53,11 @@ async function callClaude(messages, propertyName) {
 async function runConciergeTurn(conversationHistory, property) {
   const { propertyId, propertyName } = property;
   const toolImplementations = createTools(propertyId);
+  const hotelInfo = await getHotelInfo(propertyId);
   let messages = [...conversationHistory];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const data = await callClaude(messages, propertyName);
+    const data = await callClaude(messages, propertyName, hotelInfo);
 
     const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
     const textBlocks = data.content.filter(b => b.type === 'text');
