@@ -82,8 +82,11 @@ html[data-theme="dark"] .icon-sun{display:block; color:#C9A46A;}
 @media (prefers-reduced-motion: reduce){.account-dropdown{transition:none;}}
 .acct-row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px;}
 .acct-row:last-of-type{border-bottom:none;}
+.acct-row--stack{flex-direction:column; align-items:flex-start; gap:4px;}
 .acct-label{color:var(--muted); flex-shrink:0;}
 .acct-value{font-weight:600; text-align:right; word-break:break-word;}
+.acct-row--stack .acct-value{text-align:left; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.acct-value--sub{font-weight:500; font-size:12px; color:var(--muted);}
 .acct-pw{margin-top:6px; padding-top:14px; border-top:1px solid var(--line);}
 .acct-forgot-pw{width:100%; justify-content:center; padding:10px;}
 .acct-logout{width:100%; margin-top:14px; justify-content:center; padding:10px;}
@@ -690,6 +693,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "auth.err.rateLimit":"Забагато листів підряд — вбудована пошта Supabase дозволяє лише кілька листів на годину на весь сайт. Це не помилка вашого акаунта: зачекайте 10-15 хв і спробуйте ще раз, або попросіть розробника підключити власний SMTP чи вимкнути підтвердження email у Supabase.",
       "auth.err.emailNotConfirmed":"Цей email ще не підтверджено. Перевірте пошту (і \"Спам\") за листом від Supabase, або зверніться до розробника, щоб вимкнути обов'язкове підтвердження email.",
       "auth.err.invalidCredentials":"Невірний email або пароль.",
+      "auth.err.network":"Не вдалося з'єднатися з сервером. Перевірте інтернет-з'єднання і спробуйте ще раз.",
 
       "reset.title":"Новий пароль","reset.hint":"Встановіть новий пароль для входу в кабінет.",
       "reset.label":"Новий пароль","reset.submit":"Зберегти пароль",
@@ -859,6 +863,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "auth.err.rateLimit":"Too many emails sent in a row — Supabase's built-in mail sends only a few emails per hour for the whole site. This isn't an error with your account: wait 10-15 min and try again, or ask the developer to connect a custom SMTP or disable email confirmation in Supabase.",
       "auth.err.emailNotConfirmed":"This email hasn't been confirmed yet. Check your inbox (and Spam) for an email from Supabase, or contact the developer to disable mandatory email confirmation.",
       "auth.err.invalidCredentials":"Invalid email or password.",
+      "auth.err.network":"Could not connect to the server. Check your internet connection and try again.",
 
       "reset.title":"New password","reset.hint":"Set a new password to log in to your cabinet.",
       "reset.label":"New password","reset.submit":"Save password",
@@ -1063,6 +1068,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (/rate limit/i.test(m)) return t('auth.err.rateLimit', getLang());
     if (/email not confirmed/i.test(m)) return t('auth.err.emailNotConfirmed', getLang());
     if (/invalid login credentials/i.test(m)) return t('auth.err.invalidCredentials', getLang());
+    // Supabase-клієнт огортає збій самого fetch (обірваний/повільний
+    // з'єднання, тимчасова недоступність) в AuthError з технічним текстом
+    // на кшталт "Load failed" (Safari) чи "Failed to fetch" (Chrome) — без
+    // цієї гілки він показувався б людині як є, англійською.
+    if (/load failed|failed to fetch|networkerror|network request failed/i.test(m)) return t('auth.err.network', getLang());
     return m;
   }
 
@@ -1141,31 +1151,38 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     return plan || t('sub.active', lang);
   }
 
-  function subscriptionStatusText(property) {
-    if (!property) return '—';
+  // Повертає підписку у вигляді двох рядків для дропдауна: головний
+  // (план + залишок) і, за наявності, дата закінчення в дужках окремим
+  // рядком нижче — щоб довгий текст не переносився посередині значення.
+  function subscriptionStatusParts(property) {
     const lang = getLang();
+    if (!property) return { main: '—', detail: null };
     if (property.subscription_status === 'active') {
       const planLabel = getPlanLabel(property, lang);
       const countdown = property.subscription_active_until && formatCountdown(property.subscription_active_until, lang);
       if (countdown) {
-        return `${planLabel} · ${countdown} (${t('sub.until', lang)} ${formatDate(property.subscription_active_until)})`;
+        return {
+          main: `${planLabel} · ${countdown}`,
+          detail: `(${t('sub.until', lang)} ${formatDate(property.subscription_active_until)})`,
+        };
       }
-      return planLabel;
+      return { main: planLabel, detail: null };
     }
     const trialCountdown = property.trial_ends_at && formatCountdown(property.trial_ends_at, lang);
     if (trialCountdown) {
-      return `${t('sub.trial', lang)} · ${trialCountdown}`;
+      return { main: `${t('sub.trial', lang)} · ${trialCountdown}`, detail: null };
     }
-    return t('sub.inactive', lang);
+    return { main: t('sub.inactive', lang), detail: null };
   }
 
   function buildAccountInfoHTML(suffix) {
     const msgId = 'acctPwMsg' + suffix;
     const lang = getLang();
+    const sub = subscriptionStatusParts(currentProperty);
     return `
-      <div class="acct-row"><span class="acct-label">${t('acct.email', lang)}</span><span class="acct-value">${currentUser.email}</span></div>
+      <div class="acct-row acct-row--stack"><span class="acct-label">${t('acct.email', lang)}</span><span class="acct-value" title="${currentUser.email}">${currentUser.email}</span></div>
       <div class="acct-row"><span class="acct-label">${t('acct.registered', lang)}</span><span class="acct-value">${formatDate(currentUser.created_at)}</span></div>
-      <div class="acct-row"><span class="acct-label">${t('acct.subscription', lang)}</span><span class="acct-value">${subscriptionStatusText(currentProperty)}</span></div>
+      <div class="acct-row acct-row--stack"><span class="acct-label">${t('acct.subscription', lang)}</span><span class="acct-value">${sub.main}</span>${sub.detail ? `<span class="acct-value acct-value--sub">${sub.detail}</span>` : ''}</div>
       <div class="acct-pw">
         <button type="button" class="btn-secondary acct-forgot-pw" data-msg="${msgId}" data-email="${currentUser.email}">${t('acct.forgotPassword', lang)}</button>
         <span class="msg" id="${msgId}"></span>

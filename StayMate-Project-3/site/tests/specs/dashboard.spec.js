@@ -454,7 +454,7 @@ test.describe('Dashboard — account dropdown subscription countdown (regression
     await page.goto('/cabinet/');
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
     await page.click('#accountMenuBtn');
-    const subRow = page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value');
+    const subRow = page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value').first();
     await expect(subRow).not.toHaveText('—');
     await expect(subRow).toContainText(/\d+ дн\./);
   });
@@ -471,7 +471,7 @@ test.describe('Dashboard — account dropdown subscription countdown (regression
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
     await expect(page.locator('#subHint')).toContainText(/5 год \d{1,2} хв/);
     await page.click('#accountMenuBtn');
-    await expect(page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value')).toContainText(/5 год \d{1,2} хв/);
+    await expect(page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' }).locator('.acct-value').first()).toContainText(/5 год \d{1,2} хв/);
   });
 
   test('a missing subscription_plan falls back to a readable label, not a bare dash', async ({ page }) => {
@@ -485,6 +485,46 @@ test.describe('Dashboard — account dropdown subscription countdown (regression
     await page.goto('/cabinet/');
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
     await expect(page.locator('#subHint')).toContainText('Активна підписка: Активна.');
+  });
+
+  // Reported: email and the subscription line wrapped/ran together in the
+  // narrow (290px) dropdown, especially with a long email address. Fixed by
+  // stacking the label above the value (.acct-row--stack) and splitting the
+  // subscription line into a bold "plan · countdown" line with the "(until
+  // date)" parenthetical on its own smaller line below.
+  test('email never wraps and the subscription row shows countdown on top, date below', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'chernikov.danila2000@gmail.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: null,
+        subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+      },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('#accountMenuBtn');
+
+    const emailValue = page.locator('#accountDropdown .acct-row', { hasText: 'Email' }).locator('.acct-value');
+    await expect(emailValue).toHaveText('chernikov.danila2000@gmail.com');
+    const emailBox = await emailValue.boundingBox();
+    const emailScrollWidth = await emailValue.evaluate((el) => el.scrollWidth);
+    // Truncated with ellipsis rather than wrapping onto a second line —
+    // scrollWidth may exceed the visible box, but the element itself stays
+    // single-line height.
+    expect(emailBox.height).toBeLessThan(24);
+    expect(await emailValue.evaluate((el) => getComputedStyle(el).whiteSpace)).toBe('nowrap');
+    expect(emailScrollWidth).toBeGreaterThan(0);
+
+    const subRow = page.locator('#accountDropdown .acct-row', { hasText: 'Підписка' });
+    const mainLine = subRow.locator('.acct-value').first();
+    const detailLine = subRow.locator('.acct-value--sub');
+    await expect(mainLine).toContainText(/\d+ дн\./);
+    await expect(mainLine).not.toContainText('до');
+    await expect(detailLine).toContainText(/^\(до .+\)$/);
+
+    const mainBox = await mainLine.boundingBox();
+    const detailBox = await detailLine.boundingBox();
+    expect(detailBox.y).toBeGreaterThan(mainBox.y);
   });
 });
 

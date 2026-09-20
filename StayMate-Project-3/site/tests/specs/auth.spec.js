@@ -75,6 +75,23 @@ test.describe('Auth — login', () => {
     await expect(page.locator('#authScreen')).not.toHaveClass(/hidden/);
   });
 
+  // Reported bug: a transient network hiccup during sign-in shows a raw,
+  // untranslated technical string ("Load failed" in Safari, "Failed to
+  // fetch" in Chrome) straight from Supabase's fetch wrapper instead of a
+  // readable message, and the user has no idea what went wrong.
+  test('a network failure during sign-in shows a readable message, not a raw "Load failed"/"Failed to fetch"', async ({ page }) => {
+    await installBackendMock(page, { signInError: 'Load failed' });
+    await page.goto('/cabinet/');
+    await page.fill('#authEmail', 'user@example.com');
+    await page.fill('#authPassword', 'password123');
+    await page.click('#authSubmit');
+    await expect(page.locator('#authMsg')).not.toContainText('Load failed');
+    await expect(page.locator('#authMsg')).toContainText(/з'єднат/i);
+    // The submit button must not stay stuck disabled/darkened after the
+    // failed attempt — a retry should work immediately.
+    await expect(page.locator('#authSubmit')).toBeEnabled();
+  });
+
   test('empty email/password shows a validation message, does not call Supabase', async ({ page }) => {
     await installBackendMock(page);
     await page.goto('/cabinet/');
