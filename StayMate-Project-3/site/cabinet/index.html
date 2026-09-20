@@ -156,6 +156,41 @@ td.del-col button{background:none; border:none; color:var(--warn); font-size:18p
 .status-pill{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:500; padding:4px 11px; border-radius:100px; background:var(--accent-soft); color:var(--accent-text);}
 .status-pill.off{background:var(--gold-soft); color:var(--gold);}
 
+/* ---------- номери: картки замість таблиці (mobile-first, Блок 2) ---------- */
+.room-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:16px 18px; margin-bottom:12px;}
+.room-card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+.room-card-title{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15.5px;}
+.room-card-meta{font-size:13px; color:var(--muted); margin-top:3px;}
+.room-card-desc{font-size:13.5px; color:var(--ink-soft); margin-top:10px; line-height:1.5;}
+.room-card-actions{display:flex; gap:6px; flex-shrink:0;}
+.icon-btn{width:30px; height:30px; border-radius:8px; background:var(--surface); border:1px solid var(--line-strong); display:flex; align-items:center; justify-content:center; font-size:15px; color:var(--ink-soft); flex-shrink:0;}
+.icon-btn:hover{border-color:var(--ink); color:var(--ink);}
+.icon-btn.danger{color:var(--warn);}
+.chip-row{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;}
+.chip{font-size:11.5px; background:var(--bg); border:1px solid var(--line); border-radius:100px; padding:3px 10px; color:var(--ink-soft);}
+.rooms-empty{font-size:13.5px; color:var(--muted); padding:18px 0; text-align:center;}
+
+/* ---------- модалки (форма номера, масове завантаження) ---------- */
+.modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; overflow-y:auto;}
+.modal-overlay.hidden{display:none;}
+.modal-box{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:26px; max-width:620px; width:100%; margin:auto;}
+.modal-box h2{margin-bottom:6px;}
+.modal-box textarea{width:100%; padding:12px 14px; border-radius:var(--radius-s); border:1px solid var(--line-strong); font-size:14.5px; font-family:'Inter',sans-serif; background:var(--input-bg); color:var(--ink); resize:vertical; min-height:70px;}
+
+/* ---------- масове завантаження: preview-картки ---------- */
+.preview-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:14px 16px; margin-bottom:10px;}
+.preview-card.is-uncertain{border-color:var(--gold);}
+.preview-card.is-duplicate{border-color:var(--accent);}
+.preview-card .row{gap:8px; margin-top:8px;}
+.preview-card input, .preview-card select{padding:9px 11px; font-size:13.5px;}
+.preview-badge{display:inline-block; font-size:11px; font-family:'IBM Plex Mono',monospace; padding:3px 9px; border-radius:100px; margin-bottom:8px;}
+.preview-badge.dup{background:var(--accent-soft); color:var(--accent-text);}
+.preview-badge.new{background:var(--gold-soft); color:var(--gold);}
+.preview-badge.uncertain{background:var(--warn-soft); color:var(--warn); margin-left:6px;}
+.upload-drop{border:1.5px dashed var(--line-strong); border-radius:var(--radius-s); padding:26px 18px; text-align:center; cursor:pointer; transition:border-color .2s ease;}
+.upload-drop:hover{border-color:var(--accent);}
+.upload-drop input[type=file]{display:none;}
+
 /* ---------- канали зв'язку ---------- */
 .channel-card{border:1px solid var(--line); border-radius:var(--radius-s); padding:20px; margin-bottom:14px;}
 .channel-card:last-child{margin-bottom:0;}
@@ -350,23 +385,66 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <div class="card">
       <h2>Номери</h2>
       <p class="hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
-      <table>
-        <thead>
-          <tr>
-            <th>Тип номера</th>
-            <th class="num-col">Ціна/ніч</th>
-            <th class="num-col">Місткість</th>
-            <th class="num-col">Кількість</th>
-            <th>Опис</th>
-            <th class="del-col"></th>
-          </tr>
-        </thead>
-        <tbody id="roomsBody"></tbody>
-      </table>
-      <div class="actions">
-        <button class="btn-secondary" id="addRoomRow">+ Додати номер</button>
-        <button class="btn-primary" id="saveRooms">Зберегти номери</button>
-        <span class="msg" id="roomsMsg"></span>
+      <div class="actions" style="margin-bottom:18px;">
+        <button class="btn-primary" id="openAddRoom">+ Додати номер</button>
+        <button class="btn-secondary" id="openBulkUpload">Завантажити прайс-лист файлом</button>
+        <a class="btn-secondary" href="/cabinet/rooms-template.xlsx" download>Завантажити шаблон Excel</a>
+      </div>
+      <div id="roomsList"></div>
+      <p class="rooms-empty hidden" id="roomsEmptyHint">Ще немає жодного номера — додайте вручну або завантажте файлом.</p>
+      <span class="msg" id="roomsMsg"></span>
+    </div>
+
+    <!-- Модалка: додати / редагувати один номер -->
+    <div class="modal-overlay hidden" id="roomFormModal">
+      <div class="modal-box">
+        <h2 id="roomFormTitle">Новий номер</h2>
+        <label for="rfType">Тип / назва номера</label>
+        <input id="rfType" type="text" placeholder="Наприклад, Стандарт">
+        <div class="row">
+          <div><label for="rfPrice">Ціна за ніч</label><input id="rfPrice" type="number" min="0" step="1"></div>
+          <div><label for="rfCapacity">Місткість</label><input id="rfCapacity" type="number" min="1" step="1"></div>
+          <div><label for="rfQty">Кількість номерів</label><input id="rfQty" type="number" min="1" step="1" value="1"></div>
+        </div>
+        <label for="rfDesc">Опис</label>
+        <textarea id="rfDesc" placeholder="Короткий опис номера"></textarea>
+        <label for="rfAmenities">Зручності (через кому)</label>
+        <input id="rfAmenities" type="text" placeholder="Wi-Fi, Кондиціонер, Балкон">
+        <div class="actions">
+          <button class="btn-primary" id="rfSave">Зберегти</button>
+          <button class="btn-secondary" id="rfCancel">Скасувати</button>
+          <span class="msg" id="rfMsg"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модалка: масове завантаження прайс-листа -->
+    <div class="modal-overlay hidden" id="bulkUploadModal">
+      <div class="modal-box" style="max-width:760px;">
+        <h2>Завантажити прайс-лист</h2>
+        <p class="hint">Підтримуються CSV, Excel (XLSX/XLS), PDF, Word (DOCX) і фото/скан прайс-листа. Максимальний розмір файлу — 10 МБ. Перед збереженням ви зможете перевірити й відредагувати розпізнані дані.</p>
+
+        <div id="bulkStepPick">
+          <label class="upload-drop" for="bulkFileInput">
+            <span id="bulkDropLabel">Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)</span>
+            <input id="bulkFileInput" type="file" accept=".csv,.xlsx,.xls,.pdf,.docx,.jpg,.jpeg,.png">
+          </label>
+          <div class="actions">
+            <button class="btn-primary" id="bulkAnalyzeBtn" disabled>Аналізувати файл</button>
+            <button class="btn-secondary" id="bulkCancelBtn">Скасувати</button>
+            <span class="msg" id="bulkPickMsg"></span>
+          </div>
+        </div>
+
+        <div class="hidden" id="bulkStepPreview">
+          <p class="hint" id="bulkPreviewHint"></p>
+          <div id="bulkPreviewList"></div>
+          <div class="actions">
+            <button class="btn-primary" id="bulkConfirmBtn">Підтвердити і зберегти всі</button>
+            <button class="btn-secondary" id="bulkBackBtn">Назад до вибору файлу</button>
+            <span class="msg" id="bulkPreviewMsg"></span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1111,14 +1189,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('dashAddress').value = currentProperty.address || '';
     renderSubscriptionCard();
 
-    const { data: roomRows } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('property_id', currentProperty.property_id)
-      .order('price_per_night', { ascending: true });
-
-    rooms = roomRows || [];
-    renderRooms();
+    await reloadRooms();
     await loadChannels();
     dashScreen.classList.remove('hidden');
   }
@@ -1272,100 +1343,314 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     setTimeout(() => { msg.textContent = ''; }, 2500);
   });
 
-  // ---- Номери ----
+  // ---- Номери: список карток + модалка додавання/редагування (Блок 2) ----
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  async function reloadRooms() {
+    const { data: roomRows } = await supabase
+      .from('rooms')
+      .select('*')
+      .eq('property_id', currentProperty.property_id)
+      .order('price_per_night', { ascending: true });
+    rooms = roomRows || [];
+    renderRooms();
+  }
+
   function renderRooms() {
-    const body = document.getElementById('roomsBody');
-    body.innerHTML = '';
-    rooms.forEach((room, idx) => addRoomRow(room, idx));
-  }
+    const list = document.getElementById('roomsList');
+    const emptyHint = document.getElementById('roomsEmptyHint');
+    if (!rooms.length) {
+      list.innerHTML = '';
+      emptyHint.classList.remove('hidden');
+      return;
+    }
+    emptyHint.classList.add('hidden');
+    list.innerHTML = rooms.map((room) => {
+      const amenities = Array.isArray(room.amenities) ? room.amenities : [];
+      return `
+        <div class="room-card" data-id="${room.id}">
+          <div class="room-card-head">
+            <div>
+              <div class="room-card-title">${escapeHtml(room.room_type)}</div>
+              <div class="room-card-meta">${room.price_per_night} грн/ніч · до ${room.capacity} гостей · ${room.quantity ?? 1} шт.</div>
+            </div>
+            <div class="room-card-actions">
+              <button type="button" class="icon-btn edit-room" title="Редагувати" aria-label="Редагувати">✎</button>
+              <button type="button" class="icon-btn danger delete-room" title="Видалити" aria-label="Видалити">×</button>
+            </div>
+          </div>
+          ${room.description ? `<p class="room-card-desc">${escapeHtml(room.description)}</p>` : ''}
+          ${amenities.length ? `<div class="chip-row">${amenities.map((a) => `<span class="chip">${escapeHtml(a)}</span>`).join('')}</div>` : ''}
+        </div>
+      `;
+    }).join('');
 
-  function addRoomRow(room = {}, idx = rooms.length) {
-    const body = document.getElementById('roomsBody');
-    const tr = document.createElement('tr');
-    tr.dataset.idx = idx;
-    tr.innerHTML = `
-      <td><input type="text" class="f-type" value="${room.room_type ?? ''}" placeholder="Стандарт"></td>
-      <td class="num-col"><input type="number" class="f-price" min="0" step="1" value="${room.price_per_night ?? ''}" placeholder="1500"></td>
-      <td class="num-col"><input type="number" class="f-capacity" min="1" step="1" value="${room.capacity ?? ''}" placeholder="2"></td>
-      <td class="num-col"><input type="number" class="f-qty" min="1" step="1" value="${room.quantity ?? 1}" placeholder="1"></td>
-      <td><input type="text" class="f-desc" value="${room.description ?? ''}" placeholder="Короткий опис номера"></td>
-      <td class="del-col"><button type="button" title="Видалити">×</button></td>
-    `;
-    tr.querySelector('.del-col button').addEventListener('click', () => tr.remove());
-    body.appendChild(tr);
-  }
-
-  document.getElementById('addRoomRow').addEventListener('click', () => addRoomRow());
-
-  document.getElementById('saveRooms').addEventListener('click', async () => {
-    const msg = document.getElementById('roomsMsg');
-    msg.className = 'msg';
-    msg.textContent = 'Зберігаємо...';
-
-    const rowsEls = [...document.querySelectorAll('#roomsBody tr')];
-    let valid = true;
-    const newRooms = [];
-
-    rowsEls.forEach(tr => {
-      const typeEl = tr.querySelector('.f-type');
-      const priceEl = tr.querySelector('.f-price');
-      const capEl = tr.querySelector('.f-capacity');
-      const qtyEl = tr.querySelector('.f-qty');
-      const descEl = tr.querySelector('.f-desc');
-      [typeEl, priceEl, capEl, qtyEl].forEach(el => el.classList.remove('field-error'));
-
-      const roomType = typeEl.value.trim();
-      if (!roomType) return; // порожній рядок — пропускаємо, як і раніше
-
-      const price = Number(priceEl.value);
-      const capacity = Number(capEl.value);
-      const quantity = Number(qtyEl.value || 1);
-
-      if (!(price > 0)) { priceEl.classList.add('field-error'); valid = false; }
-      if (!(capacity > 0) || !Number.isInteger(capacity)) { capEl.classList.add('field-error'); valid = false; }
-      if (!(quantity > 0) || !Number.isInteger(quantity)) { qtyEl.classList.add('field-error'); valid = false; }
-
-      newRooms.push({
-        room_type: roomType,
-        price_per_night: price,
-        capacity,
-        quantity,
-        description: descEl.value.trim(),
+    list.querySelectorAll('.edit-room').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('.room-card').dataset.id;
+        openRoomForm(rooms.find((r) => String(r.id) === id));
       });
+    });
+    list.querySelectorAll('.delete-room').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.closest('.room-card').dataset.id;
+        const room = rooms.find((r) => String(r.id) === id);
+        if (!confirm(`Видалити номер "${room ? room.room_type : ''}"?`)) return;
+        const { error } = await supabase.from('rooms').delete().eq('id', id).eq('property_id', currentProperty.property_id);
+        const msg = document.getElementById('roomsMsg');
+        if (error) {
+          msg.className = 'msg error';
+          msg.textContent = error.message;
+          return;
+        }
+        msg.className = '';
+        msg.textContent = '';
+        await reloadRooms();
+      });
+    });
+  }
+
+  let editingRoomId = null;
+
+  function openRoomForm(room) {
+    editingRoomId = room ? room.id : null;
+    document.getElementById('roomFormTitle').textContent = room ? 'Редагувати номер' : 'Новий номер';
+    document.getElementById('rfType').value = room ? room.room_type : '';
+    document.getElementById('rfPrice').value = room ? room.price_per_night : '';
+    document.getElementById('rfCapacity').value = room ? room.capacity : '';
+    document.getElementById('rfQty').value = room ? (room.quantity ?? 1) : 1;
+    document.getElementById('rfDesc').value = room ? (room.description || '') : '';
+    document.getElementById('rfAmenities').value = room && Array.isArray(room.amenities) ? room.amenities.join(', ') : '';
+    document.getElementById('rfMsg').textContent = '';
+    document.getElementById('roomFormModal').classList.remove('hidden');
+    document.getElementById('rfType').focus();
+  }
+
+  function closeRoomForm() {
+    document.getElementById('roomFormModal').classList.add('hidden');
+  }
+
+  document.getElementById('openAddRoom').addEventListener('click', () => openRoomForm(null));
+  document.getElementById('rfCancel').addEventListener('click', closeRoomForm);
+  document.getElementById('roomFormModal').addEventListener('click', (e) => {
+    if (e.target.id === 'roomFormModal') closeRoomForm();
+  });
+
+  onClickGuarded(document.getElementById('rfSave'), async () => {
+    const msg = document.getElementById('rfMsg');
+    msg.className = 'msg';
+    const roomType = document.getElementById('rfType').value.trim();
+    const price = Number(document.getElementById('rfPrice').value);
+    const capacity = Number(document.getElementById('rfCapacity').value);
+    const quantity = Number(document.getElementById('rfQty').value || 1);
+    const description = document.getElementById('rfDesc').value.trim();
+    const amenities = document.getElementById('rfAmenities').value.split(',').map((s) => s.trim()).filter(Boolean);
+
+    if (!roomType) { msg.className = 'msg error'; msg.textContent = 'Вкажіть тип/назву номера.'; return; }
+    if (!(price > 0)) { msg.className = 'msg error'; msg.textContent = 'Ціна за ніч має бути додатним числом.'; return; }
+    if (!(capacity > 0) || !Number.isInteger(capacity)) { msg.className = 'msg error'; msg.textContent = 'Місткість має бути цілим додатним числом.'; return; }
+    if (!(quantity > 0) || !Number.isInteger(quantity)) { msg.className = 'msg error'; msg.textContent = 'Кількість номерів має бути цілим додатним числом.'; return; }
+
+    const payload = { room_type: roomType, price_per_night: price, capacity, quantity, description, amenities };
+    const { error } = editingRoomId
+      ? await supabase.from('rooms').update(payload).eq('id', editingRoomId).eq('property_id', currentProperty.property_id)
+      : await supabase.from('rooms').insert({ ...payload, property_id: currentProperty.property_id });
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    closeRoomForm();
+    await reloadRooms();
+  });
+
+  // ---- Номери: масове завантаження файлом (Блок 2) ----
+  const BULK_MAX_FILE_SIZE = 10 * 1024 * 1024;
+  let bulkPreviewRows = [];
+
+  function resetBulkModal() {
+    document.getElementById('bulkStepPick').classList.remove('hidden');
+    document.getElementById('bulkStepPreview').classList.add('hidden');
+    document.getElementById('bulkFileInput').value = '';
+    document.getElementById('bulkDropLabel').textContent = 'Натисніть, щоб обрати файл (CSV, XLSX, PDF, DOCX, JPG, PNG)';
+    document.getElementById('bulkAnalyzeBtn').disabled = true;
+    document.getElementById('bulkPickMsg').textContent = '';
+    document.getElementById('bulkPreviewMsg').textContent = '';
+    bulkPreviewRows = [];
+  }
+
+  document.getElementById('openBulkUpload').addEventListener('click', () => {
+    resetBulkModal();
+    document.getElementById('bulkUploadModal').classList.remove('hidden');
+  });
+  document.getElementById('bulkCancelBtn').addEventListener('click', () => {
+    document.getElementById('bulkUploadModal').classList.add('hidden');
+  });
+  document.getElementById('bulkUploadModal').addEventListener('click', (e) => {
+    if (e.target.id === 'bulkUploadModal') document.getElementById('bulkUploadModal').classList.add('hidden');
+  });
+  document.getElementById('bulkBackBtn').addEventListener('click', resetBulkModal);
+
+  document.getElementById('bulkFileInput').addEventListener('change', () => {
+    const file = document.getElementById('bulkFileInput').files[0];
+    const pickMsg = document.getElementById('bulkPickMsg');
+    pickMsg.className = 'msg';
+    pickMsg.textContent = '';
+    if (!file) { document.getElementById('bulkAnalyzeBtn').disabled = true; return; }
+    if (file.size > BULK_MAX_FILE_SIZE) {
+      pickMsg.className = 'msg error';
+      pickMsg.textContent = `Файл завеликий (${(file.size / 1024 / 1024).toFixed(1)} МБ) — максимум 10 МБ.`;
+      document.getElementById('bulkAnalyzeBtn').disabled = true;
+      return;
+    }
+    document.getElementById('bulkDropLabel').textContent = file.name;
+    document.getElementById('bulkAnalyzeBtn').disabled = false;
+  });
+
+  function renderBulkPreview() {
+    const list = document.getElementById('bulkPreviewList');
+    list.innerHTML = bulkPreviewRows.map((row, idx) => {
+      const uncertain = row.uncertain_fields || [];
+      const badges = [
+        row.is_duplicate ? `<span class="preview-badge dup">Схоже на наявний номер</span>` : `<span class="preview-badge new">Новий номер</span>`,
+        uncertain.length ? `<span class="preview-badge uncertain">Перевірте: ${uncertain.map(escapeHtml).join(', ')}</span>` : '',
+      ].join('');
+      return `
+        <div class="preview-card ${row.is_duplicate ? 'is-duplicate' : ''} ${uncertain.length ? 'is-uncertain' : ''}" data-idx="${idx}">
+          ${badges}
+          <label>Тип / назва номера</label>
+          <input class="pv-type" value="${escapeHtml(row.room_type)}">
+          <div class="row">
+            <div><label>Ціна/ніч</label><input class="pv-price" type="number" value="${row.price_per_night}"></div>
+            <div><label>Місткість</label><input class="pv-capacity" type="number" value="${row.capacity}"></div>
+            <div><label>Кількість</label><input class="pv-qty" type="number" value="${row.quantity}"></div>
+          </div>
+          <label>Опис</label>
+          <input class="pv-desc" value="${escapeHtml(row.description || '')}">
+          <label>Зручності (через кому)</label>
+          <input class="pv-amenities" value="${escapeHtml((row.amenities || []).join(', '))}">
+          ${row.is_duplicate ? `
+            <label>Що робити з дублікатом</label>
+            <select class="pv-action">
+              <option value="update" ${row.action !== 'create' ? 'selected' : ''}>Оновити наявний номер "${escapeHtml(row.room_type)}"</option>
+              <option value="create" ${row.action === 'create' ? 'selected' : ''}>Створити як новий окремий номер</option>
+            </select>
+          ` : ''}
+          <div class="actions">
+            <button type="button" class="btn-secondary pv-remove">Не завантажувати цей рядок</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    list.querySelectorAll('.pv-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.closest('.preview-card').dataset.idx);
+        bulkPreviewRows.splice(idx, 1);
+        renderBulkPreview();
+      });
+    });
+  }
+
+  onClickGuarded(document.getElementById('bulkAnalyzeBtn'), async () => {
+    const file = document.getElementById('bulkFileInput').files[0];
+    const pickMsg = document.getElementById('bulkPickMsg');
+    if (!file) return;
+    pickMsg.className = 'msg';
+    pickMsg.textContent = 'Аналізуємо файл — це може зайняти кілька секунд...';
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const formData = new FormData();
+      formData.append('propertyId', currentProperty.property_id);
+      formData.append('file', file);
+
+      const res = await fetch(`${API_BASE_URL}/api/rooms/parse-upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося розпізнати файл.');
+
+      if (!data.rooms || !data.rooms.length) {
+        pickMsg.className = 'msg error';
+        pickMsg.textContent = data.warning || 'У файлі не знайдено жодного номера. Перевірте файл або скористайтесь шаблоном.';
+        return;
+      }
+
+      bulkPreviewRows = data.rooms.map((r) => ({ ...r, action: r.is_duplicate ? 'update' : 'create' }));
+      document.getElementById('bulkPreviewHint').textContent =
+        `Розпізнано ${bulkPreviewRows.length} номер(ів). Перевірте виділені жовтим поля та позначені дублікати перед збереженням — нічого не потрапить у базу, поки ви не натиснете "Підтвердити".`;
+      renderBulkPreview();
+      document.getElementById('bulkStepPick').classList.add('hidden');
+      document.getElementById('bulkStepPreview').classList.remove('hidden');
+    } catch (e) {
+      pickMsg.className = 'msg error';
+      pickMsg.textContent = e.message;
+    }
+  });
+
+  onClickGuarded(document.getElementById('bulkConfirmBtn'), async () => {
+    const msg = document.getElementById('bulkPreviewMsg');
+    msg.className = 'msg';
+
+    const cards = [...document.querySelectorAll('#bulkPreviewList .preview-card')];
+    const finalRows = [];
+    let valid = true;
+
+    cards.forEach((card) => {
+      const idx = Number(card.dataset.idx);
+      const source = bulkPreviewRows[idx];
+      const roomType = card.querySelector('.pv-type').value.trim();
+      const price = Number(card.querySelector('.pv-price').value);
+      const capacity = Number(card.querySelector('.pv-capacity').value);
+      const quantity = Number(card.querySelector('.pv-qty').value);
+      const description = card.querySelector('.pv-desc').value.trim();
+      const amenities = card.querySelector('.pv-amenities').value.split(',').map((s) => s.trim()).filter(Boolean);
+      const actionEl = card.querySelector('.pv-action');
+      const action = actionEl ? actionEl.value : 'create';
+
+      if (!roomType || !(price > 0) || !(capacity > 0) || !(quantity > 0)) { valid = false; return; }
+
+      const row = { room_type: roomType, price_per_night: price, capacity, quantity, description, amenities };
+      if (source.is_duplicate && action === 'update') row.id = source.existing_room_id;
+      finalRows.push(row);
     });
 
     if (!valid) {
       msg.className = 'msg error';
-      msg.textContent = 'Перевірте виділені поля: ціна, місткість і кількість номерів мають бути додатними числами.';
+      msg.textContent = 'Перевірте всі рядки — тип, ціна і місткість обов\'язкові, а числові поля мають бути додатними.';
       return;
     }
-
-    // Проста стратегія: видаляємо всі попередні номери цього готелю і вставляємо поточний список.
-    const { error: delError } = await supabase
-      .from('rooms')
-      .delete()
-      .eq('property_id', currentProperty.property_id);
-
-    if (delError) {
+    if (!finalRows.length) {
       msg.className = 'msg error';
-      msg.textContent = delError.message;
+      msg.textContent = 'Немає жодного рядка для збереження.';
       return;
     }
 
-    if (newRooms.length) {
-      const { error: insError } = await supabase
-        .from('rooms')
-        .insert(newRooms.map(r => ({ ...r, property_id: currentProperty.property_id })));
-      if (insError) {
-        msg.className = 'msg error';
-        msg.textContent = insError.message;
-        return;
-      }
+    msg.textContent = 'Зберігаємо...';
+    // Один виклик БД-функції — записується або все, або нічого (Блок 2: атомарність).
+    const { error } = await supabase.rpc('commit_room_bulk_upload', {
+      p_property_id: currentProperty.property_id,
+      p_rooms: finalRows,
+    });
+
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = 'Не вдалося зберегти: ' + error.message;
+      return;
     }
 
-    msg.className = 'msg ok';
-    msg.textContent = 'Номери збережено.';
-    setTimeout(() => { msg.textContent = ''; }, 2500);
+    document.getElementById('bulkUploadModal').classList.add('hidden');
+    const roomsMsg = document.getElementById('roomsMsg');
+    roomsMsg.className = 'msg ok';
+    roomsMsg.textContent = `Завантажено ${finalRows.length} номер(ів).`;
+    await reloadRooms();
+    setTimeout(() => { roomsMsg.textContent = ''; }, 4000);
   });
 
   // ---- Перемикач мови (той самий стан, що й на решті сайту) ----

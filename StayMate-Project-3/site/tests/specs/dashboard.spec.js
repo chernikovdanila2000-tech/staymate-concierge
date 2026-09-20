@@ -61,11 +61,21 @@ test.describe('Dashboard — main screen (active trial)', () => {
     await expect(page.locator('#subHint')).toContainText(/Пробний період/);
   });
 
-  test('rooms table starts empty (empty state) and "add room" adds a row', async ({ page }) => {
+  test('rooms list starts empty (empty state) and "+ Додати номер" adds a room via the form modal', async ({ page }) => {
     await loginWithTrial(page);
-    await expect(page.locator('#roomsBody tr')).toHaveCount(0);
-    await page.click('#addRoomRow');
-    await expect(page.locator('#roomsBody tr')).toHaveCount(1);
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(0);
+    await expect(page.locator('#roomsEmptyHint')).toBeVisible();
+
+    await page.click('#openAddRoom');
+    await expect(page.locator('#roomFormModal')).not.toHaveClass(/hidden/);
+    await page.fill('#rfType', 'Стандарт');
+    await page.fill('#rfPrice', '1500');
+    await page.fill('#rfCapacity', '2');
+    await page.click('#rfSave');
+
+    await expect(page.locator('#roomFormModal')).toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(1);
+    await expect(page.locator('.room-card-title')).toHaveText('Стандарт');
   });
 
   test('saving hotel info without changes does not error', async ({ page }) => {
@@ -100,8 +110,8 @@ test.describe('Dashboard — pre-seeded rooms and channels render correctly', ()
     });
     await page.goto('/cabinet/');
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
-    await expect(page.locator('#roomsBody tr')).toHaveCount(1);
-    await expect(page.locator('#roomsBody .f-type')).toHaveValue('Стандарт');
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(1);
+    await expect(page.locator('.room-card-title')).toHaveText('Стандарт');
     await expect(page.locator('#pill-telegram')).toHaveText(/Підключено/);
     await expect(page.locator('#pill-telegram')).not.toHaveClass(/off/);
   });
@@ -125,6 +135,69 @@ test.describe('Dashboard — double-submit protection (regression)', () => {
     // enabled again, but it must never be double-clickable while in flight.
     await expect(page.locator('#infoMsg')).toContainText(/Збережено/i, { timeout: 5000 });
     await expect(btn).toBeEnabled();
+  });
+});
+
+test.describe('Dashboard — room edit/delete and bulk upload (Block 2)', () => {
+  async function loginWithOneRoom(page) {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel',
+        trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), subscription_status: 'inactive',
+      },
+      rooms: [
+        { id: 'room-1', property_id: 'p1', room_type: 'Стандарт', price_per_night: 1500, capacity: 2, quantity: 5, description: 'Опис', amenities: ['Wi-Fi'] },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+  }
+
+  test('editing a room through the modal updates it in place (no duplicate row)', async ({ page }) => {
+    await loginWithOneRoom(page);
+    await page.click('.edit-room');
+    await expect(page.locator('#roomFormTitle')).toHaveText('Редагувати номер');
+    await expect(page.locator('#rfType')).toHaveValue('Стандарт');
+    await page.fill('#rfPrice', '1700');
+    await page.click('#rfSave');
+    await expect(page.locator('#roomFormModal')).toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(1);
+    await expect(page.locator('.room-card-meta')).toContainText('1700');
+  });
+
+  test('deleting a room asks for confirmation and removes it', async ({ page }) => {
+    await loginWithOneRoom(page);
+    page.once('dialog', (d) => d.accept());
+    await page.click('.delete-room');
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(0, { timeout: 5000 });
+    await expect(page.locator('#roomsEmptyHint')).toBeVisible();
+  });
+
+  test('bulk upload: analyze shows an editable preview, confirming adds it as a new room', async ({ page }) => {
+    await loginWithOneRoom(page);
+    await page.click('#openBulkUpload');
+    await expect(page.locator('#bulkUploadModal')).not.toHaveClass(/hidden/);
+
+    // installBackendMock stubs /api/rooms/parse-upload to always return one
+    // canned room regardless of the actual file content — good enough to
+    // exercise the preview -> confirm -> saved pipeline end to end.
+    await page.setInputFiles('#bulkFileInput', {
+      name: 'price-list.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('Тип,Ціна\nМок-номер,1000\n'),
+    });
+    await page.click('#bulkAnalyzeBtn');
+
+    await expect(page.locator('#bulkStepPreview')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('.preview-card')).toHaveCount(1);
+    await expect(page.locator('.preview-card .pv-type')).toHaveValue('Мок-номер');
+
+    await page.click('#bulkConfirmBtn');
+    await expect(page.locator('#bulkUploadModal')).toHaveClass(/hidden/, { timeout: 5000 });
+    // The seeded room plus the one from the mocked upload.
+    await expect(page.locator('#roomsList .room-card')).toHaveCount(2);
+    await expect(page.locator('#roomsMsg')).toContainText(/Завантажено/);
   });
 });
 

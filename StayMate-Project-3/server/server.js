@@ -39,6 +39,12 @@ const {
   createSubscriptionInvoice,
   cancelRegularPayment,
 } = require('./tools');
+const {
+  extractRoomsFromFile,
+  markDuplicates,
+  MAX_FILE_SIZE_BYTES: ROOMS_MAX_FILE_SIZE_BYTES,
+} = require('./rooms-import');
+const busboy = require('busboy');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -189,6 +195,52 @@ async function getProperty(propertyId) {
   });
 
   return data;
+}
+
+/**
+ * Перевіряє, що запит несе дійсний Supabase-токен власника готелю
+ * propertyId (заголовок Authorization: Bearer <jwt>), а не просто довіряє
+ * propertyId із тіла запиту — інакше будь-хто, хто вгадає/підгляне чужий
+ * property_id, міг би читати чи змінювати дані іншого готелю через backend
+ * API (на відміну від прямих запитів кабінету до Supabase, які й так
+ * захищені RLS-політиками за owner_id). Повертає рядок properties або
+ * кидає Error з полем .status для однакової обробки в усіх новых роутах.
+ */
+async function requireOwnedProperty(req, propertyId) {
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  if (!token) {
+    const err = new Error('Потрібна авторизація.');
+    err.status = 401;
+    throw err;
+  }
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  if (userError || !user) {
+    const err = new Error('Недійсна сесія — увійдіть у кабінет ще раз.');
+    err.status = 401;
+    throw err;
+  }
+
+  const { data: property, error: propError } = await supabase
+    .from('properties')
+    .select('property_id, owner_id, hotel_name')
+    .eq('property_id', String(propertyId || '').trim())
+    .maybeSingle();
+
+  if (propError || !property) {
+    const err = new Error('Готель не знайдено.');
+    err.status = 404;
+    throw err;
+  }
+
+  if (property.owner_id !== user.id) {
+    const err = new Error('Немає доступу до цього готелю.');
+    err.status = 403;
+    throw err;
+  }
+
+  return property;
 }
 
 async function resolveMessengerPropertyId(
@@ -1501,6 +1553,7 @@ const server =
           '/api/notify-signin',
           '/api/create-trial-invoice',
           '/api/cancel-auto-renew',
+          '/api/rooms/parse-upload',
         ].includes(req.url)
       ) {
         res.writeHead(
@@ -1513,7 +1566,7 @@ const server =
               'POST, OPTIONS',
 
             'Access-Control-Allow-Headers':
-              'Content-Type',
+              'Content-Type, Authorization',
           }
         );
 
@@ -3100,6 +3153,90 @@ const server =
           }
         );
 
+        return;
+      }
+
+      if (
+        req.method === 'POST' &&
+        req.url === '/api/rooms/parse-upload'
+      ) {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        let bb;
+        try {
+          bb = busboy({ headers: req.headers, limits: { fileSize: ROOMS_MAX_FILE_SIZE_BYTES, files: 1 } });
+        } catch (error) {
+          return sendJson(res, 400, { error: 'Некоректний запит завантаження файлу.' }, corsHeaders);
+        }
+
+        let propertyId = '';
+        let fileName = '';
+        let fileChunks = [];
+        let fileTooLarge = false;
+        let sawFile = false;
+
+        bb.on('field', (name, value) => {
+          if (name === 'propertyId') propertyId = value;
+        });
+
+        bb.on('file', (name, stream, info) => {
+          sawFile = true;
+          fileName = (info && info.filename) || '';
+          stream.on('data', (chunk) => fileChunks.push(chunk));
+          stream.on('limit', () => { fileTooLarge = true; });
+        });
+
+        bb.on('error', (error) => {
+          if (!res.headersSent) {
+            sendJson(res, 400, { error: 'Не вдалося прочитати файл: ' + error.message }, corsHeaders);
+          }
+        });
+
+        bb.on('close', async () => {
+          if (res.headersSent) return;
+          try {
+            if (fileTooLarge) {
+              return sendJson(res, 413, { error: `Файл завеликий — максимум ${Math.round(ROOMS_MAX_FILE_SIZE_BYTES / (1024 * 1024))} МБ.` }, corsHeaders);
+            }
+            if (!sawFile || !fileChunks.length) {
+              return sendJson(res, 400, { error: 'Файл не завантажено.' }, corsHeaders);
+            }
+            if (!propertyId) {
+              return sendJson(res, 400, { error: 'Не вказано готель (propertyId).' }, corsHeaders);
+            }
+
+            await requireOwnedProperty(req, propertyId);
+
+            const fileBuffer = Buffer.concat(fileChunks);
+            const { rooms, source } = await extractRoomsFromFile(fileBuffer, fileName);
+
+            if (!rooms.length) {
+              return sendJson(res, 200, {
+                ok: true,
+                rooms: [],
+                source,
+                warning: 'Не вдалося розпізнати жодного номера в цьому файлі. Перевірте, чи файл містить назви номерів і ціни, або скористайтеся шаблоном.',
+              }, corsHeaders);
+            }
+
+            const { data: existingRooms, error: existingError } = await supabase
+              .from('rooms')
+              .select('id, room_type, price_per_night, capacity, quantity, description')
+              .eq('property_id', propertyId);
+
+            if (existingError) {
+              console.error('[rooms/parse-upload] existing rooms lookup error:', existingError);
+            }
+
+            const roomsWithDuplicates = markDuplicates(rooms, existingRooms || []);
+            return sendJson(res, 200, { ok: true, rooms: roomsWithDuplicates, source }, corsHeaders);
+          } catch (error) {
+            console.error('[rooms/parse-upload]', error);
+            return sendJson(res, error.status || 500, { error: error.message || 'Помилка при обробці файлу.' }, corsHeaders);
+          }
+        });
+
+        req.pipe(bb);
         return;
       }
 

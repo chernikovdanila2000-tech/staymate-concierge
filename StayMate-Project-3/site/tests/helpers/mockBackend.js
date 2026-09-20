@@ -88,32 +88,37 @@ function buildClientSource() {
         },
       },
       from: (table) => {
-        // Thin thenable query-builder stand-in: every chain method returns
-        // itself so any combination of .eq()/.order()/.select() the app
-        // code happens to call keeps working, and the chain resolves via
-        // .then()/.maybeSingle()/.single() to whatever resolveFn() returns —
-        // matching how real supabase-js query builders are themselves
-        // thenable (the app frequently awaits a chain directly without a
-        // trailing .select()).
+        // Thin thenable query-builder stand-in: .eq() ACCUMULATES filters
+        // (needed so e.g. rooms.update({...}).eq('id', X).eq('property_id', Y)
+        // only touches the one matching row, like real PostgREST/RLS would),
+        // every other chain method returns itself, and the chain resolves
+        // via .then()/.maybeSingle()/.single() to whatever resolveFn()
+        // returns — matching how real supabase-js query builders are
+        // themselves thenable (the app frequently awaits a chain directly
+        // without a trailing .select()).
         function makeQuery(resolveFn) {
+          const filters = {};
           const q = {
-            eq: () => q,
+            eq: (col, val) => { filters[col] = val; return q; },
             order: () => q,
             select: () => q,
             limit: () => q,
-            single: async () => resolveFn(),
-            maybeSingle: async () => resolveFn(),
-            then: (resolve, reject) => Promise.resolve(resolveFn()).then(resolve, reject),
+            single: async () => resolveFn(filters),
+            maybeSingle: async () => resolveFn(filters),
+            then: (resolve, reject) => Promise.resolve(resolveFn(filters)).then(resolve, reject),
           };
           return q;
         }
+        function rowMatches(row, filters) {
+          return Object.entries(filters).every(([k, v]) => String(row[k]) === String(v));
+        }
 
         return {
-          select: () => makeQuery(() => {
+          select: () => makeQuery((filters) => {
             const st = __qaGetState();
             if (table === 'properties') return { data: st.property, error: null };
-            if (table === 'rooms') return { data: st.rooms || [], error: null };
-            if (table === 'channels') return { data: st.channels || [], error: null };
+            if (table === 'rooms') return { data: (st.rooms || []).filter((r) => rowMatches(r, filters)), error: null };
+            if (table === 'channels') return { data: (st.channels || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'hotel_info') return { data: st.hotelInfo || null, error: null };
             return { data: null, error: null };
           }),
@@ -122,7 +127,7 @@ function buildClientSource() {
               const st = __qaGetState();
               const arr = Array.isArray(row) ? row : [row];
               if (table === 'rooms') {
-                const withIds = arr.map((r) => ({ id: 'r_' + Math.random().toString(36).slice(2, 9), ...r }));
+                const withIds = arr.map((r) => ({ id: 'r_' + Math.random().toString(36).slice(2, 9), amenities: [], ...r }));
                 st.rooms = (st.rooms || []).concat(withIds);
                 __qaPersist();
                 return { data: withIds, error: null };
@@ -139,15 +144,21 @@ function buildClientSource() {
               then: (resolve, reject) => Promise.resolve(doInsert()).then(resolve, reject),
             };
           },
-          delete: () => makeQuery(() => {
+          delete: () => makeQuery((filters) => {
             const st = __qaGetState();
-            if (table === 'rooms') { st.rooms = []; __qaPersist(); }
+            if (table === 'rooms') { st.rooms = (st.rooms || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'channels') { st.channels = (st.channels || []).filter((r) => !rowMatches(r, filters)); }
+            __qaPersist();
             return { error: null };
           }),
-          update: (patch) => makeQuery(() => {
+          update: (patch) => makeQuery((filters) => {
             const st = __qaGetState();
-            if (table === 'properties' && st.property) { Object.assign(st.property, patch); __qaPersist(); }
-            if (table === 'hotel_info') { st.hotelInfo = { ...(st.hotelInfo || {}), ...patch }; __qaPersist(); }
+            if (table === 'properties' && st.property) { Object.assign(st.property, patch); }
+            if (table === 'hotel_info') { st.hotelInfo = { ...(st.hotelInfo || {}), ...patch }; }
+            if (table === 'rooms') {
+              st.rooms = (st.rooms || []).map((r) => (rowMatches(r, filters) ? { ...r, ...patch } : r));
+            }
+            __qaPersist();
             return { error: null };
           }),
           upsert: (row) => makeQuery(() => {
@@ -163,6 +174,25 @@ function buildClientSource() {
             return { error: null };
           }),
         };
+      },
+      // Mirrors the commit_room_bulk_upload Postgres function (see
+      // rooms-bulk-upload-migration.sql): rows with an id update the
+      // matching room, rows without one insert a new one.
+      rpc: async (fnName, params) => {
+        const st = __qaGetState();
+        if (fnName === 'commit_room_bulk_upload') {
+          const incoming = (params && params.p_rooms) || [];
+          for (const r of incoming) {
+            if (r.id) {
+              st.rooms = (st.rooms || []).map((room) => (String(room.id) === String(r.id) ? { ...room, ...r } : room));
+            } else {
+              st.rooms = (st.rooms || []).concat([{ id: 'r_' + Math.random().toString(36).slice(2, 9), property_id: params.p_property_id, ...r }]);
+            }
+          }
+          __qaPersist();
+          return { data: st.rooms, error: null };
+        }
+        return { data: null, error: null };
       },
     };
   }
@@ -220,6 +250,19 @@ async function installBackendMock(page, initialState = {}) {
   );
   await page.route('**/api/notify-signin', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
   await page.route('**/api/connect-channel', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
+  await page.route('**/api/rooms/parse-upload', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ok: true,
+        source: 'code',
+        rooms: [
+          { room_type: 'Мок-номер', price_per_night: 1000, capacity: 2, quantity: 1, description: '', amenities: [], uncertain_fields: [], is_duplicate: false },
+        ],
+      }),
+    })
+  );
 
   return state;
 }
