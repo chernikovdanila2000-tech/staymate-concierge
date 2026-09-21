@@ -1060,8 +1060,14 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   // Захоплюємо це ДО createClient(), бо supabase-js сам розбирає і чистить
   // хеш з токенами при ініціалізації — після цього location.hash вже не
-  // міститиме "type=signup".
+  // міститиме "type=signup"/"type=recovery".
   const cameFromSignupConfirmation = /type=signup/.test(window.location.hash);
+  // Посилання "Скинути пароль" з листа теж одразу створює робочу сесію
+  // (так влаштований recovery-флоу Supabase) — без цієї перевірки стартовий
+  // блок нижче бачив лише "є сесія" і вів одразу в кабінет/дашборд НАВІТЬ
+  // РАНІШЕ, ніж встигав спрацювати onAuthStateChange('PASSWORD_RECOVERY'):
+  // людина замість форми нового пароля потрапляла прямо в акаунт.
+  const cameFromPasswordRecovery = /type=recovery/.test(window.location.hash);
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -2278,6 +2284,15 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   (async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+    if (cameFromPasswordRecovery) {
+      // Показуємо форму нового пароля напряму, синхронно з цим стартовим
+      // блоком — не покладаємось лише на асинхронну подію
+      // onAuthStateChange('PASSWORD_RECOVERY'), яка інакше могла програти
+      // гонку з afterLogin() нижче.
+      hideAllScreens();
+      resetScreen.classList.remove('hidden');
+      return;
+    }
     if (cameFromSignupConfirmation) {
       // Щойно перейшли за посиланням підтвердження email — так само, як і
       // при миттєвій сесії одразу після реєстрації, не змушуємо заповнювати

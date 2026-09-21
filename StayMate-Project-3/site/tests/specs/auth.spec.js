@@ -127,3 +127,46 @@ test.describe('Auth — session persistence', () => {
     await expect(page.locator('#authScreen')).toHaveClass(/hidden/);
   });
 });
+
+test.describe('Auth — password recovery link (regression)', () => {
+  // Reported bug: opening the "reset password" link from the email — which,
+  // per Supabase's recovery flow, lands on the page with a #...&type=recovery
+  // hash and an already-active session — skipped the "set a new password"
+  // form entirely and dropped the person straight into the dashboard, as if
+  // they'd just logged in normally. Root cause: the startup block only knew
+  // to special-case a signup-confirmation link (type=signup in the hash),
+  // not a recovery one, so it saw "there's a session" and called
+  // afterLogin() before the async PASSWORD_RECOVERY auth event had a chance
+  // to show the reset form — a race that afterLogin() usually won.
+  test('a recovery link shows the new-password form, not the dashboard', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/#access_token=fake&refresh_token=fake&type=recovery');
+    await expect(page.locator('#resetScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#dashScreen')).toHaveClass(/hidden/);
+    await expect(page.locator('#onboardScreen')).toHaveClass(/hidden/);
+    await expect(page.locator('#gateScreen')).toHaveClass(/hidden/);
+  });
+
+  test('a recovery link for a brand-new user (no property yet) still shows the reset form, not onboarding', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: null,
+    });
+    await page.goto('/cabinet/#access_token=fake&refresh_token=fake&type=recovery');
+    await expect(page.locator('#resetScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#onboardScreen')).toHaveClass(/hidden/);
+  });
+
+  test('a normal visit (no recovery hash) is unaffected — still goes straight to the dashboard', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#resetScreen')).toHaveClass(/hidden/);
+  });
+});
