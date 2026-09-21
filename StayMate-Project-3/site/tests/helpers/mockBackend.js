@@ -18,6 +18,7 @@ const DEFAULT_STATE = {
   requireEmailConfirmation: false, // mirrors Supabase's "Confirm email" toggle
   signInDelayMs: 0, // artificial latency, for testing in-flight/double-submit UI states
   queryDelayMs: 0, // artificial latency on rooms/channels/hotel_info selects, for testing parallel vs sequential loading
+  failContactForm: false, // make /api/contact respond with an error, to test the contacts.html form's failure path
 };
 
 function buildClientSource() {
@@ -310,6 +311,20 @@ async function installBackendMock(page, initialState = {}) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, wayforpayConfirmed: false }) })
   );
   await page.route('**/api/notify-signin', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
+  // Records every /api/contact call on window.__qaContactCalls (array of
+  // parsed request bodies) so tests can assert what was actually posted,
+  // and fails on demand (state.failContactForm) to exercise the error path.
+  await page.route('**/api/contact', async (route) => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    await page.evaluate((b) => {
+      window.__qaContactCalls = window.__qaContactCalls || [];
+      window.__qaContactCalls.push(b);
+    }, body);
+    if (state.failContactForm) {
+      return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'mock failure' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
   // /api/connect-channel and /api/disconnect-channel are handled by the
   // in-page window.fetch() override in buildClientSource() instead of a
   // page.route here — they need to mutate __qaState (so a later

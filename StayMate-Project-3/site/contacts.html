@@ -338,10 +338,13 @@ html[data-theme="dark"] .spinner{border:2px solid color-mix(in srgb, var(--accen
 .contact-grid{display:grid; grid-template-columns:0.9fr 1.1fr; gap:64px;}
 .contact-list{display:flex; flex-direction:column; gap:0; margin-top:8px;}
 .contact-row{display:flex; align-items:center; gap:16px; padding:18px 0; border-bottom:1px solid var(--line);}
+a.contact-row{transition:opacity .15s ease;}
+a.contact-row:hover{opacity:.7;}
+a.contact-row:hover .c-value{color:var(--accent-text);}
 .contact-row .c-icon{width:40px; height:40px; border-radius:10px; background:var(--accent-soft); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
 .contact-row .c-icon svg path, .contact-row .c-icon svg circle{stroke:var(--accent-text);}
 .contact-row .c-label{font-size:12px; color:var(--muted); margin-bottom:3px;}
-.contact-row .c-value{font-size:15px; font-weight:500;}
+.contact-row .c-value{font-size:15px; font-weight:500; transition:color .15s ease;}
 @media (max-width:860px){.contact-grid{grid-template-columns:1fr; gap:40px;}}
 
 /* ---------- generic content pages helpers ---------- */
@@ -425,20 +428,20 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
     <div class="contact-grid reveal">
       <div>
         <div class="contact-list">
-          <div class="contact-row">
+          <a class="contact-row" href="mailto:stayaiproject@gmail.com" style="text-decoration:none; color:inherit; cursor:pointer;">
             <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke-width="1.6"/></svg></div>
             <div>
               <div class="c-label" data-i18n="contact.email.label">Пошта</div>
-              <div class="c-value">hello@staymate.example</div>
+              <div class="c-value">stayaiproject@gmail.com</div>
             </div>
-          </div>
-          <div class="contact-row">
+          </a>
+          <a class="contact-row" href="https://t.me/StayAI_support" target="_blank" rel="noopener" style="text-decoration:none; color:inherit; cursor:pointer;">
             <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke-width="1.6"/></svg></div>
             <div>
               <div class="c-label" data-i18n="contact.telegram.label">Telegram</div>
-              <div class="c-value">@staymate_support</div>
+              <div class="c-value">@StayAI_support</div>
             </div>
-          </div>
+          </a>
           <div class="contact-row">
             <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke-width="1.6"/><path d="M12 7v5l3 3" stroke-width="1.6"/></svg></div>
             <div>
@@ -483,6 +486,7 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 
 <div class="toast" id="toast"></div>
 <script>
+const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
 /* ============ StayAI — i18n ============ */
 const I18N = {
 uk: {
@@ -493,6 +497,7 @@ uk: {
   "theme.toggleLabel":"Змінити тему","burger.label":"Меню","acct.ariaLabel":"Акаунт",
   "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Повідомлення надіслано — відповімо протягом дня",
+  "toast.contactError":"Не вдалося надіслати. Напишіть нам напряму в Telegram або на пошту нижче.",
   "toast.paySuccess":"Оплата пройшла успішно","toast.keyCopied":"Ключ скопійовано",
   "config.notSetup":"Supabase ще не налаштовано розробником сайту. Відкрийте файл supabase-config.js і вставте свої ключі проєкту.",
 
@@ -614,7 +619,7 @@ uk: {
   "contact.response.label":"Відповідь на звернення","contact.response.value":"протягом робочого дня",
   "form.name.label":"Ім'я","form.name.ph":"Ваше ім'я","form.email.label":"Email","form.email.ph":"you@hotel.com",
   "form.msg.label":"Повідомлення","form.msg.ph":"Розкажіть про об'єкт і що хочете автоматизувати",
-  "form.submit":"Надіслати повідомлення"
+  "form.submit":"Надіслати повідомлення","form.sending":"Надсилаємо..."
 },
 en: {
   "meta.title":"StayAI — Contact",
@@ -624,6 +629,7 @@ en: {
   "theme.toggleLabel":"Toggle theme","burger.label":"Menu","acct.ariaLabel":"Account",
   "footer.rights":"© 2026 StayAI",
   "toast.contactSent":"Message sent — we'll reply within a day",
+  "toast.contactError":"Couldn't send it. Please message us directly on Telegram or email below.",
   "toast.paySuccess":"Payment successful","toast.keyCopied":"Key copied",
   "config.notSetup":"Supabase hasn't been configured by the site owner yet. Open supabase-config.js and paste your project keys.",
 
@@ -745,7 +751,7 @@ en: {
   "contact.response.label":"Response time","contact.response.value":"within one business day",
   "form.name.label":"Name","form.name.ph":"Your name","form.email.label":"Email","form.email.ph":"you@hotel.com",
   "form.msg.label":"Message","form.msg.ph":"Tell us about your property and what you'd like to automate",
-  "form.submit":"Send message"
+  "form.submit":"Send message","form.sending":"Sending..."
 }
 };
 
@@ -1150,13 +1156,32 @@ function initMisc(){
   const lockPanel = document.getElementById('lockPanel');
   if(lockPanel) initInstructions();
 
-  /* contact form */
+  /* contact form — POSTs to the backend, which relays it to @StayAI_support
+     on Telegram (default channel) and, if configured, emails a copy to
+     stayaiproject@gmail.com via Resend. */
   const contactForm = document.getElementById('contactForm');
   if(contactForm){
+    const submitBtn = contactForm.querySelector('button[type="submit"]');
     contactForm.addEventListener('submit', (e)=>{
       e.preventDefault();
-      showToast(t('toast.contactSent', getLang()));
-      contactForm.reset();
+      if(submitBtn.disabled) return;
+      const name = document.getElementById('cName').value.trim();
+      const email = document.getElementById('cEmail').value.trim();
+      const message = document.getElementById('cMsg').value.trim();
+      submitBtn.disabled = true;
+      submitBtn.textContent = t('form.sending', getLang());
+      fetch(`${API_BASE_URL}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, message }),
+      })
+        .then((res) => (res.ok ? contactForm.reset() : Promise.reject()))
+        .then(() => showToast(t('toast.contactSent', getLang())))
+        .catch(() => showToast(t('toast.contactError', getLang())))
+        .finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = t('form.submit', getLang());
+        });
     });
   }
 

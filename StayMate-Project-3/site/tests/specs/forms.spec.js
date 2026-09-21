@@ -21,6 +21,46 @@ test.describe('Forms — contact form (contacts.html)', () => {
     await expect(page.locator('#toast')).toHaveClass(/on/);
     await expect(page.locator('#cName')).toHaveValue('');
   });
+
+  // Reported: the form was purely cosmetic — it just showed a toast and
+  // reset itself, never actually sending anything anywhere. It must now
+  // really POST to the backend, which relays it to Telegram (@StayAI_support)
+  // and, as a bonus channel, email.
+  test('submitting actually POSTs the message to the backend', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/contacts.html');
+    await page.fill('#cName', 'Test User');
+    await page.fill('#cEmail', 'test@example.com');
+    await page.fill('#cMsg', 'Hello, testing the contact form.');
+    await page.click('button[data-i18n="form.submit"]');
+    await expect(page.locator('#toast')).toHaveClass(/on/);
+    const calls = await page.evaluate(() => window.__qaContactCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ name: 'Test User', email: 'test@example.com', message: 'Hello, testing the contact form.' });
+  });
+
+  test('a backend failure shows an error toast and keeps the form filled in (nothing lost)', async ({ page }) => {
+    await installBackendMock(page, { failContactForm: true });
+    await page.goto('/contacts.html');
+    await page.fill('#cName', 'Test User');
+    await page.fill('#cEmail', 'test@example.com');
+    await page.fill('#cMsg', 'Hello, testing the contact form.');
+    await page.click('button[data-i18n="form.submit"]');
+    await expect(page.locator('#toast')).toHaveClass(/on/);
+    await expect(page.locator('#toast')).toContainText(/telegram|email|пошт/i);
+    await expect(page.locator('#cName')).toHaveValue('Test User');
+    await expect(page.locator('button[data-i18n="form.submit"]')).toBeEnabled();
+  });
+
+  test('email and Telegram contact rows link to real, working addresses', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/contacts.html');
+    const rows = page.locator('a.contact-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toHaveAttribute('href', 'mailto:stayaiproject@gmail.com');
+    await expect(rows.nth(1)).toHaveAttribute('href', 'https://t.me/StayAI_support');
+    await expect(rows.nth(1)).toHaveAttribute('target', '_blank');
+  });
 });
 
 test.describe('Forms — cabinet auth form', () => {

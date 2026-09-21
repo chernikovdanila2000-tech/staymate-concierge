@@ -77,6 +77,19 @@ const RESEND_FROM_EMAIL =
   process.env.RESEND_FROM_EMAIL ||
   'StayAI <noreply@stayai.online>';
 
+// Бот і чат для сайтового contact-form (сторінка "Контакти") — окремий від
+// ботів окремих готелів (ті зберігаються в таблиці channels per-property).
+// STAYAI_SUPPORT_TELEGRAM_CHAT_ID — id чату/каналу @StayAI_support, куди
+// падають звернення з сайту.
+const STAYAI_SUPPORT_TELEGRAM_BOT_TOKEN =
+  process.env.STAYAI_SUPPORT_TELEGRAM_BOT_TOKEN || '';
+
+const STAYAI_SUPPORT_TELEGRAM_CHAT_ID =
+  process.env.STAYAI_SUPPORT_TELEGRAM_CHAT_ID || '';
+
+const STAYAI_SUPPORT_EMAIL =
+  process.env.STAYAI_SUPPORT_EMAIL || 'stayaiproject@gmail.com';
+
 const META_MESSENGER_PAGE_ACCESS_TOKEN =
   process.env.META_MESSENGER_PAGE_ACCESS_TOKEN || '';
 
@@ -760,6 +773,61 @@ async function sendSignInNotification(
       error.message
     );
   }
+}
+
+// Звернення з форми на сторінці "Контакти" сайту — надсилаємо в Telegram
+// @StayAI_support (основний канал, за замовчуванням) і, якщо налаштовано
+// Resend, дублюємо на пошту stayaiproject@gmail.com. Обидва канали
+// best-effort і незалежні один від одного: збій одного не має блокувати
+// інший чи ламати відповідь для гостя, який просто хоче написати нам.
+async function sendContactFormNotification(name, email, message) {
+  const result = { telegramSent: false, emailSent: false };
+
+  if (STAYAI_SUPPORT_TELEGRAM_BOT_TOKEN && STAYAI_SUPPORT_TELEGRAM_CHAT_ID) {
+    try {
+      const text = `📩 Нове звернення з сайту StayAI\n\nІм'я: ${name}\nEmail: ${email}\n\n${message}`;
+      await sendTelegramMessage(STAYAI_SUPPORT_TELEGRAM_BOT_TOKEN, STAYAI_SUPPORT_TELEGRAM_CHAT_ID, text);
+      result.telegramSent = true;
+    } catch (error) {
+      console.error('[contact-form][telegram]', error.message);
+    }
+  }
+
+  if (RESEND_API_KEY) {
+    try {
+      const html = `
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#17181b">
+  <h2>StayAI — нове звернення з сайту</h2>
+  <p><b>Ім'я:</b> ${name}</p>
+  <p><b>Email:</b> ${email}</p>
+  <p><b>Повідомлення:</b></p>
+  <p style="white-space:pre-wrap">${message}</p>
+</div>`;
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: RESEND_FROM_EMAIL,
+          to: [STAYAI_SUPPORT_EMAIL],
+          reply_to: email,
+          subject: `Нове звернення з сайту — ${name}`,
+          html,
+        }),
+      });
+      if (response.ok) {
+        result.emailSent = true;
+      } else {
+        console.error('[contact-form][email]', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('[contact-form][email]', error.message);
+    }
+  }
+
+  return result;
 }
 
 function wfpAcceptResponse(
@@ -1600,6 +1668,7 @@ const server =
           '/api/cancel-auto-renew',
           '/api/rooms/parse-upload',
           '/api/disconnect-channel',
+          '/api/contact',
         ].includes(req.url)
       ) {
         res.writeHead(
@@ -3002,6 +3071,46 @@ const server =
             );
           }
         );
+
+        return;
+      }
+
+      // =========================
+      // CONTACT FORM (сторінка "Контакти")
+      // =========================
+
+      if (req.method === 'POST' && req.url === '/api/contact') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const name = String(parsed.name || '').trim().slice(0, 200);
+          const email = String(parsed.email || '').trim().slice(0, 200);
+          const message = String(parsed.message || '').trim().slice(0, 5000);
+
+          if (!name || !email || !message) {
+            return sendJson(res, 400, { error: "Заповніть ім'я, email і повідомлення." }, corsHeaders);
+          }
+
+          const result = await sendContactFormNotification(name, email, message);
+
+          if (!result.telegramSent && !result.emailSent) {
+            return sendJson(
+              res,
+              502,
+              { ok: false, error: 'Не вдалося надіслати повідомлення. Напишіть нам напряму в Telegram або на пошту.' },
+              corsHeaders
+            );
+          }
+
+          return sendJson(res, 200, { ok: true }, corsHeaders);
+        });
 
         return;
       }
