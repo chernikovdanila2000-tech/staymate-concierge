@@ -11,18 +11,45 @@ const TELEGRAM_API_BASE = 'https://api.telegram.org/bot';
 
 /**
  * Дістає chatId і текст повідомлення з "сирого" тіла вебхука Telegram.
- * Повертає null, якщо це не текстове повідомлення.
+ * Повертає null, якщо це не текстове або голосове повідомлення.
  */
 function parseTelegramUpdate(update) {
   const message = update && update.message;
-  if (!message || typeof message.text !== 'string') {
+  if (!message) {
     return null;
   }
+
+  const voice = message.voice;
+  if (typeof message.text !== 'string' && !voice?.file_id) return null;
+
   return {
     chatId: message.chat.id,
-    text: message.text,
+    text: typeof message.text === 'string' ? message.text : null,
+    voice: voice?.file_id ? {
+      fileId: voice.file_id,
+      fileSize: Number(voice.file_size || 0),
+      mediaType: 'audio/ogg',
+    } : null,
     fromName: [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || null,
   };
+}
+
+/** Downloads an audio file only after the caller has checked its size/type. */
+async function downloadTelegramFile(botToken, fileId, fetchImpl = globalThis.fetch) {
+  const metadataResponse = await fetchImpl(`${TELEGRAM_API_BASE}${botToken}/getFile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+  if (!metadataResponse.ok) throw new Error('Telegram не надав голосове повідомлення.');
+
+  const metadata = await metadataResponse.json();
+  const filePath = metadata?.result?.file_path;
+  if (!filePath || typeof filePath !== 'string') throw new Error('Telegram не повернув шлях до голосового повідомлення.');
+
+  const fileResponse = await fetchImpl(`https://api.telegram.org/file/bot${botToken}/${filePath}`);
+  if (!fileResponse.ok) throw new Error('Не вдалося завантажити голосове повідомлення з Telegram.');
+  return Buffer.from(await fileResponse.arrayBuffer());
 }
 
 /**
@@ -64,4 +91,4 @@ async function setWebhook(botToken, publicUrl) {
   return data;
 }
 
-module.exports = { parseTelegramUpdate, sendTelegramMessage, setWebhook };
+module.exports = { parseTelegramUpdate, downloadTelegramFile, sendTelegramMessage, setWebhook };

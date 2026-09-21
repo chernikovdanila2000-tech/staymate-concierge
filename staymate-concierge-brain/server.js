@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { runConciergeTurn } = require('./claude-client');
 const {
   parseTelegramUpdate,
+  downloadTelegramFile,
   sendTelegramMessage,
   setWebhook: setTelegramWebhook,
 } = require('./telegram');
@@ -36,6 +37,7 @@ const {
 } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
 const { isConversationTakenOver } = require('./takeover');
+const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
 const {
   createSubscriptionInvoice,
   cancelRegularPayment,
@@ -2041,7 +2043,7 @@ const server =
 
             const {
               chatId,
-              text,
+              voice,
             } = parsed;
 
             if (
@@ -2058,6 +2060,32 @@ const server =
               } catch {}
 
               return;
+            }
+
+            let text = parsed.text;
+            if (voice) {
+              if (voice.fileSize > MAX_AUDIO_BYTES) {
+                await sendTelegramMessage(botToken, chatId, 'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.');
+                return;
+              }
+              try {
+                const audio = await downloadTelegramFile(botToken, voice.fileId);
+                if (audio.length > MAX_AUDIO_BYTES) {
+                  await sendTelegramMessage(botToken, chatId, 'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.');
+                  return;
+                }
+                text = await transcribeAudio({
+                  audio,
+                  mediaType: voice.mediaType,
+                  filename: 'telegram-voice.ogg',
+                });
+              } catch (error) {
+                // Errors from transcription are already customer-safe.  Do
+                // not log raw audio, bot credentials, or provider responses.
+                console.error('[telegram voice]', error.code || 'VOICE_PROCESSING_ERROR');
+                await sendTelegramMessage(botToken, chatId, error.message || 'Не вдалося розпізнати голосове повідомлення.');
+                return;
+              }
             }
 
             const history =
