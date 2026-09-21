@@ -38,7 +38,8 @@ function parseWhatsAppEvents(payload) {
       for (const message of value.messages) {
         if (!message?.from) continue;
 
-        let text = '';
+        let text = null;
+        let audio = null;
         if (message.type === 'text') {
           text = message.text?.body || '';
         } else if (message.type === 'button') {
@@ -50,13 +51,19 @@ function parseWhatsAppEvents(payload) {
             message.interactive?.list_reply?.title ||
             message.interactive?.list_reply?.id ||
             '';
+        } else if (message.type === 'audio' && message.audio?.id) {
+          audio = {
+            mediaId: String(message.audio.id),
+            mediaType: normalizeMediaType(message.audio.mime_type),
+          };
         }
-        if (typeof text !== 'string' || !text.trim()) continue;
+        if (!audio && (typeof text !== 'string' || !text.trim())) continue;
 
         events.push({
           phoneNumberId,
           senderId: String(message.from),
-          text: text.trim(),
+          text: typeof text === 'string' ? text.trim() : null,
+          audio,
           messageId: String(message.id || ''),
         });
       }
@@ -64,6 +71,58 @@ function parseWhatsAppEvents(payload) {
   }
 
   return events;
+}
+
+function normalizeMediaType(value) {
+  return String(value || 'audio/ogg').split(';', 1)[0].trim().toLowerCase() || 'audio/ogg';
+}
+
+/**
+ * Downloads Meta-hosted WhatsApp media after the caller has applied the
+ * property access gate. The temporary URL and bearer token stay in memory
+ * only and are never logged.
+ */
+async function downloadWhatsAppMedia(
+  accessToken,
+  mediaId,
+  phoneNumberId,
+  graphVersion = 'v24.0',
+  fetchImpl = globalThis.fetch
+) {
+  if (!accessToken || !mediaId || !phoneNumberId || typeof fetchImpl !== 'function') {
+    throw new Error('WhatsApp media is unavailable.');
+  }
+
+  const authHeaders = { Authorization: `Bearer ${accessToken}` };
+  const metadataResponse = await fetchImpl(
+    `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(mediaId)}?phone_number_id=${encodeURIComponent(phoneNumberId)}`,
+    { headers: authHeaders }
+  );
+  if (!metadataResponse.ok) throw new Error('WhatsApp media metadata request failed.');
+
+  const metadata = await metadataResponse.json();
+  const mediaUrl = metadata?.url;
+  if (typeof mediaUrl !== 'string') throw new Error('WhatsApp did not provide a media URL.');
+
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(mediaUrl);
+  } catch {
+    throw new Error('WhatsApp provided an invalid media URL.');
+  }
+  if (parsedUrl.protocol !== 'https:') throw new Error('WhatsApp media URL must use HTTPS.');
+
+  const mediaResponse = await fetchImpl(mediaUrl, {
+    headers: authHeaders,
+    redirect: 'error',
+  });
+  if (!mediaResponse.ok) throw new Error('WhatsApp media download failed.');
+
+  return {
+    audio: Buffer.from(await mediaResponse.arrayBuffer()),
+    mediaType: normalizeMediaType(metadata.mime_type || mediaResponse.headers?.get?.('content-type')),
+    fileSize: Number(metadata.file_size || 0),
+  };
 }
 
 async function sendWhatsAppMessage(
@@ -110,5 +169,6 @@ async function sendWhatsAppMessage(
 module.exports = {
   verifyWhatsAppSignature,
   parseWhatsAppEvents,
+  downloadWhatsAppMedia,
   sendWhatsAppMessage,
 };
