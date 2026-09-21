@@ -2,7 +2,7 @@
 
 Мультитенантний Node.js-сервер: один процес обслуговує багато готелів одночасно,
 кожен зі своїми номерами, цінами і підключеними каналами зв'язку (Telegram, Viber,
-чат-віджет на сайті готелю; WhatsApp/Instagram — коли пройде верифікація Meta).
+чат-віджет на сайті готелю, WhatsApp та Instagram).
 
 Деплой: Railway, root directory цієї папки (`staymate-concierge-brain`). Публічний
 домен зараз — `staymate-concierge-production.up.railway.app`.
@@ -15,7 +15,9 @@
 | Telegram | ✅ Реальне, self-service підключення з кабінету |
 | Чат-віджет на сайті готелю | ✅ Реальне, підключення не потребує зовнішньої верифікації |
 | Viber | ✅ Код готовий (webhook + REST-виклики), але не протестовано на живому акаунті — очікує комерційного схвалення заявки Viber |
-| WhatsApp / Instagram | ⚠️ Тільки збереження реквізитів у кабінеті — сама інтеграція потребує верифікації бізнесу в Meta (Фаза 4 плану) |
+| WhatsApp | ✅ Живий text E2E підтверджений; голосові повідомлення готові в коді та очікують ключ розпізнавання |
+| Instagram | ⚠️ Канал потребує окремого живого підключення та перевірки Meta |
+| Голосові повідомлення | 🚧 Telegram і WhatsApp: безпечне завантаження аудіо → розпізнавання → спільний AI → відповідь у тому самому каналі. Для живого тесту потрібен ключ OpenAI Audio Transcriptions. Viber Bot API не заявляє тип вхідного voice-повідомлення, тому його не позначено як підтримуваний голосовий канал. |
 | Реальний облік зайнятості номерів по датах | ✅ Реальне (`quantity` на номері + перетин із таблицею bookings) |
 | Історія переписки | ✅ Зберігається в Supabase (`conversations`), не губиться при перезапуску |
 | Оплата гостя за бронювання | ⚠️ Робоче на тестовому мерчант-акаунті WayForPay (`test_merch_n1`) — власного мерчант-акаунту ще нема |
@@ -58,8 +60,23 @@ API_BASE_URL                  = https://staymate-concierge-production.up.railway
 CABINET_URL                   = https://stayai.online/cabinet/  (необов'язково, є дефолт)
 RESEND_API_KEY                (необов'язково — без нього лист "новий вхід в акаунт" просто не шлеться)
 RESEND_FROM_EMAIL             = StayAI <noreply@stayai.online>  (необов'язково, є дефолт)
+TRANSCRIPTION_API_KEY         = ключ OpenAI Audio Transcriptions (потрібен лише для голосових повідомлень)
+TRANSCRIPTION_API_URL         = необов'язково: сумісний endpoint розпізнавання
+TRANSCRIPTION_MODEL           = необов'язково: модель, за замовчуванням gpt-4o-mini-transcribe
 PORT
 ```
+
+### Голосові повідомлення
+
+Підтримані формати: AAC, FLAC, M4A, MP3, MP4, OGG/Opus, WAV та WebM. Розмір
+обмежений 20 MiB ще до звернення до сервісу розпізнавання. Мова не задається
+жорстко, тому постачальник автоматично розпізнає українську, російську та
+англійську. Аудіо, токени каналів і ключ розпізнавання не пишуться в логи.
+
+Для production достатньо додати **лише** `TRANSCRIPTION_API_KEY` до Railway.
+За замовчуванням використовується OpenAI Audio Transcriptions (`/v1/audio/transcriptions`);
+`TRANSCRIPTION_API_URL` дозволяє підключити сумісного постачальника без змін
+канальної логіки.
 
 ## Роути
 
@@ -68,6 +85,7 @@ PORT
 | `POST /chat` | тестовий роут без месенджера (потрібен `propertyId` в тілі) |
 | `POST /webhook/telegram/<property_id>` | вебхук Telegram-бота готелю |
 | `POST /webhook/viber/<property_id>` | вебхук Viber-бота готелю |
+| `POST /webhook/whatsapp` | підписаний webhook WhatsApp (текст і голосові повідомлення) |
 | `POST /webhook/website/<property_id>` | чат-віджет на сайті готелю (`widget.js`) |
 | `POST /webhook/wayforpay` | підтвердження оплати гостя за бронювання |
 | `POST /webhook/wayforpay-subscription` | підтвердження оплати підписки готелю |
@@ -88,6 +106,8 @@ staymate-concierge-brain/
 ├── tools.js                  — інструменти ШІ (наявність/бронювання/ескалація) + рахунки WayForPay
 ├── claude-client.js          — виклик Claude API + цикл tool-calling
 ├── telegram.js                — Telegram Bot API
+├── whatsapp.js                — WhatsApp Cloud API (підпис, повідомлення, медіа)
+├── transcription.js           — загальний безпечний клієнт розпізнавання аудіо
 ├── viber.js                    — Viber Bot API (код готовий, очікує схвалення Viber)
 ├── channels.js                  — довідник підключених каналів (з кешем)
 ├── conversations.js               — постійна історія переписки (Supabase замість Map)
