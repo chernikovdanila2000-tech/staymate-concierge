@@ -128,6 +128,64 @@ test.describe('Auth — session persistence', () => {
   });
 });
 
+test.describe('Auth — reset/signup emails always link to the one canonical site (regression)', () => {
+  // Reported: the password-reset email link sometimes opened a completely
+  // different (stale) deployment of the site instead of the real one.
+  // Root cause: redirectTo used window.location.href/origin — whichever
+  // domain the person happened to be on when they clicked "Forgot
+  // password?" (an old bookmark, a stale Netlify preview, etc.) is what got
+  // baked into the email link. Fixed by hardcoding the canonical
+  // https://stayai.online domain instead of reading it from the current page.
+  test('cabinet sign-in screen "Forgot password?" always targets stayai.online, not the current origin', async ({ page }) => {
+    await installBackendMock(page);
+    await page.goto('/cabinet/');
+    await page.fill('#authEmail', 'user@example.com');
+    await page.click('#forgotBtn');
+    const calls = await page.evaluate(() => window.__qaResetPasswordCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].redirectTo).toBe('https://stayai.online/cabinet/');
+  });
+
+  test('cabinet account-dropdown "Forgot password?" also targets stayai.online', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.locator('#accountMenuBtn').click();
+    await page.locator('#accountStatus .acct-forgot-pw').click();
+    const calls = await page.evaluate(() => window.__qaResetPasswordCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].redirectTo).toBe('https://stayai.online/cabinet/');
+  });
+
+  test('marketing-page "Forgot password?" (account dropdown) also targets stayai.online', async ({ page }) => {
+    await installBackendMock(page, {
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+    });
+    await page.goto('/index.html');
+    await page.click('#accountMenuBtn');
+    await page.locator('.acct-forgot-pw').click();
+    const calls = await page.evaluate(() => window.__qaResetPasswordCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].redirectTo).toBe('https://stayai.online/cabinet/');
+  });
+
+  test('signup confirmation email also targets stayai.online, not the current origin', async ({ page }) => {
+    await installBackendMock(page, { requireEmailConfirmation: true });
+    await page.goto('/cabinet/');
+    await page.click('#switcherBtn');
+    await page.fill('#authEmail', 'newuser@example.com');
+    await page.fill('#authPassword', 'password123');
+    await page.click('#authSubmit');
+    await expect(page.locator('#authMsg')).toContainText(/пошту|email/i, { timeout: 5000 });
+    const calls = await page.evaluate(() => window.__qaSignUpCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].emailRedirectTo).toBe('https://stayai.online/cabinet/');
+  });
+});
+
 test.describe('Auth — password recovery link (regression)', () => {
   // Reported bug: opening the "reset password" link from the email — which,
   // per Supabase's recovery flow, lands on the page with a #...&type=recovery

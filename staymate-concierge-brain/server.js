@@ -623,6 +623,102 @@ async function resolveMessengerConnection(pageId) {
   return null;
 }
 
+/**
+ * Надсилає повідомлення гостю назад через той самий канал, яким власник
+ * готелю зайшов у розмову з кабінету (розділ "Ескалації"). На відміну від
+ * resolveInstagramConnection/resolveWhatsAppConnection/resolveMessengerConnection
+ * вище (які шукають властивість ЗА зовнішнім account/phone/page id — вхідний
+ * вебхук), тут property_id вже відомий (власник автентифікований і працює у
+ * своєму кабінеті), тому шукаємо канал напряму за property_id + channel_type.
+ */
+async function sendReplyThroughChannel(propertyId, channel, chatId, text) {
+  if (channel === 'telegram') {
+    const property = await getProperty(propertyId);
+    const botToken = await getTelegramToken(propertyId, property);
+    if (!botToken) throw new Error('Telegram не підключено для цього готелю.');
+    return sendTelegramMessage(botToken, chatId, text);
+  }
+
+  if (channel === 'viber') {
+    const botToken = await getViberToken(propertyId);
+    if (!botToken) throw new Error('Viber не підключено для цього готелю.');
+    return sendViberMessage(botToken, chatId, text);
+  }
+
+  if (channel === 'whatsapp') {
+    const { data } = await supabase
+      .from('channels')
+      .select('credentials, connected')
+      .eq('property_id', propertyId)
+      .eq('channel_type', 'whatsapp')
+      .maybeSingle();
+    let accessToken = null;
+    let phoneNumberId = null;
+    if (data && data.connected && data.credentials) {
+      const creds = decryptCredentialsPartial(data.credentials, 'access_token');
+      accessToken = creds.access_token || null;
+      phoneNumberId = creds.phone_number_id || null;
+    }
+    if (!accessToken || !phoneNumberId) {
+      accessToken = META_WHATSAPP_ACCESS_TOKEN || null;
+      phoneNumberId = META_WHATSAPP_PHONE_NUMBER_ID || null;
+    }
+    if (!accessToken || !phoneNumberId) throw new Error('WhatsApp не підключено для цього готелю.');
+    return sendWhatsAppMessage(accessToken, phoneNumberId, chatId, text, META_GRAPH_VERSION);
+  }
+
+  if (channel === 'instagram') {
+    const { data } = await supabase
+      .from('channels')
+      .select('credentials, connected')
+      .eq('property_id', propertyId)
+      .eq('channel_type', 'instagram')
+      .maybeSingle();
+    let accessToken = null;
+    let instagramAccountId = null;
+    if (data && data.connected && data.credentials) {
+      const creds = decryptCredentialsPartial(data.credentials, 'access_token');
+      accessToken = creds.access_token || null;
+      instagramAccountId = creds.instagram_account_id || null;
+    }
+    if (!accessToken) {
+      accessToken = META_INSTAGRAM_ACCESS_TOKEN || null;
+      instagramAccountId = META_INSTAGRAM_ACCOUNT_ID || null;
+    }
+    if (!accessToken) throw new Error('Instagram не підключено для цього готелю.');
+    return sendInstagramMessage(accessToken, instagramAccountId, chatId, text, META_GRAPH_VERSION);
+  }
+
+  if (channel === 'messenger') {
+    const { data } = await supabase
+      .from('channels')
+      .select('credentials, connected')
+      .eq('property_id', propertyId)
+      .eq('channel_type', 'messenger')
+      .maybeSingle();
+    let accessToken = null;
+    if (data && data.connected && data.credentials) {
+      const creds = decryptCredentialsPartial(data.credentials, 'access_token');
+      accessToken = creds.access_token || null;
+    }
+    if (!accessToken) {
+      accessToken = META_MESSENGER_PAGE_ACCESS_TOKEN || null;
+    }
+    if (!accessToken) throw new Error('Messenger не підключено для цього готелю.');
+    return sendMessengerMessage(accessToken, chatId, text, META_GRAPH_VERSION);
+  }
+
+  if (channel === 'website' || channel === 'test') {
+    // Гість у віджеті сайту (чи тестовому чаті) не має постійного відкритого
+    // з'єднання, яке чекає на push — немає технічної можливості "дотягнутися"
+    // до нього пізніше. Розмова лишається видимою в кабінеті, але відповідь
+    // не надсилається жодним каналом.
+    throw new Error('Цей канал не підтримує відповідь із кабінету — гість спілкується через віджет на сайті.');
+  }
+
+  throw new Error('Невідомий канал: ' + channel);
+}
+
 function computeAccess(property) {
   const now = new Date();
 
@@ -1043,6 +1139,8 @@ const server =
                           propertyId: connection.propertyId,
                           propertyName:
                             property.hotel_name,
+                          channel: 'messenger',
+                          chatId: event.senderId,
                         }
                       );
 
@@ -1419,6 +1517,12 @@ const server =
 
                             propertyName:
                               property.hotel_name,
+
+                            channel:
+                              'instagram',
+
+                            chatId:
+                              event.senderId,
                           }
                         );
 
@@ -1601,7 +1705,7 @@ const server =
 
                 const { replyText, updatedHistory } = await runConciergeTurn(
                   history,
-                  { propertyId: connection.propertyId, propertyName: property.hotel_name }
+                  { propertyId: connection.propertyId, propertyName: property.hotel_name, channel: 'whatsapp', chatId: event.senderId }
                 );
 
                 await saveHistory(
@@ -1669,6 +1773,7 @@ const server =
           '/api/rooms/parse-upload',
           '/api/disconnect-channel',
           '/api/contact',
+          '/api/escalations/reply',
         ].includes(req.url)
       ) {
         res.writeHead(
@@ -1791,6 +1896,8 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    channel: 'test',
+                    chatId: userId,
                   }
                 );
 
@@ -1934,6 +2041,8 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    channel: 'telegram',
+                    chatId,
                   }
                 );
 
@@ -2075,6 +2184,8 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    channel: 'viber',
+                    chatId,
                   }
                 );
 
@@ -2239,6 +2350,8 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    channel: 'website',
+                    chatId: sessionId,
                   }
                 );
 
@@ -3108,6 +3221,68 @@ const server =
               corsHeaders
             );
           }
+
+          return sendJson(res, 200, { ok: true }, corsHeaders);
+        });
+
+        return;
+      }
+
+      // =========================
+      // ESCALATIONS (розділ "Ескалації" в кабінеті)
+      // =========================
+
+      if (req.method === 'POST' && req.url === '/api/escalations/reply') {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, escalationId, message } = parsed;
+          const text = String(message || '').trim();
+          if (!propertyId || !escalationId || !text) {
+            return sendJson(res, 400, { error: "Потрібні propertyId, escalationId, message." }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          const { data: escalation, error: escError } = await supabase
+            .from('escalations')
+            .select('id, property_id, channel, chat_id')
+            .eq('id', escalationId)
+            .eq('property_id', propertyId)
+            .maybeSingle();
+          if (escError || !escalation) {
+            return sendJson(res, 404, { error: 'Ескалацію не знайдено.' }, corsHeaders);
+          }
+          if (!escalation.channel || !escalation.chat_id) {
+            return sendJson(res, 400, { error: 'У цієї ескалації немає прив\'язаного діалогу (стара ескалація без каналу).' }, corsHeaders);
+          }
+
+          try {
+            await sendReplyThroughChannel(propertyId, escalation.channel, escalation.chat_id, text);
+          } catch (sendError) {
+            return sendJson(res, 502, { error: sendError.message }, corsHeaders);
+          }
+
+          // Дописуємо відповідь власника в ту саму розмову, щоб вона була
+          // видна в історії — так само, як автоматичні відповіді бота.
+          const history = await getHistory(propertyId, escalation.channel, escalation.chat_id);
+          history.push({ role: 'assistant', content: text, from_owner: true });
+          await saveHistory(propertyId, escalation.channel, escalation.chat_id, history);
 
           return sendJson(res, 200, { ok: true }, corsHeaders);
         });

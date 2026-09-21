@@ -575,3 +575,127 @@ test.describe('Dashboard — login/reload loads rooms, hotel info and channels i
     expect(elapsed).toBeLessThan(1100);
   });
 });
+
+test.describe('Dashboard — Escalations (new feature)', () => {
+  // A guest conversation the AI administrator couldn't handle and passed to
+  // a human (escalate_to_human on the backend) — the owner sees it here,
+  // with the actual conversation history, and can reply through the same
+  // channel the guest wrote on.
+  const baseSession = { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } };
+  const baseProperty = {
+    property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
+    subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+  };
+
+  test('empty state when there are no escalations', async ({ page }) => {
+    await installBackendMock(page, { session: baseSession, property: baseProperty, escalations: [] });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('#escEmptyHint')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#escTabBadge')).toHaveClass(/hidden/);
+  });
+
+  test('shows escalations with a badge counting only the open ones, reason, urgency and channel', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [
+        { id: 'e1', property_id: 'p1', reason: 'Гість просить знижку 50%', urgency: 'high', status: 'open', channel: 'telegram', chat_id: '123', created_at: new Date().toISOString() },
+        { id: 'e2', property_id: 'p1', reason: 'Питання про парковку для інваліда', urgency: 'normal', status: 'resolved', channel: 'website', chat_id: 'sess1', created_at: new Date().toISOString() },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('#escTabBadge')).toHaveText('1'); // only e1 is still open
+    await expect(page.locator('.esc-row')).toHaveCount(2);
+    await expect(page.locator('.esc-row').first()).toContainText('Гість просить знижку');
+  });
+
+  test('opening an escalation shows the real conversation history and lets the owner reply', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [{ id: 'e1', property_id: 'p1', reason: 'Скарга на шум', urgency: 'high', status: 'open', channel: 'telegram', chat_id: '123', created_at: new Date().toISOString() }],
+      conversations: [{
+        property_id: 'p1', channel: 'telegram', chat_id: '123',
+        messages: [
+          { role: 'user', content: 'У сусідів дуже голосна музика, не можу заснути' },
+          { role: 'assistant', content: 'Мені шкода це чути. Передаю ваше звернення адміністрації.' },
+        ],
+      }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await page.click('.esc-row');
+    await expect(page.locator('#escalationModal')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#escChatHistory')).toContainText('голосна музика');
+    await expect(page.locator('#escReplyBlock')).not.toHaveClass(/hidden/);
+
+    await page.fill('#escReplyText', "Ми зв'яжемось із сусідами найближчим часом.");
+    await page.click('#escReplySend');
+    await expect(page.locator('#escReplyMsg')).toContainText(/надіслано/i);
+    const calls = await page.evaluate(() => window.__qaEscalationReplyCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ propertyId: 'p1', escalationId: 'e1', message: "Ми зв'яжемось із сусідами найближчим часом." });
+    // Reply gets appended to the conversation and re-rendered right away —
+    // the owner sees it land in the same thread, not just a "sent" toast.
+    await expect(page.locator('#escChatHistory')).toContainText("Ми зв'яжемось");
+  });
+
+  test('a website-widget escalation has no reply box — that channel has no way to push a delayed message', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [{ id: 'e2', property_id: 'p1', reason: 'Питання про сніданок', urgency: 'low', status: 'open', channel: 'website', chat_id: 'sess1', created_at: new Date().toISOString() }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await page.click('.esc-row');
+    await expect(page.locator('#escReplyBlock')).toHaveClass(/hidden/);
+    await expect(page.locator('#escNoChannelHint')).not.toHaveClass(/hidden/);
+  });
+
+  test('marking an escalation resolved updates the badge count and can be reopened', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [{ id: 'e1', property_id: 'p1', reason: 'Втрачені ключі', urgency: 'normal', status: 'open', channel: 'viber', chat_id: '456', created_at: new Date().toISOString() }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('#escTabBadge')).toHaveText('1');
+    await page.click('.esc-row');
+    await page.click('#escToggleStatus');
+    await expect(page.locator('#escToggleStatus')).toContainText(/знову/i);
+    await expect(page.locator('#escTabBadge')).toHaveClass(/hidden/);
+    await page.click('#escModalClose');
+    await expect(page.locator('.esc-row')).toHaveClass(/is-resolved/);
+
+    // And back open again.
+    await page.click('.esc-row');
+    await page.click('#escToggleStatus');
+    await expect(page.locator('#escTabBadge')).toHaveText('1');
+  });
+
+  test('a reply failure shows an error and keeps the draft in the textbox', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      failEscalationReply: true,
+      escalations: [{ id: 'e1', property_id: 'p1', reason: 'Тест', urgency: 'normal', status: 'open', channel: 'telegram', chat_id: '1', created_at: new Date().toISOString() }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await page.click('.esc-row');
+    await page.fill('#escReplyText', 'Відповідь гостю');
+    await page.click('#escReplySend');
+    await expect(page.locator('#escReplyMsg')).toContainText(/mock failure/i);
+    await expect(page.locator('#escReplyText')).toHaveValue('Відповідь гостю');
+  });
+});

@@ -47,12 +47,16 @@ async function callClaude(messages, propertyName, hotelInfo) {
  * Веде повний обмін з гостем, включно з виконанням tool-calls,
  * для конкретного готелю (property).
  * @param {Array} conversationHistory - масив повідомлень у форматі Claude API
- * @param {{ propertyId: string, propertyName: string }} property
+ * @param {{ propertyId: string, propertyName: string, channel?: string, chatId?: string }} property
+ *   channel/chatId — звідки прийшло це повідомлення (telegram/viber/whatsapp/
+ *   instagram/messenger/website/test) — потрібні лише для того, щоб
+ *   escalate_to_human зберіг, до якої саме розмови прив'язана ескалація
+ *   (щоб власник міг відкрити її в кабінеті й відповісти гостю звідти).
  * @returns {Promise<{ replyText: string, updatedHistory: Array }>}
  */
 async function runConciergeTurn(conversationHistory, property) {
-  const { propertyId, propertyName } = property;
-  const toolImplementations = createTools(propertyId);
+  const { propertyId, propertyName, channel, chatId } = property;
+  const toolImplementations = createTools(propertyId, channel, chatId);
   const hotelInfo = await getHotelInfo(propertyId);
   let messages = [...conversationHistory];
 

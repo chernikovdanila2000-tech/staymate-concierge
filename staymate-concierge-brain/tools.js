@@ -159,7 +159,7 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
  * Схема інструментів (toolDefinitions) однакова для всіх готелів — Claude API
  * не потребує per-tenant версії схеми, тільки реалізація (виконання) різниться.
  */
-function createTools(propertyId) {
+function createTools(propertyId, channel, chatId) {
   async function checkAvailability({ check_in, check_out, guests } = {}) {
     let query = supabase
       .from('rooms')
@@ -299,6 +299,8 @@ function createTools(propertyId) {
         reason,
         urgency: urgency || 'normal',
         status: 'open',
+        channel: channel || null,
+        chat_id: chatId != null ? String(chatId) : null,
       });
 
     if (error) {

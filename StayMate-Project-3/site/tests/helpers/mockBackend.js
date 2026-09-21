@@ -12,6 +12,8 @@ const DEFAULT_STATE = {
   rooms: [], // rows from the `rooms` table for the current property
   channels: [], // rows from the `channels` table for the current property
   hotelInfo: null, // row from the `hotel_info` table for the current property
+  escalations: [], // rows from the `escalations` table for the current property
+  conversations: [], // rows from the `conversations` table: { property_id, channel, chat_id, messages }
   users: {}, // email -> { password, user }
   signInError: null,
   failNextRequest: null, // url substring to fail once
@@ -19,6 +21,7 @@ const DEFAULT_STATE = {
   signInDelayMs: 0, // artificial latency, for testing in-flight/double-submit UI states
   queryDelayMs: 0, // artificial latency on rooms/channels/hotel_info selects, for testing parallel vs sequential loading
   failContactForm: false, // make /api/contact respond with an error, to test the contacts.html form's failure path
+  failEscalationReply: false, // make /api/escalations/reply respond with an error, to test the cabinet's failure path
 };
 
 function buildClientSource() {
@@ -66,7 +69,9 @@ function buildClientSource() {
           __qaPersist();
           return { data: { session: st.session, user: rec.user }, error: null };
         },
-        signUp: async ({ email, password }) => {
+        signUp: async ({ email, password, options }) => {
+          window.__qaSignUpCalls = window.__qaSignUpCalls || [];
+          window.__qaSignUpCalls.push({ email, emailRedirectTo: options && options.emailRedirectTo });
           const st = __qaGetState();
           if (st.users[email]) {
             const user = st.users[email].user;
@@ -83,7 +88,11 @@ function buildClientSource() {
           return { data: { session: st.session, user: { ...user, identities: [{ id: '1' }] } }, error: null };
         },
         signOut: async () => { __qaGetState().session = null; __qaPersist(); return {}; },
-        resetPasswordForEmail: async () => ({ error: null }),
+        resetPasswordForEmail: async (email, opts) => {
+          window.__qaResetPasswordCalls = window.__qaResetPasswordCalls || [];
+          window.__qaResetPasswordCalls.push({ email, redirectTo: opts && opts.redirectTo });
+          return { error: null };
+        },
         updateUser: async ({ password }) => {
           if (password && password.length < 6) return { error: { message: 'Password should be at least 6 characters' } };
           return { error: null };
@@ -131,6 +140,11 @@ function buildClientSource() {
             if (table === 'rooms') return { data: (st.rooms || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'channels') return { data: (st.channels || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'hotel_info') return { data: st.hotelInfo || null, error: null };
+            if (table === 'escalations') return { data: (st.escalations || []).filter((r) => rowMatches(r, filters)), error: null };
+            if (table === 'conversations') {
+              const match = (st.conversations || []).find((r) => rowMatches(r, filters));
+              return { data: match || null, error: null };
+            }
             return { data: null, error: null };
           }),
           insert: (row) => {
@@ -168,6 +182,9 @@ function buildClientSource() {
             if (table === 'hotel_info') { st.hotelInfo = { ...(st.hotelInfo || {}), ...patch }; }
             if (table === 'rooms') {
               st.rooms = (st.rooms || []).map((r) => (rowMatches(r, filters) ? { ...r, ...patch } : r));
+            }
+            if (table === 'escalations') {
+              st.escalations = (st.escalations || []).map((r) => (rowMatches(r, filters) ? { ...r, ...patch } : r));
             }
             __qaPersist();
             return { error: null };
@@ -323,6 +340,28 @@ async function installBackendMock(page, initialState = {}) {
     if (state.failContactForm) {
       return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'mock failure' }) });
     }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
+  // Mirrors the real /api/escalations/reply: appends the owner's reply to
+  // the matching conversation (so the cabinet's chat history re-render
+  // picks it up), and can be made to fail on demand for the error-path test.
+  await page.route('**/api/escalations/reply', async (route) => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    await page.evaluate((b) => {
+      window.__qaEscalationReplyCalls = window.__qaEscalationReplyCalls || [];
+      window.__qaEscalationReplyCalls.push(b);
+    }, body);
+    if (state.failEscalationReply) {
+      return route.fulfill({ status: 502, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'mock failure' }) });
+    }
+    await page.evaluate((b) => {
+      const st = window.__qaState;
+      const esc = (st.escalations || []).find((e) => String(e.id) === String(b.escalationId));
+      if (esc) {
+        const conv = (st.conversations || []).find((c) => c.property_id === b.propertyId && c.channel === esc.channel && c.chat_id === esc.chat_id);
+        if (conv) conv.messages = (conv.messages || []).concat([{ role: 'assistant', content: b.message, from_owner: true }]);
+      }
+    }, body);
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
   });
   // /api/connect-channel and /api/disconnect-channel are handled by the

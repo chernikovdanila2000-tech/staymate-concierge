@@ -807,7 +807,7 @@ async function authGetSession(){
 }
 async function authSignUp(name, email, password){
   const { data, error } = await window.sb.auth.signUp({
-    email, password, options:{ data:{ full_name: name } }
+    email, password, options:{ data:{ full_name: name }, emailRedirectTo: 'https://stayai.online/cabinet/' }
   });
   if(error) throw error;
   return data;
@@ -958,7 +958,7 @@ function wireAcctDropdownEvents(){
       const lang = getLang();
       msg.className = 'msg acct-pw-msg';
       msg.textContent = acctT('acct.sendingEmail', lang);
-      const { error } = await window.sb.auth.resetPasswordForEmail(forgotBtn.dataset.email, { redirectTo: window.location.origin + '/cabinet/' });
+      const { error } = await window.sb.auth.resetPasswordForEmail(forgotBtn.dataset.email, { redirectTo: 'https://stayai.online/cabinet/' });
       if(error){
         msg.className = 'msg acct-pw-msg error';
         msg.textContent = translateAuthError(error.message);
