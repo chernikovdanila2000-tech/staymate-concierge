@@ -72,10 +72,25 @@ const SUPABASE_CONFIGURED = !!(
 
 window.sb = null;
 if (SUPABASE_CONFIGURED && window.supabase) {
-  // Той самий localStorage, що й кабінет (той самий проєкт Supabase) — тому
-  // явно вмикаємо збереження сесії й автооновлення токена тут теж, щоб вхід
-  // однаково тримався і на маркетингових сторінках, і в кабінеті.
+  // 570d220 temporarily changed the launch-board auth key. Move that session
+  // back to Supabase's stable project key once, so owners stay signed in.
+  try {
+    const legacyAuthKey = 'stayai-launch-board-auth';
+    const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+    const projectAuthKey = `sb-${projectRef}-auth-token`;
+    if (!localStorage.getItem(projectAuthKey) && localStorage.getItem(legacyAuthKey)) {
+      localStorage.setItem(projectAuthKey, localStorage.getItem(legacyAuthKey));
+    }
+    localStorage.removeItem(legacyAuthKey);
+  } catch (_) {
+    // Storage can be unavailable in hardened/private contexts; Auth reports it.
+  }
   window.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce'
+    }
   });
 }
