@@ -547,18 +547,25 @@ test.describe('Dashboard — themed form fields (regression)', () => {
   });
 });
 
-test.describe('Dashboard — login/reload loads rooms, hotel info and channels in parallel (regression)', () => {
+test.describe('Dashboard — login/reload loads rooms, hotel info, channels and escalations in the background (regression)', () => {
   // Reported: logging in (or reloading with a stored session) into the
-  // cabinet felt slow. Root cause: showDashboard() awaited reloadRooms(),
+  // cabinet felt slow. Root cause #1: showDashboard() awaited reloadRooms(),
   // loadHotelInfo() and fetchChannels() one after another — three
   // independent Supabase queries paying their network round-trip
   // sequentially — plus afterLogin() made its own separate getUser() call
   // even when the caller already had a fresh user object in hand. Fixed by
-  // running the three independent queries via Promise.all and reusing the
+  // running the independent queries via Promise.all and reusing the
   // already-known user instead of re-fetching it.
-  test('dashboard appears in roughly one query round-trip, not the sum of three', async ({ page }) => {
+  // Root cause #2 (recurrence): dashScreen only lost its "hidden" class
+  // AFTER that whole Promise.all resolved — so the cabinet stayed invisible
+  // (and the sign-in button stayed disabled) until the slowest of those
+  // queries answered, and each query added to the batch (like
+  // fetchEscalations(), added with the Escalations tab) pushed that wait out
+  // further. Fixed by revealing the dashboard shell immediately and letting
+  // each section populate independently once its own query resolves.
+  test('dashboard shell appears immediately, without waiting for any of its data queries', async ({ page }) => {
     await installBackendMock(page, {
-      queryDelayMs: 400,
+      queryDelayMs: 2000,
       session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
       property: {
         property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
@@ -567,12 +574,30 @@ test.describe('Dashboard — login/reload loads rooms, hotel info and channels i
     });
     const start = Date.now();
     await page.goto('/cabinet/');
-    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 800 });
     const elapsed = Date.now() - start;
-    // Sequential (rooms -> hotel_info -> channels, 400ms each) would need
-    // at least 1200ms just for those three queries, on top of page load and
-    // the properties fetch. Parallel needs roughly one 400ms delay.
-    expect(elapsed).toBeLessThan(1100);
+    // Even with a 2s artificial delay on rooms/hotel_info/channels, the
+    // shell must show up almost instantly — it no longer waits on them.
+    expect(elapsed).toBeLessThan(800);
+  });
+
+  test('rooms list still fills in once its query resolves, after the shell is already visible', async ({ page }) => {
+    await installBackendMock(page, {
+      queryDelayMs: 500,
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: {
+        property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
+        subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+      },
+      rooms: [{ id: 'r1', property_id: 'p1', room_type: 'Deluxe Suite', price_per_night: 120, capacity: 2, amenities: [] }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 800 });
+    // Right after the shell shows up, the query hasn't resolved yet.
+    await expect(page.locator('.room-card')).toHaveCount(0);
+    // Once the delayed query resolves, the room shows up on its own.
+    await expect(page.locator('.room-card')).toHaveCount(1, { timeout: 2000 });
+    await expect(page.locator('.room-card')).toContainText('Deluxe Suite');
   });
 });
 
