@@ -19,7 +19,10 @@ function parseTelegramUpdate(update) {
     return null;
   }
 
-  const voice = message.voice;
+  // Telegram records made with the microphone arrive as `voice`; files sent
+  // through the attachment picker arrive as `audio`.  Both are guest voice
+  // input for StayAI and should follow the same transcription path.
+  const voice = message.voice || message.audio;
   if (typeof message.text !== 'string' && !voice?.file_id) return null;
 
   return {
@@ -28,7 +31,7 @@ function parseTelegramUpdate(update) {
     voice: voice?.file_id ? {
       fileId: voice.file_id,
       fileSize: Number(voice.file_size || 0),
-      mediaType: 'audio/ogg',
+      mediaType: String(voice.mime_type || 'audio/ogg').toLowerCase(),
     } : null,
     fromName: [message.from?.first_name, message.from?.last_name].filter(Boolean).join(' ') || null,
   };

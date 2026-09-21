@@ -14,6 +14,21 @@ test('parses a Telegram voice message without mistaking it for text', () => {
   });
 });
 
+test('accepts an audio attachment through the same voice flow', () => {
+  const parsed = parseTelegramUpdate({
+    message: {
+      chat: { id: 73 },
+      audio: { file_id: 'audio-file', file_size: 99, mime_type: 'audio/mpeg' },
+    },
+  });
+
+  assert.equal(parsed.chatId, 73);
+  assert.equal(parsed.text, null);
+  assert.deepEqual(parsed.voice, {
+    fileId: 'audio-file', fileSize: 99, mediaType: 'audio/mpeg',
+  });
+});
+
 test('keeps text messages backwards compatible', () => {
   assert.equal(parseTelegramUpdate({ message: { chat: { id: 42 }, text: 'Привіт' } }).text, 'Привіт');
 });

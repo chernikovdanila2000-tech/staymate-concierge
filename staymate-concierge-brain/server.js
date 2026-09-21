@@ -2091,6 +2091,7 @@ const server =
 
             let text = parsed.text;
             if (voice) {
+              console.info('[telegram] voice received');
               if (voice.fileSize > MAX_AUDIO_BYTES) {
                 await sendTelegramMessage(botToken, chatId, 'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.');
                 return;
@@ -2106,6 +2107,7 @@ const server =
                   mediaType: voice.mediaType,
                   filename: 'telegram-voice.ogg',
                 });
+                console.info('[telegram] voice transcribed');
               } catch (error) {
                 // Errors from transcription are already customer-safe.  Do
                 // not log raw audio, bot credentials, or provider responses.
@@ -2160,6 +2162,7 @@ const server =
                 chatId,
                 replyText
               );
+              if (voice) console.info('[telegram] voice reply sent');
             } catch (error) {
               console.error(
                 '[telegram]',
@@ -2167,6 +2170,11 @@ const server =
               );
             }
           }
+        ).catch(error => {
+          // The webhook acknowledgement has already been sent to Telegram.
+          // Keep diagnostics safe: never include message content or tokens.
+          console.error('[telegram] processing failed:', error.code || 'UNEXPECTED_ERROR');
+        }
         );
 
         return;
