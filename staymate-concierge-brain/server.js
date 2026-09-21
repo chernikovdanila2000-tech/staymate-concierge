@@ -27,6 +27,7 @@ const {
 const {
   verifyWhatsAppSignature,
   parseWhatsAppEvents,
+  downloadWhatsAppMedia,
   sendWhatsAppMessage,
 } = require('./whatsapp');
 const { serveLegalPage } = require('./legal-pages');
@@ -1730,12 +1731,38 @@ const server =
                   continue;
                 }
 
+                let incomingText = event.text;
+                if (event.audio) {
+                  const media = await downloadWhatsAppMedia(
+                    connection.accessToken,
+                    event.audio.mediaId,
+                    connection.phoneNumberId,
+                    META_GRAPH_VERSION
+                  );
+                  if (media.audio.length > MAX_AUDIO_BYTES || (media.fileSize && media.fileSize > MAX_AUDIO_BYTES)) {
+                    await sendWhatsAppMessage(
+                      connection.accessToken,
+                      connection.phoneNumberId,
+                      event.senderId,
+                      'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.',
+                      META_GRAPH_VERSION
+                    );
+                    continue;
+                  }
+                  incomingText = await transcribeAudio({
+                    audio: media.audio,
+                    mediaType: media.mediaType || event.audio.mediaType,
+                    filename: 'whatsapp-voice.ogg',
+                  });
+                }
+                if (!incomingText) continue;
+
                 const history = await getHistory(
                   connection.propertyId,
                   'whatsapp',
                   event.senderId
                 );
-                history.push({ role: 'user', content: event.text });
+                history.push({ role: 'user', content: incomingText });
 
                 if (await isTakenOverConversation(connection.propertyId, 'whatsapp', event.senderId)) {
                   await saveHistory(connection.propertyId, 'whatsapp', event.senderId, history);
