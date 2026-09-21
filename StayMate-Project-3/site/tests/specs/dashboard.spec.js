@@ -645,11 +645,11 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     await expect(page.locator('#escChatHistory')).toContainText("Ми зв'яжемось");
   });
 
-  test('a website-widget escalation has no reply box — that channel has no way to push a delayed message', async ({ page }) => {
+  test('a test-chat escalation has no reply box — that channel has no way to push a delayed message', async ({ page }) => {
     await installBackendMock(page, {
       session: baseSession,
       property: baseProperty,
-      escalations: [{ id: 'e2', property_id: 'p1', reason: 'Питання про сніданок', urgency: 'low', status: 'open', channel: 'website', chat_id: 'sess1', created_at: new Date().toISOString() }],
+      escalations: [{ id: 'e2', property_id: 'p1', reason: 'Питання про сніданок', urgency: 'low', status: 'open', channel: 'test', chat_id: 'sess1', created_at: new Date().toISOString() }],
     });
     await page.goto('/cabinet/');
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
@@ -657,6 +657,35 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     await page.click('.esc-row');
     await expect(page.locator('#escReplyBlock')).toHaveClass(/hidden/);
     await expect(page.locator('#escNoChannelHint')).not.toHaveClass(/hidden/);
+  });
+
+  test('a website-widget escalation now has a reply box — the widget polls for the owner reply', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [{ id: 'e2', property_id: 'p1', reason: 'Питання про сніданок', urgency: 'low', status: 'open', channel: 'website', chat_id: 'sess1', created_at: new Date().toISOString() }],
+      conversations: [{
+        property_id: 'p1', channel: 'website', chat_id: 'sess1',
+        messages: [
+          { role: 'user', content: 'До котрої години сніданок?' },
+          { role: 'assistant', content: 'Передаю ваше питання адміністратору.' },
+        ],
+      }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await page.click('.esc-row');
+    await expect(page.locator('#escReplyBlock')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#escNoChannelHint')).toHaveClass(/hidden/);
+
+    await page.fill('#escReplyText', 'Сніданок з 8:00 до 11:00.');
+    await page.click('#escReplySend');
+    await expect(page.locator('#escReplyMsg')).toContainText(/надіслано/i);
+    const calls = await page.evaluate(() => window.__qaEscalationReplyCalls);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ propertyId: 'p1', escalationId: 'e2', message: 'Сніданок з 8:00 до 11:00.' });
+    await expect(page.locator('#escChatHistory')).toContainText('Сніданок з 8:00 до 11:00');
   });
 
   test('marking an escalation resolved updates the badge count and can be reopened', async ({ page }) => {

@@ -1834,7 +1834,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   let escalations = [];
   let currentEscalationId = null;
 
-  const ESC_REPLYABLE_CHANNELS = ['telegram', 'viber', 'whatsapp', 'instagram', 'messenger'];
+  // 'website' відповідає теж: гість не отримує push, але його віджет
+  // періодично опитує сервер і покаже відповідь власника, поки тримає
+  // вкладку з сайтом готелю відкритою (чи повернувшись на неї пізніше).
+  const ESC_REPLYABLE_CHANNELS = ['telegram', 'viber', 'whatsapp', 'instagram', 'messenger', 'website'];
 
   async function fetchEscalations() {
     const { data } = await supabase

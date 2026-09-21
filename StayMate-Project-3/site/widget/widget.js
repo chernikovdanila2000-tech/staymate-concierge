@@ -38,6 +38,19 @@
     try { localStorage.setItem(SESSION_KEY, sessionId); } catch (e) {}
   }
 
+  // Скільки повідомлень цієї розмови гість уже бачив — зберігаємо в
+  // localStorage (не тільки в пам'яті), щоб відповідь адміністратора, яку
+  // гість уже прочитав на одній сторінці сайту готелю, не "виринала" знову
+  // при переході на іншу сторінку (sessionId той самий на всіх сторінках).
+  var COUNT_KEY = 'staymate_widget_count_' + propertyId;
+  var knownCount = 0;
+  try {
+    knownCount = parseInt(localStorage.getItem(COUNT_KEY), 10) || 0;
+  } catch (e) {}
+  function persistKnownCount() {
+    try { localStorage.setItem(COUNT_KEY, String(knownCount)); } catch (e) {}
+  }
+
   var root = document.createElement('div');
   root.id = 'staymate-widget-root';
   document.addEventListener('DOMContentLoaded', mount);
@@ -52,8 +65,10 @@
     var style = document.createElement('style');
     style.textContent =
       '#staymate-widget-root{position:fixed;bottom:20px;right:20px;z-index:2147483000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}' +
-      '.sm-w-btn{width:58px;height:58px;border-radius:50%;background:' + accent + ';box-shadow:0 8px 24px rgba(0,0,0,.25);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;}' +
+      '.sm-w-btn{width:58px;height:58px;border-radius:50%;background:' + accent + ';box-shadow:0 8px 24px rgba(0,0,0,.25);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;}' +
       '.sm-w-btn svg{width:26px;height:26px;}' +
+      '.sm-w-dot{display:none;position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#e0453f;border:2px solid #fff;}' +
+      '.sm-w-dot.on{display:block;}' +
       '.sm-w-panel{display:none;flex-direction:column;width:340px;max-width:calc(100vw - 40px);height:460px;max-height:calc(100vh - 110px);background:#fff;border-radius:14px;box-shadow:0 20px 50px rgba(0,0,0,.28);overflow:hidden;position:absolute;bottom:74px;right:0;}' +
       '.sm-w-panel.open{display:flex;}' +
       '.sm-w-head{background:' + accent + ';color:#fff;padding:14px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:space-between;}' +
@@ -81,6 +96,7 @@
       '</div>' +
       '<button class="sm-w-btn" id="sm-w-toggle" aria-label="' + escapeHtml(title) + '">' +
         '<svg viewBox="0 0 24 24" fill="none"><path d="M4 4h16v12H7l-3 3V4z" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/></svg>' +
+        '<span class="sm-w-dot" id="sm-w-dot"></span>' +
       '</button>';
 
     var panel = root.querySelector('#sm-w-panel');
@@ -89,13 +105,17 @@
     var body = root.querySelector('#sm-w-body');
     var input = root.querySelector('#sm-w-input');
     var sendBtn = root.querySelector('#sm-w-send');
+    var dot = root.querySelector('#sm-w-dot');
     var greeted = false;
 
     toggleBtn.addEventListener('click', function () {
       panel.classList.toggle('open');
-      if (panel.classList.contains('open') && !greeted) {
-        greeted = true;
-        addMessage('ai', 'Вітаю! Я віртуальний адміністратор. Запитайте про наявність номерів, ціни або умови заїзду.');
+      if (panel.classList.contains('open')) {
+        dot.classList.remove('on');
+        if (!greeted) {
+          greeted = true;
+          addMessage('ai', 'Вітаю! Я віртуальний адміністратор. Запитайте про наявність номерів, ціни або умови заїзду.');
+        }
       }
     });
     closeBtn.addEventListener('click', function () { panel.classList.remove('open'); });
@@ -131,6 +151,10 @@
           } else {
             addMessage('ai', 'Вибачте, сталася технічна помилка. Спробуйте, будь ласка, ще раз.');
           }
+          if (data && typeof data.messageCount === 'number') {
+            knownCount = data.messageCount;
+            persistKnownCount();
+          }
         })
         .catch(function () {
           pending.remove();
@@ -143,6 +167,34 @@
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') send();
     });
+
+    // Опитування на відповідь адміністратора з кабінету (розділ "Ескалації").
+    // Немає push-каналу до браузера гостя — це best-effort: працює, поки
+    // гість тримає вкладку з сайтом готелю відкритою (або повертається на
+    // неї пізніше — knownCount у localStorage не дає показати те саме
+    // повідомлення двічі).
+    function pollForReplies() {
+      fetch(apiBase.replace(/\/+$/, '') + '/api/website-chat/' + encodeURIComponent(propertyId) + '/' + encodeURIComponent(sessionId))
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (!data || !Array.isArray(data.messages) || data.messages.length <= knownCount) return;
+          var newOnes = data.messages.slice(knownCount);
+          knownCount = data.messages.length;
+          persistKnownCount();
+          var shown = false;
+          newOnes.forEach(function (m) {
+            if (!m || !m.from_owner) return;
+            var text = Array.isArray(m.content) ? m.content.map(function (c) { return c.text || ''; }).join(' ') : String(m.content || '');
+            if (!text.trim()) return;
+            addMessage('ai', text);
+            shown = true;
+          });
+          if (shown && !panel.classList.contains('open')) dot.classList.add('on');
+        })
+        .catch(function () {});
+    }
+    pollForReplies();
+    setInterval(pollForReplies, 10000);
   }
 
   function escapeHtml(s) {

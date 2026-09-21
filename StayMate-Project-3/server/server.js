@@ -708,12 +708,19 @@ async function sendReplyThroughChannel(propertyId, channel, chatId, text) {
     return sendMessengerMessage(accessToken, chatId, text, META_GRAPH_VERSION);
   }
 
-  if (channel === 'website' || channel === 'test') {
-    // Гість у віджеті сайту (чи тестовому чаті) не має постійного відкритого
-    // з'єднання, яке чекає на push — немає технічної можливості "дотягнутися"
-    // до нього пізніше. Розмова лишається видимою в кабінеті, але відповідь
-    // не надсилається жодним каналом.
-    throw new Error('Цей канал не підтримує відповідь із кабінету — гість спілкується через віджет на сайті.');
+  if (channel === 'website') {
+    // Немає push-API до гостя (лише HTTP-запит/відповідь) — "надсилання"
+    // тут означає лише дописати повідомлення в conversations (робить
+    // виклик нижче, у /api/escalations/reply). Віджет сам підхоплює нове
+    // повідомлення через періодичний GET /api/website-chat/:propertyId/:sessionId,
+    // поки в гостя відкрита вкладка з сайтом готелю.
+    return { ok: true };
+  }
+
+  if (channel === 'test') {
+    // Внутрішній dev-чат (/chat) — немає жодного віджету чи клієнта, який
+    // міг би підхопити відповідь пізніше.
+    throw new Error('Цей канал не підтримує відповідь із кабінету.');
   }
 
   throw new Error('Невідомий канал: ' + channel);
@@ -2368,6 +2375,13 @@ const server =
                 {
                   reply:
                     replyText,
+                  // Віджет запам'ятовує це число і зіставляє з ним подальші
+                  // GET /api/website-chat/:propertyId/:sessionId — так він
+                  // не показує повторно ці самі два повідомлення (гостя й
+                  // бота), коли починає опитувати сервер на нові відповіді
+                  // власника.
+                  messageCount:
+                    updatedHistory.length,
                 },
                 corsHeaders
               );
@@ -2384,6 +2398,29 @@ const server =
             }
           }
         );
+
+        return;
+      }
+
+      // =========================
+      // WEBSITE — опитування нових повідомлень (відповідь власника з
+      // кабінету, Блок "Ескалації")
+      // =========================
+
+      if (req.method === 'GET' && req.url.startsWith('/api/website-chat/')) {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+        const rest = req.url.slice('/api/website-chat/'.length).split('/');
+        const propertyId = decodeURIComponent(rest[0] || '');
+        const sessionId = decodeURIComponent(rest[1] || '');
+
+        if (!propertyId || !sessionId) {
+          return sendJson(res, 400, { error: 'Потрібні propertyId і sessionId у шляху.' }, corsHeaders);
+        }
+
+        (async () => {
+          const messages = await getHistory(propertyId, 'website', sessionId);
+          sendJson(res, 200, { messages }, corsHeaders);
+        })();
 
         return;
       }
