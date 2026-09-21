@@ -727,4 +727,41 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     await expect(page.locator('#escReplyMsg')).toContainText(/mock failure/i);
     await expect(page.locator('#escReplyText')).toHaveValue('Відповідь гостю');
   });
+
+  test('deleting an escalation removes it and its conversation, and asks for confirmation first', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [
+        { id: 'e1', property_id: 'p1', reason: 'Скарга на шум', urgency: 'high', status: 'open', channel: 'telegram', chat_id: '123', created_at: new Date().toISOString() },
+        { id: 'e2', property_id: 'p1', reason: 'Питання про сніданок', urgency: 'low', status: 'open', channel: 'viber', chat_id: '456', created_at: new Date().toISOString() },
+      ],
+      conversations: [{
+        property_id: 'p1', channel: 'telegram', chat_id: '123',
+        messages: [{ role: 'user', content: 'У сусідів дуже голосна музика' }],
+      }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('.esc-row')).toHaveCount(2);
+
+    await page.locator('.esc-row', { hasText: 'Скарга на шум' }).click();
+    await expect(page.locator('#escalationModal')).not.toHaveClass(/hidden/);
+
+    // Dismissing the confirm dialog must not delete anything.
+    page.once('dialog', (d) => d.dismiss());
+    await page.click('#escDeleteBtn');
+    await expect(page.locator('.esc-row')).toHaveCount(2);
+
+    // Accepting it deletes the escalation, closes the modal, and drops the
+    // linked conversation row too (so no history is left orphaned behind).
+    page.once('dialog', (d) => d.accept());
+    await page.click('#escDeleteBtn');
+    await expect(page.locator('#escalationModal')).toHaveClass(/hidden/);
+    await expect(page.locator('.esc-row')).toHaveCount(1);
+    await expect(page.locator('.esc-row')).toContainText('Питання про сніданок');
+    const conv = await page.evaluate(() => JSON.parse(localStorage.getItem('__qaState')).conversations);
+    expect(conv.find((c) => c.channel === 'telegram' && c.chat_id === '123')).toBeUndefined();
+  });
 });

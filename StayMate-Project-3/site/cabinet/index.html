@@ -678,6 +678,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <div class="actions">
         <button type="button" class="btn-primary" id="escReplySend" data-i18n="esc.reply.send">Надіслати</button>
         <button type="button" class="btn-secondary" id="escModalClose" data-i18n="common.close">Закрити</button>
+        <button type="button" class="btn-danger" id="escDeleteBtn" data-i18n="esc.delete" style="margin-left:auto;">Видалити</button>
         <span class="msg" id="escReplyMsg"></span>
       </div>
     </div>
@@ -792,11 +793,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "esc.empty":"Ескалацій поки немає — усі звернення гостей ШІ-адміністратор обробляє сам.",
       "esc.urgency.low":"Низька","esc.urgency.normal":"Звичайна","esc.urgency.high":"Термінова",
       "esc.status.open":"Відкрита","esc.status.resolved":"Вирішена",
-      "esc.noChannelShort":"Без каналу","esc.noChannel":"Цей діалог прийшов через канал, який не підтримує відповідь із кабінету (напр. віджет на сайті) — зв'яжіться з гостем іншим способом.",
+      "esc.noChannelShort":"Без каналу","esc.noChannel":"Цей діалог прийшов через канал, який не підтримує відповідь із кабінету (напр. тестовий чат) — зв'яжіться з гостем іншим способом.",
       "esc.noHistory":"Історія переписки порожня.",
       "esc.modal.title":"Ескалація","esc.markResolved":"Позначити вирішеною","esc.reopen":"Відкрити знову",
       "esc.reply.label":"Відповісти гостю","esc.reply.ph":"Напишіть відповідь — вона піде гостю тим самим каналом","esc.reply.send":"Надіслати",
       "esc.reply.empty":"Напишіть текст відповіді.","esc.reply.sent":"Надіслано.","esc.reply.error":"Не вдалося надіслати відповідь.",
+      "esc.delete":"Видалити","esc.deleteConfirm":"Видалити цю ескалацію разом з історією переписки? Дію не можна скасувати.","esc.deleteError":"Не вдалося видалити.",
       "ch.test.name":"Тестовий чат",
 
       "sub.title":"Тариф і підписка","sub.manageBtn":"Змінити тариф / оплатити",
@@ -974,11 +976,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "esc.empty":"No escalations yet — the AI administrator is handling every guest request on its own.",
       "esc.urgency.low":"Low","esc.urgency.normal":"Normal","esc.urgency.high":"Urgent",
       "esc.status.open":"Open","esc.status.resolved":"Resolved",
-      "esc.noChannelShort":"No channel","esc.noChannel":"This conversation came through a channel that doesn't support replying from the cabinet (e.g. the website widget) — reach the guest another way.",
+      "esc.noChannelShort":"No channel","esc.noChannel":"This conversation came through a channel that doesn't support replying from the cabinet (e.g. the test chat) — reach the guest another way.",
       "esc.noHistory":"No conversation history.",
       "esc.modal.title":"Escalation","esc.markResolved":"Mark resolved","esc.reopen":"Reopen",
       "esc.reply.label":"Reply to guest","esc.reply.ph":"Write a reply — it'll go to the guest through the same channel","esc.reply.send":"Send",
       "esc.reply.empty":"Write a reply first.","esc.reply.sent":"Sent.","esc.reply.error":"Couldn't send the reply.",
+      "esc.delete":"Delete","esc.deleteConfirm":"Delete this escalation along with its conversation history? This can't be undone.","esc.deleteError":"Couldn't delete.",
       "ch.test.name":"Test chat",
 
       "sub.title":"Plan & subscription","sub.manageBtn":"Change plan / pay",
@@ -1975,6 +1978,35 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (error) return;
     esc.status = nextStatus;
     updateEscStatusButton(nextStatus);
+    renderEscalationsList();
+  });
+
+  onClickGuarded(document.getElementById('escDeleteBtn'), async () => {
+    const esc = escalations.find((e) => String(e.id) === String(currentEscalationId));
+    if (!esc) return;
+    if (!confirm(t('esc.deleteConfirm', getLang()))) return;
+    const msg = document.getElementById('escReplyMsg');
+
+    if (esc.channel && esc.chat_id) {
+      await supabase
+        .from('conversations')
+        .delete()
+        .eq('property_id', currentProperty.property_id)
+        .eq('channel', esc.channel)
+        .eq('chat_id', esc.chat_id);
+    }
+    const { error } = await supabase
+      .from('escalations')
+      .delete()
+      .eq('id', esc.id)
+      .eq('property_id', currentProperty.property_id);
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = t('esc.deleteError', getLang());
+      return;
+    }
+    escalations = escalations.filter((e) => String(e.id) !== String(esc.id));
+    closeEscalationModal();
     renderEscalationsList();
   });
 

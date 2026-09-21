@@ -173,6 +173,8 @@ function buildClientSource() {
             const st = __qaGetState();
             if (table === 'rooms') { st.rooms = (st.rooms || []).filter((r) => !rowMatches(r, filters)); }
             if (table === 'channels') { st.channels = (st.channels || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'escalations') { st.escalations = (st.escalations || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'conversations') { st.conversations = (st.conversations || []).filter((r) => !rowMatches(r, filters)); }
             __qaPersist();
             return { error: null };
           }),
