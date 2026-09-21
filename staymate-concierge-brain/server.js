@@ -35,6 +35,7 @@ const {
   invalidateChannel,
 } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
+const { isConversationTakenOver } = require('./takeover');
 const {
   createSubscriptionInvoice,
   cancelRegularPayment,
@@ -219,6 +220,20 @@ async function getProperty(propertyId) {
   });
 
   return data;
+}
+
+// Once an employee has taken a conversation, new guest messages are still
+// preserved in its history, but the AI must stay silent until that employee
+// resolves the escalation in the cabinet.  A failed status lookup must not
+// take a production channel down, so it is logged and the normal flow stays
+// available.
+async function isTakenOverConversation(propertyId, channel, chatId) {
+  try {
+    return await isConversationTakenOver({ supabase, propertyId, channel, chatId });
+  } catch (error) {
+    console.error('[takeover] status check failed:', error.message);
+    return false;
+  }
 }
 
 /**
@@ -1136,6 +1151,11 @@ const server =
                         event.text,
                     });
 
+                    if (await isTakenOverConversation(connection.propertyId, 'messenger', event.senderId)) {
+                      await saveHistory(connection.propertyId, 'messenger', event.senderId, history);
+                      continue;
+                    }
+
                     const {
                       replyText,
                       updatedHistory,
@@ -1508,6 +1528,11 @@ const server =
                           event.text,
                       });
 
+                      if (await isTakenOverConversation(connection.propertyId, 'instagram', event.senderId)) {
+                        await saveHistory(connection.propertyId, 'instagram', event.senderId, history);
+                        continue;
+                      }
+
                       console.log(
                         '[instagram] BEFORE AI'
                       );
@@ -1710,6 +1735,11 @@ const server =
                 );
                 history.push({ role: 'user', content: event.text });
 
+                if (await isTakenOverConversation(connection.propertyId, 'whatsapp', event.senderId)) {
+                  await saveHistory(connection.propertyId, 'whatsapp', event.senderId, history);
+                  continue;
+                }
+
                 const { replyText, updatedHistory } = await runConciergeTurn(
                   history,
                   { propertyId: connection.propertyId, propertyName: property.hotel_name, channel: 'whatsapp', chatId: event.senderId }
@@ -1892,6 +1922,11 @@ const server =
               content: message,
             });
 
+            if (await isTakenOverConversation(propertyId, 'test', userId)) {
+              await saveHistory(propertyId, 'test', userId, history);
+              return sendJson(res, 200, { reply: '', takenOver: true });
+            }
+
             try {
               const {
                 replyText,
@@ -2037,6 +2072,11 @@ const server =
               content: text,
             });
 
+            if (await isTakenOverConversation(propertyId, 'telegram', chatId)) {
+              await saveHistory(propertyId, 'telegram', chatId, history);
+              return;
+            }
+
             try {
               const {
                 replyText,
@@ -2179,6 +2219,11 @@ const server =
               role: 'user',
               content: text,
             });
+
+            if (await isTakenOverConversation(propertyId, 'viber', chatId)) {
+              await saveHistory(propertyId, 'viber', chatId, history);
+              return;
+            }
 
             try {
               const {
@@ -2345,6 +2390,15 @@ const server =
               content:
                 String(message),
             });
+
+            if (await isTakenOverConversation(propertyId, 'website', sessionId)) {
+              await saveHistory(propertyId, 'website', sessionId, history);
+              return sendJson(res, 200, {
+                reply: '',
+                messageCount: history.length,
+                takenOver: true,
+              }, corsHeaders);
+            }
 
             try {
               const {
