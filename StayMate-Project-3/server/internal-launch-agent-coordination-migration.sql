@@ -16,7 +16,7 @@ update public.internal_launch_tasks
 set workflow_status = case status
   when 'done' then 'done'
   when 'blocked' then 'owner_action'
-  when 'work' then 'in_progress'
+  when 'work' then 'not_started'
   else 'not_started'
 end
 where workflow_status is null;
