@@ -789,4 +789,36 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     const conv = await page.evaluate(() => JSON.parse(localStorage.getItem('__qaState')).conversations);
     expect(conv.find((c) => c.channel === 'telegram' && c.chat_id === '123')).toBeUndefined();
   });
+
+  // Reported: deleting an escalation appeared to work (row vanished from the
+  // list) but came back after reloading the page — it was never actually
+  // deleted. Root cause: a bare .delete() never errors when Postgres RLS
+  // silently blocks it (0 rows affected is not an error), which is exactly
+  // what happens if the DELETE policy migration hasn't been run in Supabase
+  // yet — the cabinet had no way to tell "deleted" apart from "blocked" and
+  // always assumed success. Fixed by chaining .select() to see which rows
+  // actually got deleted and surfacing an error when that comes back empty.
+  test('a delete silently blocked by RLS shows an error and keeps the escalation in the list', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      failEscalationDelete: true,
+      escalations: [{ id: 'e1', property_id: 'p1', reason: 'Скарга на шум', urgency: 'high', status: 'open', channel: 'telegram', chat_id: '123', created_at: new Date().toISOString() }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await page.click('.esc-row');
+    page.once('dialog', (d) => d.accept());
+    await page.click('#escDeleteBtn');
+    await expect(page.locator('#escReplyMsg')).toContainText(/не вдалося/i);
+    // Modal stays open and the row is still there — no false "success".
+    await expect(page.locator('#escalationModal')).not.toHaveClass(/hidden/);
+    await expect(page.locator('.esc-row')).toHaveCount(1);
+    // And it survives a reload too — nothing was removed client-side either.
+    await page.reload();
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('.esc-row')).toHaveCount(1);
+  });
 });

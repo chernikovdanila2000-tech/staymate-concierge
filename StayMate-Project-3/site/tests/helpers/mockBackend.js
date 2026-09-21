@@ -22,6 +22,7 @@ const DEFAULT_STATE = {
   queryDelayMs: 0, // artificial latency on rooms/channels/hotel_info selects, for testing parallel vs sequential loading
   failContactForm: false, // make /api/contact respond with an error, to test the contacts.html form's failure path
   failEscalationReply: false, // make /api/escalations/reply respond with an error, to test the cabinet's failure path
+  failEscalationDelete: false, // simulate RLS silently blocking escalations/conversations .delete() (no error, 0 rows), e.g. before the delete migration is run
 };
 
 function buildClientSource() {
@@ -171,12 +172,23 @@ function buildClientSource() {
           },
           delete: () => makeQuery((filters) => {
             const st = __qaGetState();
-            if (table === 'rooms') { st.rooms = (st.rooms || []).filter((r) => !rowMatches(r, filters)); }
-            if (table === 'channels') { st.channels = (st.channels || []).filter((r) => !rowMatches(r, filters)); }
-            if (table === 'escalations') { st.escalations = (st.escalations || []).filter((r) => !rowMatches(r, filters)); }
-            if (table === 'conversations') { st.conversations = (st.conversations || []).filter((r) => !rowMatches(r, filters)); }
+            // Simulates RLS silently blocking the delete (real Postgres: 0 rows
+            // affected, no error) — e.g. the owner DELETE policy migration
+            // hasn't been run in Supabase yet.
+            if (st.failEscalationDelete && (table === 'escalations' || table === 'conversations')) {
+              return { data: [], error: null };
+            }
+            // Mirrors real PostgREST: .delete().select() returns the rows that
+            // actually matched (and got deleted), so a caller can tell "deleted
+            // 0 rows" (e.g. blocked by RLS) apart from "deleted, but nothing
+            // matched" the same way the real backend would.
+            let deleted = [];
+            if (table === 'rooms') { deleted = (st.rooms || []).filter((r) => rowMatches(r, filters)); st.rooms = (st.rooms || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'channels') { deleted = (st.channels || []).filter((r) => rowMatches(r, filters)); st.channels = (st.channels || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'escalations') { deleted = (st.escalations || []).filter((r) => rowMatches(r, filters)); st.escalations = (st.escalations || []).filter((r) => !rowMatches(r, filters)); }
+            if (table === 'conversations') { deleted = (st.conversations || []).filter((r) => rowMatches(r, filters)); st.conversations = (st.conversations || []).filter((r) => !rowMatches(r, filters)); }
             __qaPersist();
-            return { error: null };
+            return { data: deleted, error: null };
           }),
           update: (patch) => makeQuery((filters) => {
             const st = __qaGetState();

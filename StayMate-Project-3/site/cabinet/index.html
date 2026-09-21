@@ -1151,7 +1151,14 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // людина замість форми нового пароля потрапляла прямо в акаунт.
   const cameFromPasswordRecovery = /type=recovery/.test(window.location.hash);
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // persistSession/autoRefreshToken — типові значення за замовчуванням у
+  // supabase-js, але прописуємо явно: сесія зберігається в localStorage і
+  // токен сам оновлюється у фоні, поки браузер не закрито — тому вхід не
+  // повинен "злітати" сам по собі при кожному новому відкритті сайту, лише
+  // якщо людина сама натиснула "Вийти" або очистила дані сайту в браузері.
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
 
   // Перекладає технічні повідомлення Supabase на зрозумілі — найчастіша
   // причина плутанини: вбудований поштовий сервіс Supabase (без свого SMTP)
@@ -1999,12 +2006,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         .eq('channel', esc.channel)
         .eq('chat_id', esc.chat_id);
     }
-    const { error } = await supabase
+    // .delete() без .select() не повертає помилку, навіть якщо RLS
+    // мовчки не видалив жодного рядка (напр. міграція з політикою DELETE
+    // ще не виконана в Supabase) — тоді рядок лишається в базі, а кабінет
+    // помилково думав, що видалення пройшло успішно, і ховав його лише
+    // локально до наступного перезавантаження сторінки. .select('id')
+    // повертає фактично видалені рядки, тож порожній масив = нічого не
+    // видалилось насправді.
+    const { data: deletedRows, error } = await supabase
       .from('escalations')
       .delete()
       .eq('id', esc.id)
-      .eq('property_id', currentProperty.property_id);
-    if (error) {
+      .eq('property_id', currentProperty.property_id)
+      .select('id');
+    if (error || !deletedRows || !deletedRows.length) {
       msg.className = 'msg error';
       msg.textContent = t('esc.deleteError', getLang());
       return;

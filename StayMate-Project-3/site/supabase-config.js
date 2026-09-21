@@ -72,5 +72,10 @@ const SUPABASE_CONFIGURED = !!(
 
 window.sb = null;
 if (SUPABASE_CONFIGURED && window.supabase) {
-  window.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Той самий localStorage, що й кабінет (той самий проєкт Supabase) — тому
+  // явно вмикаємо збереження сесії й автооновлення токена тут теж, щоб вхід
+  // однаково тримався і на маркетингових сторінках, і в кабінеті.
+  window.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  });
 }
