@@ -1,5 +1,11 @@
 const crypto = require('crypto');
 
+// Customer-safe reply used when a voice note reached StayAI but could not be
+// downloaded or transcribed. Keep this separate from provider errors so a
+// temporary integration issue never leaves a guest without any response.
+const VOICE_PROCESSING_FALLBACK =
+  'Не вдалося розпізнати голосове повідомлення. Будь ласка, надішліть його ще раз або напишіть повідомлення текстом.';
+
 function safeEqual(left, right) {
   const a = Buffer.from(String(left || ''), 'utf8');
   const b = Buffer.from(String(right || ''), 'utf8');
@@ -167,6 +173,7 @@ async function sendWhatsAppMessage(
 }
 
 module.exports = {
+  VOICE_PROCESSING_FALLBACK,
   verifyWhatsAppSignature,
   parseWhatsAppEvents,
   downloadWhatsAppMedia,

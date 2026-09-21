@@ -29,6 +29,7 @@ const {
   parseWhatsAppEvents,
   downloadWhatsAppMedia,
   sendWhatsAppMessage,
+  VOICE_PROCESSING_FALLBACK,
 } = require('./whatsapp');
 const { serveLegalPage } = require('./legal-pages');
 const {
@@ -1691,6 +1692,7 @@ const server =
             req.headers['x-hub-signature-256'],
             META_MESSENGER_APP_SECRET
           )) {
+            console.warn('[whatsapp] Rejected webhook with invalid signature');
             return sendJson(res, 401, { error: 'Invalid WhatsApp signature.' });
           }
 
@@ -1702,6 +1704,7 @@ const server =
           }
 
           const events = parseWhatsAppEvents(payload);
+          console.log('[whatsapp] Webhook received:', { messageEvents: events.length });
           sendJson(res, 200, { ok: true });
           if (events.length === 0) return;
 
@@ -1733,27 +1736,43 @@ const server =
 
                 let incomingText = event.text;
                 if (event.audio) {
-                  const media = await downloadWhatsAppMedia(
-                    connection.accessToken,
-                    event.audio.mediaId,
-                    connection.phoneNumberId,
-                    META_GRAPH_VERSION
-                  );
-                  if (media.audio.length > MAX_AUDIO_BYTES || (media.fileSize && media.fileSize > MAX_AUDIO_BYTES)) {
+                  console.log('[whatsapp] Voice received');
+                  try {
+                    const media = await downloadWhatsAppMedia(
+                      connection.accessToken,
+                      event.audio.mediaId,
+                      connection.phoneNumberId,
+                      META_GRAPH_VERSION
+                    );
+                    if (media.audio.length > MAX_AUDIO_BYTES || (media.fileSize && media.fileSize > MAX_AUDIO_BYTES)) {
+                      await sendWhatsAppMessage(
+                        connection.accessToken,
+                        connection.phoneNumberId,
+                        event.senderId,
+                        'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.',
+                        META_GRAPH_VERSION
+                      );
+                      continue;
+                    }
+                    incomingText = await transcribeAudio({
+                      audio: media.audio,
+                      mediaType: media.mediaType || event.audio.mediaType,
+                      filename: 'whatsapp-voice.ogg',
+                    });
+                    console.log('[whatsapp] Voice transcribed');
+                  } catch (error) {
+                    // The webhook was accepted, but a temporary media or
+                    // transcription failure must not look like silence to a guest.
+                    console.error('[whatsapp] Voice processing error:', error && error.message ? error.message : error);
                     await sendWhatsAppMessage(
                       connection.accessToken,
                       connection.phoneNumberId,
                       event.senderId,
-                      'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.',
+                      VOICE_PROCESSING_FALLBACK,
                       META_GRAPH_VERSION
                     );
                     continue;
                   }
-                  incomingText = await transcribeAudio({
-                    audio: media.audio,
-                    mediaType: media.mediaType || event.audio.mediaType,
-                    filename: 'whatsapp-voice.ogg',
-                  });
                 }
                 if (!incomingText) continue;
 
@@ -1788,6 +1807,7 @@ const server =
                   replyText,
                   META_GRAPH_VERSION
                 );
+                console.log('[whatsapp] Reply sent');
               } catch (error) {
                 console.error('[whatsapp] EVENT ERROR:', error && error.stack ? error.stack : error);
               }

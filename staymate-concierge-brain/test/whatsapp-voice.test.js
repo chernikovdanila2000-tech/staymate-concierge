@@ -1,7 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { parseWhatsAppEvents, downloadWhatsAppMedia } = require('../whatsapp');
+const {
+  VOICE_PROCESSING_FALLBACK,
+  parseWhatsAppEvents,
+  downloadWhatsAppMedia,
+} = require('../whatsapp');
+
+test('keeps a customer-safe fallback for WhatsApp voice processing failures', () => {
+  assert.match(VOICE_PROCESSING_FALLBACK, /надішліть.*ще раз|напишіть.*текстом/i);
+  assert.doesNotMatch(VOICE_PROCESSING_FALLBACK, /token|openai|meta|error/i);
+});
 
 test('parses an inbound WhatsApp voice message without treating it as text', () => {
   const events = parseWhatsAppEvents({
