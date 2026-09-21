@@ -324,6 +324,21 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     </div>
   </div>
 
+  <!-- Екран завантаження після входу: показуємо одразу, щойно відомо, що
+       сесія є (до цього людина бачила форму входу — контрадикторно, якщо
+       вона вже увійшла) — і тут же ловимо помилку, якщо запит властивості
+       готелю не відповів (мережевий збій), замість того щоб мовчки лишити
+       форму входу висіти назавжди, вдаючи, що людина не увійшла. -->
+  <div class="hidden wrap-cab center-screen" id="loadingScreen">
+    <div class="auth-card" style="text-align:center;">
+      <p class="lede" id="loadingMsg" style="margin:0;" data-i18n="loading.checking">Завантаження кабінету…</p>
+      <div class="hidden" id="loadingErrorBlock" style="margin-top:18px;">
+        <p class="msg error" id="loadingErrorMsg" data-i18n="loading.error">Не вдалося завантажити дані. Перевірте інтернет-з'єднання.</p>
+        <button class="btn-primary" id="loadingRetryBtn" type="button" data-i18n="loading.retry" style="margin-top:8px;">Спробувати знову</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Екран встановлення нового пароля -->
   <div class="hidden wrap-cab center-screen" id="resetScreen">
     <div class="auth-card">
@@ -785,6 +800,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
       "common.save":"Зберегти","common.cancel":"Скасувати","common.connect":"Підключити","common.disconnect":"Відключити",
       "common.loading":"Завантаження…","common.saved":"Збережено.","common.close":"Закрити",
+      "loading.checking":"Завантаження кабінету…","loading.error":"Не вдалося завантажити дані. Перевірте інтернет-з'єднання.","loading.retry":"Спробувати знову",
 
       "dash.lede":"Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.",
       "dash.tab.overview":"Огляд","dash.tab.channels":"Канали","dash.tab.escalations":"Ескалації",
@@ -968,6 +984,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
       "common.save":"Save","common.cancel":"Cancel","common.connect":"Connect","common.disconnect":"Disconnect",
       "common.loading":"Loading…","common.saved":"Saved.","common.close":"Close",
+      "loading.checking":"Loading your cabinet…","loading.error":"Couldn't load your data. Check your internet connection.","loading.retry":"Try again",
 
       "dash.lede":"Here you manage the data the AI administrator sees and uses across every connected channel.",
       "dash.tab.overview":"Overview","dash.tab.channels":"Channels","dash.tab.escalations":"Escalations",
@@ -1183,6 +1200,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   // ---- Елементи ----
   const authScreen = document.getElementById('authScreen');
+  const loadingScreen = document.getElementById('loadingScreen');
   const resetScreen = document.getElementById('resetScreen');
   const onboardScreen = document.getElementById('onboardScreen');
   const gateScreen = document.getElementById('gateScreen');
@@ -1198,6 +1216,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function hideAllScreens() {
     authScreen.classList.add('hidden');
+    loadingScreen.classList.add('hidden');
     resetScreen.classList.add('hidden');
     onboardScreen.classList.add('hidden');
     gateScreen.classList.add('hidden');
@@ -1521,11 +1540,34 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
     renderAccountStatus();
 
-    const { data: property } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('owner_id', user.id)
-      .maybeSingle();
+    // Раніше форма входу (authScreen, видима за замовчуванням) ховалась
+    // лише ПІСЛЯ того, як відповість запит властивості готелю нижче — якщо
+    // цей запит "зависав" чи падав (мережевий збій), людина, яка вже
+    // увійшла (дропдаун акаунту вгорі це підтверджував), назавжди бачила
+    // перед собою форму входу, наче вона не залогінена. Ховаємо форму входу
+    // одразу, щойно відомо, що сесія є — і показуємо нейтральний екран
+    // завантаження, а не лишаємо суперечливий стан.
+    hideAllScreens();
+    loadingScreen.classList.remove('hidden');
+    document.getElementById('loadingErrorBlock').classList.add('hidden');
+
+    let property;
+    try {
+      const result = await supabase
+        .from('properties')
+        .select('*')
+        .eq('owner_id', user.id)
+        .maybeSingle();
+      if (result.error) throw result.error;
+      property = result.data;
+    } catch (err) {
+      // Так само: якщо запит справді впав (а не просто "властивості ще
+      // немає" — це error, а не null-результат), не лишаємо порожній
+      // екран завантаження навічно — показуємо помилку й кнопку "Спробувати
+      // знову", яка просто повторює afterLogin().
+      document.getElementById('loadingErrorBlock').classList.remove('hidden');
+      return;
+    }
 
     hideAllScreens();
 
@@ -1548,6 +1590,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       await showDashboard();
     }
   }
+
+  // Просто перезавантажуємо сторінку замість повторного виклику afterLogin()
+  // з поточного місця — найнадійніший спосіб почати всю перевірку сесії
+  // заново з чистого стану, яким би збоєм її не перервало.
+  document.getElementById('loadingRetryBtn').addEventListener('click', () => location.reload());
 
   // ---- Онбординг (створення готелю) ----
   // Дає вибір одразу при заповненні профілю: почати з безкоштовного
@@ -2598,7 +2645,19 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   // ---- Старт ----
   (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    let session;
+    try {
+      const result = await supabase.auth.getSession();
+      session = result.data.session;
+    } catch (err) {
+      // Якщо навіть цей перший запит впав (мережевий збій одразу при
+      // завантаженні сторінки), не лишаємо людину мовчки на формі входу,
+      // наче сесії й не було — показуємо помилку з можливістю повторити.
+      hideAllScreens();
+      loadingScreen.classList.remove('hidden');
+      document.getElementById('loadingErrorBlock').classList.remove('hidden');
+      return;
+    }
     if (!session) return;
     if (cameFromPasswordRecovery) {
       // Показуємо форму нового пароля напряму, синхронно з цим стартовим

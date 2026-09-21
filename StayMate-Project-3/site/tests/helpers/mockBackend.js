@@ -23,6 +23,7 @@ const DEFAULT_STATE = {
   failContactForm: false, // make /api/contact respond with an error, to test the contacts.html form's failure path
   failEscalationReply: false, // make /api/escalations/reply respond with an error, to test the cabinet's failure path
   failEscalationDelete: false, // simulate RLS silently blocking escalations/conversations .delete() (no error, 0 rows), e.g. before the delete migration is run
+  failPropertiesQuery: false, // make the properties select() return an error, to test the cabinet's "stuck on the login screen while actually signed in" failure path
 };
 
 function buildClientSource() {
@@ -137,7 +138,10 @@ function buildClientSource() {
               window.__qaQueryStarts[table] = Date.now();
               await new Promise((r) => setTimeout(r, st.queryDelayMs));
             }
-            if (table === 'properties') return { data: st.property, error: null };
+            if (table === 'properties') {
+              if (st.failPropertiesQuery) return { data: null, error: { message: 'mock network failure' } };
+              return { data: st.property, error: null };
+            }
             if (table === 'rooms') return { data: (st.rooms || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'channels') return { data: (st.channels || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'hotel_info') return { data: st.hotelInfo || null, error: null };

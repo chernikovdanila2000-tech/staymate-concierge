@@ -126,6 +126,48 @@ test.describe('Auth — session persistence', () => {
     await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
     await expect(page.locator('#authScreen')).toHaveClass(/hidden/);
   });
+
+  // Reported: a signed-in person (the account dropdown up top showed their
+  // real email, proving there was a valid session) kept seeing the "Вхід у
+  // кабінет" login form underneath, seemingly stuck forever. Root cause:
+  // afterLogin() only hid the login form (visible by default) AFTER its
+  // properties query resolved, with no error handling at all — a failed or
+  // hung query left the login form on screen forever, contradicting the
+  // already-populated account dropdown, and looking indistinguishable from
+  // "you got logged out." Fixed by hiding the login form immediately once a
+  // session is confirmed, and showing a clear retry option if the follow-up
+  // query fails instead of silently going nowhere.
+  test('a failed properties query does not strand the login form on screen for a signed-in user', async ({ page }) => {
+    await installBackendMock(page, {
+      failPropertiesQuery: true,
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+    });
+    await page.goto('/cabinet/');
+    // The login form must disappear even though the property lookup fails —
+    // it must never sit there contradicting an account dropdown that already
+    // knows the person is signed in.
+    await expect(page.locator('#authScreen')).toHaveClass(/hidden/, { timeout: 5000 });
+    await expect(page.locator('#loadingErrorBlock')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#accountStatus')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#accountStatus')).toContainText('user@example.com');
+  });
+
+  test('retrying after a failed properties query reaches the dashboard once the query succeeds', async ({ page }) => {
+    await installBackendMock(page, {
+      failPropertiesQuery: true,
+      session: { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } },
+      property: { property_id: 'p1', hotel_name: 'Test Hotel', trial_ends_at: new Date(Date.now() + 3 * 86400000).toISOString(), subscription_status: 'inactive' },
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#loadingErrorBlock')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.evaluate(() => {
+      const st = JSON.parse(localStorage.getItem('__qaState'));
+      st.failPropertiesQuery = false;
+      localStorage.setItem('__qaState', JSON.stringify(st));
+    });
+    await page.click('#loadingRetryBtn');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+  });
 });
 
 test.describe('Auth — reset/signup emails always link to the one canonical site (regression)', () => {
