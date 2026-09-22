@@ -32,6 +32,9 @@ function parseInstagramEvents(payload) {
   const events = [];
 
   for (const entry of payload.entry) {
+    const accountId = String(entry?.id || '').trim();
+    if (!accountId) continue;
+
     for (const item of entry.messaging || []) {
       if (item.message?.is_echo || !item.sender?.id) continue;
 
@@ -43,6 +46,10 @@ function parseInstagramEvents(payload) {
       if (typeof text !== 'string' || !text.trim()) continue;
 
       events.push({
+        // A webhook delivery can contain entries for more than one Instagram
+        // professional account. Keep the source account on every event so the
+        // caller always resolves the correct hotel's channel credentials.
+        accountId,
         senderId: String(item.sender.id),
         text: text.trim(),
       });
@@ -57,7 +64,8 @@ async function sendInstagramMessage(
   instagramAccountId,
   recipientId,
   text,
-  graphVersion = 'v24.0'
+  graphVersion = 'v24.0',
+  fetchImpl = fetch
 ) {
   const url =
     `https://graph.facebook.com/${graphVersion}/me/messages`;
@@ -67,7 +75,7 @@ async function sendInstagramMessage(
     textLength: String(text).length,
   });
 
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     method: 'POST',
 
     headers: {
@@ -91,21 +99,16 @@ async function sendInstagramMessage(
   const body = await response.text();
 
   if (!response.ok) {
-    console.error(
-      '[instagram] Send API error:',
-      response.status,
-      body
-    );
+    // Meta's body can contain customer or account metadata. Keep logs useful
+    // without copying external response contents into production logs.
+    console.error('[instagram] Send API error:', response.status);
 
     throw new Error(
-      `Instagram send failed: ${response.status} ${body.slice(0, 500)}`
+      `Instagram send failed: ${response.status}`
     );
   }
 
-  console.log(
-    '[instagram] Reply sent successfully:',
-    body
-  );
+  console.log('[instagram] Reply sent successfully');
 
   try {
     return JSON.parse(body);

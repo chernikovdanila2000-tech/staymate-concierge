@@ -1316,34 +1316,23 @@ const server =
               );
             }
 
-            console.log(
-              '[instagram] PAYLOAD:',
-              rawBody
-            );
-
             const events =
               parseInstagramEvents(
                 payload
               );
 
-            const accountId =
-              Array.isArray(
-                payload.entry
-              ) &&
-              payload.entry[0]
-                ? String(
-                    payload.entry[0]
-                      .id || ''
-                  )
-                : '';
-
             console.log(
               '[instagram] PARSED:',
               {
-                accountId,
                 eventsCount:
                   events.length,
-                events,
+                accountIds: [
+                  ...new Set(
+                    events.map(
+                      event => event.accountId
+                    )
+                  ),
+                ],
               }
             );
 
@@ -1355,14 +1344,10 @@ const server =
               }
             );
 
-            if (
-              !accountId ||
-              events.length === 0
-            ) {
+            if (events.length === 0) {
               console.error(
                 '[instagram] Nothing to process:',
                 {
-                  accountId,
                   eventsCount:
                     events.length,
                 }
@@ -1374,110 +1359,40 @@ const server =
             setImmediate(
               async () => {
                 try {
-                  console.log(
-                    '[instagram] BEFORE CONNECTION'
-                  );
-
-                  const connection =
-                    await resolveInstagramConnection(
-                      accountId
-                    );
-
-                  console.log(
-                    '[instagram] CONNECTION:',
-                    {
-                      found:
-                        !!connection,
-
-                      propertyId:
-                        connection
-                          ? connection.propertyId
-                          : null,
-
-                      instagramAccountId:
-                        connection
-                          ? connection.instagramAccountId
-                          : null,
-                    }
-                  );
-
-                  if (!connection) {
-                    console.error(
-                      `[instagram] No channel for ${accountId}`
-                    );
-
-                    return;
-                  }
-
-                  console.log(
-                    '[instagram] BEFORE PROPERTY:',
-                    connection.propertyId
-                  );
-
-                  const property =
-                    await getProperty(
-                      connection.propertyId
-                    );
-
-                  console.log(
-                    '[instagram] PROPERTY:',
-                    {
-                      found:
-                        !!property,
-
-                      hotelName:
-                        property
-                          ? property.hotel_name
-                          : null,
-
-                      subscriptionStatus:
-                        property
-                          ? property.subscription_status
-                          : null,
-
-                      trialEndsAt:
-                        property
-                          ? property.trial_ends_at
-                          : null,
-
-                      subscriptionActiveUntil:
-                        property
-                          ? property.subscription_active_until
-                          : null,
-                    }
-                  );
-
-                  if (!property) {
-                    console.error(
-                      '[instagram] Property not found:',
-                      connection.propertyId
-                    );
-
-                    return;
-                  }
-
-                  const access =
-                    computeAccess(
-                      property
-                    );
-
-                  console.log(
-                    '[instagram] ACCESS:',
-                    access
-                  );
-
-                  for (
-                    const event of events
-                  ) {
+                  for (const event of events) {
                     try {
+                      const connection =
+                        await resolveInstagramConnection(
+                          event.accountId
+                        );
+
+                      if (!connection) {
+                        console.error(
+                          '[instagram] No connected channel for account'
+                        );
+                        continue;
+                      }
+
+                      const property =
+                        await getProperty(
+                          connection.propertyId
+                        );
+
+                      if (!property) {
+                        console.error(
+                          '[instagram] Resolved property was not found'
+                        );
+                        continue;
+                      }
+
+                      const access = computeAccess(property);
+
                       console.log(
                         '[instagram] EVENT START:',
                         {
                           senderId:
                             event.senderId,
-
-                          text:
-                            event.text,
+                          accountId: event.accountId,
                         }
                       );
 
