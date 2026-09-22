@@ -22,6 +22,7 @@ const {
 const {
   verifyInstagramSignature,
   parseInstagramEvents,
+  prepareInstagramIncomingText,
   sendInstagramMessage,
 } = require('./instagram');
 const {
@@ -1422,6 +1423,30 @@ const server =
                         '[instagram] BEFORE HISTORY'
                       );
 
+                      let incomingText;
+                      try {
+                        incomingText = await prepareInstagramIncomingText({
+                          event,
+                          accessToken: connection.accessToken,
+                          graphVersion: META_GRAPH_VERSION,
+                        });
+                        if (event.audio) console.log('[instagram] Voice transcribed');
+                      } catch (error) {
+                        // Do not leave a guest without feedback when Meta's
+                        // short-lived media URL or transcription fails.
+                        console.error('[instagram] Voice processing failed:', error.code || 'VOICE_PROCESSING_ERROR');
+                        await sendInstagramMessage(
+                          connection.accessToken,
+                          connection.instagramAccountId,
+                          event.senderId,
+                          VOICE_PROCESSING_FALLBACK,
+                          META_GRAPH_VERSION
+                        );
+                        continue;
+                      }
+
+                      if (!incomingText) continue;
+
                       const history =
                         await getHistory(
                           connection.propertyId,
@@ -1443,8 +1468,7 @@ const server =
 
                       history.push({
                         role: 'user',
-                        content:
-                          event.text,
+                        content: incomingText,
                       });
 
                       if (await isTakenOverConversation(connection.propertyId, 'instagram', event.senderId)) {

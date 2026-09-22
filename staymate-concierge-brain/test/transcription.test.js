@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   MAX_AUDIO_BYTES,
+  MAX_AUDIO_DURATION_SECONDS,
   TranscriptionError,
   normalizeText,
   transcribeAudio,
@@ -53,6 +54,10 @@ test('rejects unsupported and oversize uploads before contacting the provider', 
   await assert.rejects(
     transcribeAudio({ ...configured, audio: Buffer.alloc(MAX_AUDIO_BYTES + 1), mediaType: 'audio/ogg' }),
     error => error.code === 'AUDIO_TOO_LARGE'
+  );
+  await assert.rejects(
+    transcribeAudio({ ...configured, audio: Buffer.from('x'), mediaType: 'audio/ogg', durationSeconds: MAX_AUDIO_DURATION_SECONDS + 1 }),
+    error => error.code === 'AUDIO_TOO_LONG'
   );
 });
 

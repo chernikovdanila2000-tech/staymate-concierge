@@ -8,6 +8,7 @@
  */
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
+const MAX_AUDIO_DURATION_SECONDS = 10 * 60;
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const DEFAULT_MODEL = 'gpt-4o-mini-transcribe';
 const SUPPORTED_MEDIA_TYPES = new Set([
@@ -38,6 +39,7 @@ async function transcribeAudio({
   mediaType,
   filename,
   language,
+  durationSeconds,
   endpoint = process.env.TRANSCRIPTION_API_URL || DEFAULT_ENDPOINT,
   apiKey = process.env.TRANSCRIPTION_API_KEY || '',
   model = process.env.TRANSCRIPTION_MODEL || DEFAULT_MODEL,
@@ -54,6 +56,9 @@ async function transcribeAudio({
   }
   if (audio.length > MAX_AUDIO_BYTES) {
     throw new TranscriptionError('AUDIO_TOO_LARGE', 'Голосовое сообщение слишком большое.');
+  }
+  if (Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) > MAX_AUDIO_DURATION_SECONDS) {
+    throw new TranscriptionError('AUDIO_TOO_LONG', 'Голосове повідомлення занадто довге.');
   }
   if (!SUPPORTED_MEDIA_TYPES.has(mediaType)) {
     throw new TranscriptionError('UNSUPPORTED_MEDIA_TYPE', 'Этот формат голосового сообщения пока не поддерживается.');
@@ -96,6 +101,7 @@ module.exports = {
   DEFAULT_ENDPOINT,
   DEFAULT_MODEL,
   MAX_AUDIO_BYTES,
+  MAX_AUDIO_DURATION_SECONDS,
   SUPPORTED_MEDIA_TYPES,
   TranscriptionError,
   normalizeText,

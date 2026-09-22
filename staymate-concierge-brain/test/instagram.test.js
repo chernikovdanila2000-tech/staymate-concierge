@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 const crypto = require('crypto');
 
 const {
+  downloadInstagramMedia,
   parseInstagramEvents,
+  prepareInstagramIncomingText,
   sendInstagramMessage,
   verifyInstagramSignature,
 } = require('../instagram');
@@ -24,8 +26,8 @@ test('keeps the originating Instagram account on every inbound event', () => {
   });
 
   assert.deepEqual(events, [
-    { accountId: 'ig-hotel-a', senderId: 'guest-a', text: 'Вітаю' },
-    { accountId: 'ig-hotel-b', senderId: 'guest-b', text: 'Hello' },
+    { accountId: 'ig-hotel-a', senderId: 'guest-a', text: 'Вітаю', audio: null },
+    { accountId: 'ig-hotel-b', senderId: 'guest-b', text: 'Hello', audio: null },
   ]);
 });
 
@@ -45,8 +47,110 @@ test('ignores echoes, blank messages, and entries without an account id', () => 
   });
 
   assert.deepEqual(events, [
-    { accountId: 'ig-hotel-a', senderId: 'guest-a', text: 'Need a room' },
+    { accountId: 'ig-hotel-a', senderId: 'guest-a', text: 'Need a room', audio: null },
   ]);
+});
+
+test('parses a supported Instagram audio attachment as an inbound voice event', () => {
+  const events = parseInstagramEvents({
+    object: 'instagram',
+    entry: [{
+      id: 'ig-hotel-a',
+      messaging: [{
+        sender: { id: 'guest-a' },
+        message: {
+          attachments: [{
+            type: 'audio',
+            payload: {
+              url: 'https://cdn.instagram.example/temporary-audio',
+              mime_type: 'audio/ogg; codecs=opus',
+              file_size: 1234,
+              duration: 12,
+              filename: 'voice.ogg',
+            },
+          }],
+        },
+      }],
+    }],
+  });
+
+  assert.deepEqual(events, [{
+    accountId: 'ig-hotel-a',
+    senderId: 'guest-a',
+    text: null,
+    audio: {
+      url: 'https://cdn.instagram.example/temporary-audio',
+      mediaId: '',
+      mediaType: 'audio/ogg',
+      fileSize: 1234,
+      durationSeconds: 12,
+      filename: 'voice.ogg',
+    },
+  }]);
+});
+
+test('ignores an unsupported Instagram attachment without treating it as guest text', () => {
+  const events = parseInstagramEvents({
+    entry: [{
+      id: 'ig-hotel-a',
+      messaging: [{ sender: { id: 'guest-a' }, message: { attachments: [{ type: 'image', payload: { url: 'https://cdn.example/photo' } }] } }],
+    }],
+  });
+  assert.deepEqual(events, []);
+});
+
+test('downloads temporary Instagram audio with the access token and keeps it in memory', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url, options });
+    return new Response(new Uint8Array([1, 2, 3]), {
+      status: 200,
+      headers: { 'content-type': 'audio/ogg', 'content-length': '3' },
+    });
+  };
+
+  const media = await downloadInstagramMedia('access-token', {
+    url: 'https://cdn.instagram.example/audio', mediaType: 'audio/ogg', filename: 'voice.ogg',
+  }, 'v24.0', fetchImpl);
+
+  assert.deepEqual([...media.audio], [1, 2, 3]);
+  assert.equal(media.mediaType, 'audio/ogg');
+  assert.equal(requests[0].options.headers.Authorization, 'Bearer access-token');
+  assert.equal(requests[0].options.redirect, 'error');
+});
+
+test('uses the shared transcription service result as ordinary incoming text for the AI pipeline', async () => {
+  const text = await prepareInstagramIncomingText({
+    event: { audio: { url: 'https://cdn.instagram.example/audio', durationSeconds: 4 } },
+    accessToken: 'access-token',
+    downloadMedia: async () => ({
+      audio: Buffer.from('voice'), mediaType: 'audio/ogg', filename: 'voice.ogg', durationSeconds: 4,
+    }),
+    transcribe: async ({ audio, mediaType }) => {
+      assert.deepEqual(audio, Buffer.from('voice'));
+      assert.equal(mediaType, 'audio/ogg');
+      return 'Потрібен номер на двох';
+    },
+  });
+
+  assert.equal(text, 'Потрібен номер на двох');
+});
+
+test('surfaces media-download and transcription failures for the customer-safe webhook fallback', async () => {
+  const event = { audio: { url: 'https://cdn.instagram.example/audio', durationSeconds: 4 } };
+  await assert.rejects(
+    () => prepareInstagramIncomingText({ event, accessToken: 'token', downloadMedia: async () => { throw new Error('download failed'); } }),
+    /download failed/
+  );
+  await assert.rejects(
+    () => prepareInstagramIncomingText({
+      event,
+      accessToken: 'token',
+      downloadMedia: async () => ({ audio: Buffer.from('voice'), mediaType: 'audio/ogg', filename: 'voice.ogg' }),
+      transcribe: async () => { throw new Error('transcription failed'); },
+    }),
+    /transcription failed/
+  );
 });
 
 test('accepts only a valid Meta SHA-256 signature', () => {
