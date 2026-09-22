@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StayAI — Контакти</title>
+<title>StayAI — Політика конфіденційності</title>
 <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png?v=2" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
@@ -354,6 +354,25 @@ a.contact-row:hover .c-value{color:var(--accent-text);}
 .info-card h3{font-size:16.5px; margin-bottom:10px;}
 .info-card p{font-size:14px; color:var(--ink-soft); line-height:1.6;}
 
+/* ---------- legal documents (terms / privacy) ---------- */
+html[lang="uk"] .lang-en, html[lang="en"] .lang-uk{display:none;}
+.legal-updated{font-size:13px; color:var(--muted); margin-bottom:8px;}
+.legal-body{max-width:760px;}
+.legal-body h2{font-size:22px; margin:44px 0 14px; font-weight:600;}
+.legal-body h2:first-child{margin-top:0;}
+.legal-body h3{font-size:16.5px; margin:22px 0 8px; font-weight:600;}
+.legal-body p{font-size:15px; color:var(--ink-soft); line-height:1.7; margin-bottom:14px;}
+.legal-body ul, .legal-body ol{margin:0 0 14px; padding-left:22px; display:flex; flex-direction:column; gap:8px;}
+.legal-body li{font-size:15px; color:var(--ink-soft); line-height:1.6;}
+.legal-body li b, .legal-body p b{color:var(--ink); font-weight:600;}
+.legal-body a{color:var(--accent-text); text-decoration:underline; text-underline-offset:2px;}
+.legal-toc{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:22px 26px; margin-bottom:8px;}
+.legal-toc p{font-size:13px; color:var(--muted); margin-bottom:10px;}
+.legal-toc ol{margin:0; padding-left:20px; columns:2; column-gap:24px;}
+.legal-toc li{font-size:13.5px; margin-bottom:6px;}
+@media (max-width:760px){.legal-toc ol{columns:1;}}
+.legal-placeholder{background:var(--accent-soft); border:1px dashed var(--line-strong); border-radius:var(--radius-s); padding:2px 8px; font-family:'IBM Plex Mono',monospace; font-size:0.92em;}
+
 /* ---------- footer ---------- */
 footer{border-top:1px solid var(--line); padding:40px 0;}
 .footer-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;}
@@ -417,59 +436,234 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 <section class="page-hero">
   <div class="grid-floor" aria-hidden="true"><div class="grid-floor-plane"></div></div>
   <div class="wrap">
-    <span class="kicker" data-i18n="contacts.hero.kicker">Контакти</span>
-    <h1 data-i18n="contacts.hero.title">Залишились питання?</h1>
-    <p data-i18n="contacts.hero.desc">Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.</p>
+    <span class="kicker" data-i18n="privacy.hero.kicker">Юридична інформація</span>
+    <h1 data-i18n="privacy.hero.title">Політика конфіденційності</h1>
+    <p class="legal-updated lang-uk">Останнє оновлення: 22 вересня 2026 р.</p>
+    <p class="legal-updated lang-en">Last updated: September 22, 2026.</p>
   </div>
 </section>
 
 <section>
-  <div class="wrap">
-    <div class="contact-grid reveal">
-      <div>
-        <div class="contact-list">
-          <a class="contact-row" href="mailto:stayaiproject@gmail.com" style="text-decoration:none; color:inherit; cursor:pointer;">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.email.label">Пошта</div>
-              <div class="c-value">stayaiproject@gmail.com</div>
-            </div>
-          </a>
-          <a class="contact-row" href="https://t.me/StayAI_support" target="_blank" rel="noopener" style="text-decoration:none; color:inherit; cursor:pointer;">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.telegram.label">Telegram</div>
-              <div class="c-value">@StayAI_support</div>
-            </div>
-          </a>
-          <div class="contact-row">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke-width="1.6"/><path d="M12 7v5l3 3" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.response.label">Відповідь на звернення</div>
-              <div class="c-value" data-i18n="contact.response.value">протягом робочого дня</div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="wrap legal-body reveal">
 
-      <form class="contact-form" id="contactForm">
-        <div class="field-row" style="margin-bottom:16px;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="cName" data-i18n="form.name.label">Ім'я</label>
-            <input id="cName" type="text" data-i18n-ph="form.name.ph" placeholder="Ваше ім'я" required style="font-family:'Inter',sans-serif;">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="cEmail" data-i18n="form.email.label">Email</label>
-            <input id="cEmail" type="email" data-i18n-ph="form.email.ph" placeholder="you@hotel.com" required style="font-family:'Inter',sans-serif;">
-          </div>
-        </div>
-        <div class="field">
-          <label for="cMsg" data-i18n="form.msg.label">Повідомлення</label>
-          <textarea id="cMsg" data-i18n-ph="form.msg.ph" placeholder="Розкажіть про об'єкт і що хочете автоматизувати" required style="font-family:'Inter',sans-serif;"></textarea>
-        </div>
-        <button type="submit" class="btn-primary" style="width:100%;" data-i18n="form.submit">Надіслати повідомлення</button>
-      </form>
+    <div class="lang-uk">
+    <div class="legal-toc">
+      <p>Зміст</p>
+      <ol>
+        <li>Загальні положення</li>
+        <li>Хто є хто</li>
+        <li>Які дані ми збираємо</li>
+        <li>Для чого ми використовуємо дані</li>
+        <li>Хто ще отримує доступ до даних</li>
+        <li>Передача даних за кордон</li>
+        <li>Cookies та localStorage</li>
+        <li>Скільки ми зберігаємо дані</li>
+        <li>Права суб'єкта персональних даних</li>
+        <li>Безпека</li>
+        <li>Діти</li>
+        <li>Зміни Політики</li>
+        <li>Контакти</li>
+      </ol>
     </div>
+
+    <h2>1. Загальні положення</h2>
+    <p>Ця Політика конфіденційності описує, які персональні дані збирає й обробляє StayAI (сайт stayai.online та пов'язані з ним сервіси — "Сервіс") під час його використання, і як саме ці дані обробляються. Оператор даних облікового запису Власника — <span class="legal-placeholder">ФОП [буде вказано після реєстрації]</span>, email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a>.</p>
+
+    <h2>2. Хто є хто</h2>
+    <ul>
+      <li><b>Власник</b> — особа чи готель, що зареєструвала обліковий запис у кабінеті StayAI.</li>
+      <li><b>Гість</b> — особа, яка спілкується з ШІ-адміністратором через підключені канали (Telegram, Viber, WhatsApp, Instagram, Messenger, чат-віджет на сайті готелю) від імені готелю Власника.</li>
+    </ul>
+    <p>Щодо даних Власника StayAI виступає <b>оператором (контролером)</b> персональних даних. Щодо даних Гостя StayAI обробляє дані <b>від імені та за дорученням Власника</b> (як процесор) — саме Власник визначає, з якими гостями і через які канали спілкується Сервіс.</p>
+
+    <h2>3. Які дані ми збираємо</h2>
+    <h3>3.1 Дані Власника (обліковий запис)</h3>
+    <ul>
+      <li>Email та пароль — пароль зберігається у зашифрованому/хешованому вигляді через Supabase Auth, StayAI не бачить його у відкритому вигляді.</li>
+      <li>Назва та адреса готелю чи апартаментів, дані про номери (тип, ціна, місткість).</li>
+      <li>Статус підписки та історія оплат — без збереження повного номера картки, його обробляє платіжний провайдер.</li>
+      <li>Реквізити підключення каналів зв'язку (токени ботів Telegram/Viber, дані Meta для WhatsApp/Instagram) — зберігаються в зашифрованому вигляді й розшифровуються лише на сервері в момент надсилання повідомлення.</li>
+    </ul>
+    <h3>3.2 Дані Гостя</h3>
+    <ul>
+      <li>Текст повідомлень, які гість надсилає ШІ-адміністратору, включно з текстом, розпізнаним із голосового повідомлення.</li>
+      <li>Ідентифікатор гостя в каналі спілкування (напр. Telegram chat_id, номер WhatsApp, Instagram-акаунт) — залежно від каналу.</li>
+      <li>Ім'я та контактні дані, які гість вказує при бронюванні.</li>
+      <li>Причина й деталі звернення, якщо його передано живому адміністратору (ескалація).</li>
+    </ul>
+    <h3>3.3 Технічні дані</h3>
+    <p>Стандартні технічні логи хостинг-провайдерів (IP-адреса, тип браузера чи пристрою) — для безпеки й діагностики, а також дані, що зберігаються в cookies/localStorage браузера (розділ 7).</p>
+
+    <h2>4. Для чого ми використовуємо дані</h2>
+    <ul>
+      <li>Надання самого Сервісу: розпізнавання, кому належить повідомлення, формування відповіді ШІ-адміністратора, перевірка наявності номерів, оформлення бронювання.</li>
+      <li>Автентифікація та захист облікового запису Власника.</li>
+      <li>Обробка оплати підписки.</li>
+      <li>Технічна підтримка та відповіді на звернення.</li>
+      <li>Виконання законних вимог (наприклад, на запит державних органів у передбачених законом випадках).</li>
+    </ul>
+    <p>Ми <b>не</b> використовуємо дані Гостей чи Власників для реклами, не продаємо їх третім особам і не встановлюємо рекламні чи аналітичні cookies третіх сторін (Google Analytics, Meta Pixel тощо на Сервісі не встановлені).</p>
+
+    <h2>5. Хто ще отримує доступ до даних (субпроцесори)</h2>
+    <p>Для роботи Сервісу ми користуємось наступними технічними постачальниками — кожен обробляє лише той обсяг даних, який потрібен для його функції:</p>
+    <ul>
+      <li><b>Supabase</b> — база даних, автентифікація облікових записів, зберігання переписки.</li>
+      <li><b>Railway</b> — хостинг серверної частини (обробка вебхуків від месенджерів).</li>
+      <li><b>Netlify</b> — хостинг сайту та особистого кабінету.</li>
+      <li><b>Anthropic (Claude API)</b> — обробляє текст переписки для формування відповіді ШІ-адміністратора.</li>
+      <li><b>OpenAI (Whisper API)</b> — розпізнає текст із голосових повідомлень гостей, якщо гість надсилає голосове.</li>
+      <li><b>Resend</b> — надсилання службових email (підтвердження, сповіщення про вхід).</li>
+      <li><b>WayForPay</b> — обробка платежів підписки; дані картки обробляються безпосередньо провайдером, StayAI їх не бачить і не зберігає.</li>
+      <li><b>Telegram, Viber, Meta (WhatsApp/Instagram/Messenger)</b> — платформи-месенджери, які Гість сам обирає для спілкування; на їх використання поширюються також власні умови й політики конфіденційності цих платформ.</li>
+    </ul>
+
+    <h2>6. Передача даних за кордон</h2>
+    <p>Частина перелічених постачальників (зокрема Anthropic, OpenAI, Supabase, Meta) обробляє дані на серверах за межами України, зокрема в США. Передаючи дані таким постачальникам, ми покладаємось на їхні власні договірні й технічні гарантії захисту даних (шифрування з'єднання, обмежений доступ). Використовуючи Сервіс, Гість і Власник погоджуються з такою передачею в обсязі, необхідному для роботи Сервісу.</p>
+
+    <h2>7. Cookies та localStorage</h2>
+    <p>Сервіс використовує лише функціональні (необхідні для роботи) технології зберігання в браузері:</p>
+    <ul>
+      <li>токен сесії Supabase — щоб не входити в кабінет повторно;</li>
+      <li>обрана мова інтерфейсу (uk/en) та тема оформлення (світла/темна);</li>
+      <li>ідентифікатор сесії чат-віджета на сайті готелю — щоб продовжити діалог при поверненні на сторінку.</li>
+    </ul>
+    <p>Ми не використовуємо рекламні cookies третіх сторін. Шрифти сайту завантажуються з Google Fonts (fonts.googleapis.com/fonts.gstatic.com) — під час завантаження шрифту Google технічно бачить IP-адресу запиту, як і для будь-якого зовнішнього ресурсу на сторінці.</p>
+
+    <h2>8. Скільки ми зберігаємо дані</h2>
+    <p>Дані облікового запису та переписки зберігаються, поки активний обліковий запис Власника. Після видалення облікового запису (за запитом Власника) дані видаляються протягом розумного строку, необхідного для завершення технічних процесів (як правило, до 30 днів), крім випадків, коли законодавство вимагає довшого зберігання (наприклад, фінансова звітність про оплати).</p>
+
+    <h2>9. Права суб'єкта персональних даних</h2>
+    <p>Відповідно до Закону України "Про захист персональних даних", ви маєте право:</p>
+    <ul>
+      <li>отримати інформацію про те, які ваші дані ми обробляємо;</li>
+      <li>вимагати виправлення неточних даних;</li>
+      <li>вимагати видалення даних ("право на забуття") — для власного облікового запису це частково можна зробити самостійно в кабінеті (розділ "Ескалації" дозволяє видаляти окремі діалоги), а повне видалення облікового запису — за запитом на контакти нижче;</li>
+      <li>відкликати згоду на обробку даних у будь-який час (це може означати припинення доступу до Сервісу).</li>
+    </ul>
+    <p>Для реалізації цих прав звертайтесь на email нижче — ми відповімо протягом розумного строку, як правило не пізніше 30 днів.</p>
+
+    <h2>10. Безпека</h2>
+    <p>Ми застосовуємо технічні заходи захисту: шифрування з'єднання (HTTPS) для всього трафіку, шифрування токенів підключення каналів у базі даних, розмежування доступу до даних кожного готелю на рівні бази даних (Row Level Security) — власник одного готелю технічно не може побачити дані іншого.</p>
+
+    <h2>11. Діти</h2>
+    <p>Сервіс призначений для бізнес-використання (готелі, апартаменти) і не адресований особам молодше 16 років. Якщо ви вважаєте, що ми ненавмисно зібрали дані дитини, зв'яжіться з нами для видалення.</p>
+
+    <h2>12. Зміни Політики</h2>
+    <p>Ми можемо оновлювати цю Політику. Дата останнього оновлення вказана вгорі сторінки. Про суттєві зміни повідомимо на сайті.</p>
+
+    <h2>13. Контакти</h2>
+    <p>З питань конфіденційності звертайтесь:<br>Email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a><br>Telegram: <a href="https://t.me/StayAI_support" target="_blank" rel="noopener">@StayAI_support</a></p>
+    </div>
+
+    <div class="lang-en">
+    <div class="legal-toc">
+      <p>Contents</p>
+      <ol>
+        <li>General provisions</li>
+        <li>Who's who</li>
+        <li>What data we collect</li>
+        <li>Why we use it</li>
+        <li>Who else gets access to it</li>
+        <li>International data transfers</li>
+        <li>Cookies and localStorage</li>
+        <li>How long we keep data</li>
+        <li>Data subject rights</li>
+        <li>Security</li>
+        <li>Children</li>
+        <li>Changes to this Policy</li>
+        <li>Contact</li>
+      </ol>
+    </div>
+
+    <h2>1. General provisions</h2>
+    <p>This Privacy Policy describes what personal data StayAI (the stayai.online website and related services — the "Service") collects and processes, and how. The data controller for the Owner's account is <span class="legal-placeholder">a Ukrainian sole proprietor (FOP) [to be added after registration]</span>, email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a>.</p>
+
+    <h2>2. Who's who</h2>
+    <ul>
+      <li><b>Owner</b> — the person or hotel that registered an account in the StayAI dashboard.</li>
+      <li><b>Guest</b> — a person chatting with the AI agent through a connected channel (Telegram, Viber, WhatsApp, Instagram, Messenger, the hotel's website widget) on behalf of the Owner's property.</li>
+    </ul>
+    <p>For the Owner's own account data, StayAI acts as the <b>data controller</b>. For Guest data, StayAI processes it <b>on the Owner's behalf</b> (as a processor) — it's the Owner who decides which guests and which channels the Service talks to.</p>
+
+    <h2>3. What data we collect</h2>
+    <h3>3.1 Owner data (account)</h3>
+    <ul>
+      <li>Email and password — the password is stored hashed/encrypted via Supabase Auth; StayAI never sees it in plain text.</li>
+      <li>Property name and address, room data (type, price, capacity).</li>
+      <li>Subscription status and payment history — without storing the full card number, which the payment provider handles.</li>
+      <li>Messaging-channel connection credentials (Telegram/Viber bot tokens, Meta data for WhatsApp/Instagram) — stored encrypted and decrypted only on the server at the moment a message is sent.</li>
+    </ul>
+    <h3>3.2 Guest data</h3>
+    <ul>
+      <li>The text of messages the guest sends the AI agent, including text transcribed from a voice message.</li>
+      <li>The guest's identifier on that channel (e.g. a Telegram chat_id, a WhatsApp number, an Instagram handle) — depending on the channel.</li>
+      <li>Name and contact details the guest provides when booking.</li>
+      <li>The reason and details of a request, if it's handed off to a human manager (escalation).</li>
+    </ul>
+    <h3>3.3 Technical data</h3>
+    <p>Standard hosting-provider technical logs (IP address, browser or device type) for security and diagnostics, plus data stored in the browser's cookies/localStorage (section 7).</p>
+
+    <h2>4. Why we use it</h2>
+    <ul>
+      <li>Providing the Service itself: identifying who a message belongs to, generating the AI agent's reply, checking room availability, processing a booking.</li>
+      <li>Authenticating and securing the Owner's account.</li>
+      <li>Processing subscription payments.</li>
+      <li>Technical support and replying to inquiries.</li>
+      <li>Complying with legal obligations (e.g. a lawful request from a government authority).</li>
+    </ul>
+    <p>We <b>do not</b> use Guest or Owner data for advertising, do not sell it to third parties, and do not set third-party advertising or analytics cookies (Google Analytics, Meta Pixel, etc. are not installed on the Service).</p>
+
+    <h2>5. Who else gets access to it (sub-processors)</h2>
+    <p>To run the Service, we rely on the following technical vendors — each handles only the data its function needs:</p>
+    <ul>
+      <li><b>Supabase</b> — database, account authentication, conversation storage.</li>
+      <li><b>Railway</b> — backend hosting (processing messenger webhooks).</li>
+      <li><b>Netlify</b> — hosting for the website and the dashboard.</li>
+      <li><b>Anthropic (Claude API)</b> — processes conversation text to generate the AI agent's reply.</li>
+      <li><b>OpenAI (Whisper API)</b> — transcribes guest voice messages, when a guest sends one.</li>
+      <li><b>Resend</b> — sends transactional email (confirmations, sign-in notices).</li>
+      <li><b>WayForPay</b> — processes subscription payments; card details are handled directly by the provider, StayAI never sees or stores them.</li>
+      <li><b>Telegram, Viber, Meta (WhatsApp/Instagram/Messenger)</b> — the messaging platforms the Guest chooses to use; their own terms and privacy policies also apply.</li>
+    </ul>
+
+    <h2>6. International data transfers</h2>
+    <p>Some of the vendors above (notably Anthropic, OpenAI, Supabase, Meta) process data on servers outside Ukraine, including in the US. When we transfer data to them, we rely on their own contractual and technical safeguards (encrypted connections, restricted access). By using the Service, both the Guest and the Owner consent to such transfers to the extent needed to provide the Service.</p>
+
+    <h2>7. Cookies and localStorage</h2>
+    <p>The Service uses only functional (strictly necessary) browser storage:</p>
+    <ul>
+      <li>a Supabase session token — so you don't have to log back into the dashboard every time;</li>
+      <li>your chosen interface language (uk/en) and theme (light/dark);</li>
+      <li>a session id for the hotel-website chat widget — so a conversation can continue when you return to the page.</li>
+    </ul>
+    <p>We don't use third-party advertising cookies. The site's fonts load from Google Fonts (fonts.googleapis.com/fonts.gstatic.com) — as with any external resource on a page, Google technically sees the requesting IP address when a font is fetched.</p>
+
+    <h2>8. How long we keep data</h2>
+    <p>Account and conversation data is kept for as long as the Owner's account stays active. After an account is deleted (at the Owner's request), data is removed within a reasonable time needed to complete technical processes (typically up to 30 days), except where the law requires longer retention (e.g. financial records of payments).</p>
+
+    <h2>9. Data subject rights</h2>
+    <p>Under Ukraine's Law "On Personal Data Protection", you have the right to:</p>
+    <ul>
+      <li>find out what data of yours we process;</li>
+      <li>request correction of inaccurate data;</li>
+      <li>request deletion of data ("right to be forgotten") — for your own account, you can do this partly yourself in the dashboard (the Escalations section lets you delete individual conversations), and request full account deletion via the contact details below;</li>
+      <li>withdraw consent to processing at any time (which may mean losing access to the Service).</li>
+    </ul>
+    <p>To exercise these rights, contact us at the email below — we'll respond within a reasonable time, typically no later than 30 days.</p>
+
+    <h2>10. Security</h2>
+    <p>We apply technical safeguards: encrypted connections (HTTPS) for all traffic, encrypted storage of channel-connection tokens in the database, and database-level access isolation between properties (Row Level Security) — the owner of one property technically cannot see another's data.</p>
+
+    <h2>11. Children</h2>
+    <p>The Service is intended for business use (hotels, apartments) and is not directed at anyone under 16. If you believe we've inadvertently collected a child's data, contact us and we'll delete it.</p>
+
+    <h2>12. Changes to this Policy</h2>
+    <p>We may update this Policy from time to time. The "last updated" date is shown at the top of the page. We'll announce material changes on the site.</p>
+
+    <h2>13. Contact</h2>
+    <p>For privacy questions, reach us at:<br>Email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a><br>Telegram: <a href="https://t.me/StayAI_support" target="_blank" rel="noopener">@StayAI_support</a></p>
+    </div>
+
   </div>
 </section>
 <footer>
@@ -492,7 +686,7 @@ const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
 /* ============ StayAI — i18n ============ */
 const I18N = {
 uk: {
-  "meta.title":"StayAI — Контакти",
+  "meta.title":"StayAI — Політика конфіденційності",
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити","nav.terms":"Умови використання","nav.privacy":"Політика конфіденційності",
   "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
@@ -615,6 +809,7 @@ uk: {
   "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayAI дотримуватиметься.",
   "step.s5.title":"Перевірте й запустіть","step.s5.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність — і увімкніть канал для реальних гостей.",
 
+  "privacy.hero.kicker":"Юридична інформація","privacy.hero.title":"Політика конфіденційності",
   "contacts.hero.kicker":"Контакти","contacts.hero.title":"Залишились питання?",
   "contacts.hero.desc":"Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.",
   "contact.email.label":"Пошта","contact.telegram.label":"Telegram",
@@ -624,7 +819,7 @@ uk: {
   "form.submit":"Надіслати повідомлення","form.sending":"Надсилаємо..."
 },
 en: {
-  "meta.title":"StayAI — Contact",
+  "meta.title":"StayAI — Privacy Policy",
   "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected","nav.terms":"Terms of Service","nav.privacy":"Privacy Policy",
   "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
@@ -747,6 +942,7 @@ en: {
   "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayAI will follow.",
   "step.s5.title":"Test and launch","step.s5.desc":"Send a test message as a guest, check the reply and availability — then switch the channel on for real guests.",
 
+  "privacy.hero.kicker":"Legal","privacy.hero.title":"Privacy Policy",
   "contacts.hero.kicker":"Contact","contacts.hero.title":"Still have questions?",
   "contacts.hero.desc":"We'll help with setup, pricing, or integrating your booking system.",
   "contact.email.label":"Email","contact.telegram.label":"Telegram",

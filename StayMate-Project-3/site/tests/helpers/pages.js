@@ -8,6 +8,8 @@ const MARKETING_PAGES = [
   'pricing.html',
   'instructions.html',
   'contacts.html',
+  'terms.html',
+  'privacy.html',
 ];
 
 // Pages that just redirect (no point testing them for content/i18n).

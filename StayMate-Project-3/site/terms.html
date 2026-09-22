@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StayAI — Контакти</title>
+<title>StayAI — Умови використання</title>
 <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png?v=2" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
@@ -354,6 +354,25 @@ a.contact-row:hover .c-value{color:var(--accent-text);}
 .info-card h3{font-size:16.5px; margin-bottom:10px;}
 .info-card p{font-size:14px; color:var(--ink-soft); line-height:1.6;}
 
+/* ---------- legal documents (terms / privacy) ---------- */
+html[lang="uk"] .lang-en, html[lang="en"] .lang-uk{display:none;}
+.legal-updated{font-size:13px; color:var(--muted); margin-bottom:8px;}
+.legal-body{max-width:760px;}
+.legal-body h2{font-size:22px; margin:44px 0 14px; font-weight:600;}
+.legal-body h2:first-child{margin-top:0;}
+.legal-body h3{font-size:16.5px; margin:22px 0 8px; font-weight:600;}
+.legal-body p{font-size:15px; color:var(--ink-soft); line-height:1.7; margin-bottom:14px;}
+.legal-body ul, .legal-body ol{margin:0 0 14px; padding-left:22px; display:flex; flex-direction:column; gap:8px;}
+.legal-body li{font-size:15px; color:var(--ink-soft); line-height:1.6;}
+.legal-body li b, .legal-body p b{color:var(--ink); font-weight:600;}
+.legal-body a{color:var(--accent-text); text-decoration:underline; text-underline-offset:2px;}
+.legal-toc{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-m); padding:22px 26px; margin-bottom:8px;}
+.legal-toc p{font-size:13px; color:var(--muted); margin-bottom:10px;}
+.legal-toc ol{margin:0; padding-left:20px; columns:2; column-gap:24px;}
+.legal-toc li{font-size:13.5px; margin-bottom:6px;}
+@media (max-width:760px){.legal-toc ol{columns:1;}}
+.legal-placeholder{background:var(--accent-soft); border:1px dashed var(--line-strong); border-radius:var(--radius-s); padding:2px 8px; font-family:'IBM Plex Mono',monospace; font-size:0.92em;}
+
 /* ---------- footer ---------- */
 footer{border-top:1px solid var(--line); padding:40px 0;}
 .footer-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;}
@@ -417,59 +436,144 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 <section class="page-hero">
   <div class="grid-floor" aria-hidden="true"><div class="grid-floor-plane"></div></div>
   <div class="wrap">
-    <span class="kicker" data-i18n="contacts.hero.kicker">Контакти</span>
-    <h1 data-i18n="contacts.hero.title">Залишились питання?</h1>
-    <p data-i18n="contacts.hero.desc">Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.</p>
+    <span class="kicker" data-i18n="terms.hero.kicker">Юридична інформація</span>
+    <h1 data-i18n="terms.hero.title">Умови використання</h1>
+    <p class="legal-updated lang-uk">Останнє оновлення: 22 вересня 2026 р.</p>
+    <p class="legal-updated lang-en">Last updated: September 22, 2026.</p>
   </div>
 </section>
 
 <section>
-  <div class="wrap">
-    <div class="contact-grid reveal">
-      <div>
-        <div class="contact-list">
-          <a class="contact-row" href="mailto:stayaiproject@gmail.com" style="text-decoration:none; color:inherit; cursor:pointer;">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.email.label">Пошта</div>
-              <div class="c-value">stayaiproject@gmail.com</div>
-            </div>
-          </a>
-          <a class="contact-row" href="https://t.me/StayAI_support" target="_blank" rel="noopener" style="text-decoration:none; color:inherit; cursor:pointer;">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H8l-5 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.telegram.label">Telegram</div>
-              <div class="c-value">@StayAI_support</div>
-            </div>
-          </a>
-          <div class="contact-row">
-            <div class="c-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke-width="1.6"/><path d="M12 7v5l3 3" stroke-width="1.6"/></svg></div>
-            <div>
-              <div class="c-label" data-i18n="contact.response.label">Відповідь на звернення</div>
-              <div class="c-value" data-i18n="contact.response.value">протягом робочого дня</div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="wrap legal-body reveal">
 
-      <form class="contact-form" id="contactForm">
-        <div class="field-row" style="margin-bottom:16px;">
-          <div class="field" style="margin-bottom:0;">
-            <label for="cName" data-i18n="form.name.label">Ім'я</label>
-            <input id="cName" type="text" data-i18n-ph="form.name.ph" placeholder="Ваше ім'я" required style="font-family:'Inter',sans-serif;">
-          </div>
-          <div class="field" style="margin-bottom:0;">
-            <label for="cEmail" data-i18n="form.email.label">Email</label>
-            <input id="cEmail" type="email" data-i18n-ph="form.email.ph" placeholder="you@hotel.com" required style="font-family:'Inter',sans-serif;">
-          </div>
-        </div>
-        <div class="field">
-          <label for="cMsg" data-i18n="form.msg.label">Повідомлення</label>
-          <textarea id="cMsg" data-i18n-ph="form.msg.ph" placeholder="Розкажіть про об'єкт і що хочете автоматизувати" required style="font-family:'Inter',sans-serif;"></textarea>
-        </div>
-        <button type="submit" class="btn-primary" style="width:100%;" data-i18n="form.submit">Надіслати повідомлення</button>
-      </form>
+    <div class="lang-uk">
+    <div class="legal-toc">
+      <p>Зміст</p>
+      <ol>
+        <li>Загальні положення</li>
+        <li>Опис сервісу</li>
+        <li>Обліковий запис</li>
+        <li>Тарифи, оплата та підписка</li>
+        <li>Обов'язки Власника</li>
+        <li>Використання штучного інтелекту</li>
+        <li>Інтелектуальна власність</li>
+        <li>Обмеження відповідальності</li>
+        <li>Призупинення та припинення доступу</li>
+        <li>Зміни Умов</li>
+        <li>Застосовне право</li>
+        <li>Контакти</li>
+      </ol>
     </div>
+
+    <h2>1. Загальні положення</h2>
+    <p>Ці Умови використання ("Умови") регулюють використання сервісу StayAI — сайту stayai.online, вбудованого чат-віджета, особистого кабінету та підключених через нього каналів зв'язку (разом — "Сервіс"). Сервіс надається <span class="legal-placeholder">ФОП [буде вказано після реєстрації], РНОКПП [буде вказано]</span> ("StayAI", "ми"). Реєструючись або використовуючи Сервіс, власник готелю чи апартаментів ("Власник", "Ви") погоджується з цими Умовами. Якщо ви не погоджуєтесь із будь-яким пунктом — будь ласка, не використовуйте Сервіс.</p>
+
+    <h2>2. Опис сервісу</h2>
+    <p>StayAI — це ШІ-адміністратор для готелів і апартаментів: відповідає гостям у підключених каналах (Telegram, Viber, WhatsApp, Instagram, Messenger, чат-віджет на сайті готелю), перевіряє наявність номерів, надає інформацію про заклад на основі даних, які Ви внесли в кабінет, і за потреби передає складне звернення живому адміністратору Власника (ескалація).</p>
+
+    <h2>3. Обліковий запис</h2>
+    <p>Для використання кабінету потрібна реєстрація (email і пароль через Supabase Auth). Ви відповідаєте за конфіденційність своїх облікових даних і за всі дії, вчинені під вашим акаунтом. Дані про готель — номери, ціни, правила проживання — які ви вносите в кабінет, повинні бути точними: Сервіс відповідає гостям саме на їх основі.</p>
+
+    <h2>4. Тарифи, оплата та підписка</h2>
+    <p>Доступні тарифи: Старт (€100/міс), Профі (€200/міс), Мережа (€300/міс) — детальний опис на сторінці <a href="pricing.html">Тарифи</a>. Новим користувачам доступний безкоштовний пробний період 3 дні.</p>
+    <p>Оплата здійснюється через стороннього платіжного провайдера (наразі WayForPay). Повні дані банківської картки StayAI не зберігає — вони обробляються безпосередньо провайдером платежів.</p>
+    <p>Підписка автоматично продовжується (списання за той самий тариф) щомісяця, якщо ви не скасували автопродовження в особистому кабінеті (кнопка "Скасувати автопродовження"). Скасування зупиняє майбутні списання; доступ до Сервісу зберігається до кінця вже оплаченого періоду. Кошти за вже оплачений період не повертаються, крім випадків, прямо передбачених законодавством України про захист прав споживачів.</p>
+
+    <h2>5. Обов'язки Власника</h2>
+    <ul>
+      <li>Ви відповідаєте за законність контенту, який передаєте Сервісу — опис номерів, правила проживання, відповіді, які ви схвалюєте чи публікуєте через кабінет.</li>
+      <li>Ви відповідаєте за фактичне виконання бронювань і зобов'язань перед гостем — StayAI лише передає інформацію та приймає повідомлення; договірні відносини щодо проживання виникають безпосередньо між Власником і гостем.</li>
+      <li>Забороняється використовувати Сервіс для незаконної діяльності, шахрайства, розсилки спаму або обробки особливих категорій персональних даних (наприклад, даних про стан здоров'я гостей) без попередньої письмової згоди StayAI.</li>
+    </ul>
+
+    <h2>6. Використання штучного інтелекту — межі відповідальності</h2>
+    <p>Відповіді ШІ-адміністратора ґрунтуються на даних, які Ви внесли в кабінет, і можуть містити помилки чи неточності — особливо якщо вихідні дані неповні або застарілі.</p>
+    <p>ШІ не призначений для екстрених ситуацій (загроза життю чи здоров'ю, пожежа, злочин) — такі звернення потребують негайного втручання людини. Сервіс передбачає передачу складних звернень людині (ескалацію), але Власник відповідає за наявність власного каналу зв'язку для екстрених випадків.</p>
+    <p>StayAI не гарантує безпомилковість чи безперервність роботи моделі штучного інтелекту (яка надається сторонніми постачальниками — див. Політику конфіденційності) і, тією мірою, якою це дозволяє законодавство, не несе відповідальності за збитки, спричинені помилковою відповіддю ШІ, окрім випадків умисного порушення з боку StayAI.</p>
+
+    <h2>7. Інтелектуальна власність</h2>
+    <p>Сервіс, його код, дизайн і торгова марка StayAI належать StayAI. Дані про ваш готель — номери, правила, переписка з гостями — залишаються вашою власністю; ми обробляємо їх лише для надання Сервісу.</p>
+
+    <h2>8. Обмеження відповідальності</h2>
+    <p>Сервіс надається "як є" (as is), без гарантій безперервної чи безпомилкової роботи. Тією мірою, якою це дозволяє законодавство України, StayAI не несе відповідальності за непрямі, випадкові чи побічні збитки, втрачений прибуток або дані, що виникли внаслідок використання чи неможливості використання Сервісу.</p>
+
+    <h2>9. Призупинення та припинення доступу</h2>
+    <p>Ми можемо призупинити доступ до кабінету у разі закінчення пробного періоду чи підписки без оплати, порушення цих Умов, або обґрунтованої підозри у шахрайському чи незаконному використанні. Ви можете припинити користування Сервісом у будь-який момент, скасувавши підписку та/або звернувшись із запитом на видалення облікового запису на контакти нижче.</p>
+
+    <h2>10. Зміни Умов</h2>
+    <p>Ми можемо оновлювати ці Умови. Про суттєві зміни повідомимо на сайті або на вашу email-адресу. Продовження використання Сервісу після набуття змінами чинності означає згоду з новою редакцією.</p>
+
+    <h2>11. Застосовне право</h2>
+    <p>Ці Умови регулюються законодавством України. Спори вирішуються шляхом переговорів, а за неможливості досягти згоди — в судовому порядку відповідно до законодавства України.</p>
+
+    <h2>12. Контакти</h2>
+    <p>Email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a><br>Telegram: <a href="https://t.me/StayAI_support" target="_blank" rel="noopener">@StayAI_support</a><br>Юридична особа: <span class="legal-placeholder">буде вказано після реєстрації ФОП</span></p>
+    </div>
+
+    <div class="lang-en">
+    <div class="legal-toc">
+      <p>Contents</p>
+      <ol>
+        <li>General provisions</li>
+        <li>Service description</li>
+        <li>Account</li>
+        <li>Plans, billing and subscription</li>
+        <li>Owner's responsibilities</li>
+        <li>Use of artificial intelligence</li>
+        <li>Intellectual property</li>
+        <li>Limitation of liability</li>
+        <li>Suspension and termination</li>
+        <li>Changes to these Terms</li>
+        <li>Governing law</li>
+        <li>Contact</li>
+      </ol>
+    </div>
+
+    <h2>1. General provisions</h2>
+    <p>These Terms of Service ("Terms") govern the use of StayAI — the stayai.online website, the embedded chat widget, the owner dashboard, and the messaging channels connected through it (together, the "Service"). The Service is provided by <span class="legal-placeholder">a Ukrainian sole proprietor (FOP) [to be added after registration], tax ID [to be added]</span> ("StayAI", "we"). By registering for or using the Service, the hotel or apartment owner ("Owner", "you") agrees to these Terms. If you don't agree with any part of them, please don't use the Service.</p>
+
+    <h2>2. Service description</h2>
+    <p>StayAI is an AI front-desk agent for hotels and apartments: it replies to guests across connected channels (Telegram, Viber, WhatsApp, Instagram, Messenger, the website chat widget), checks room availability, answers using the information you entered in your dashboard, and hands off complex requests to a human manager (escalation) when needed.</p>
+
+    <h2>3. Account</h2>
+    <p>Using the dashboard requires an account (email and password, via Supabase Auth). You're responsible for keeping your credentials confidential and for everything that happens under your account. Property details you enter — rooms, prices, house rules — must be accurate, since the Service answers guests based on them.</p>
+
+    <h2>4. Plans, billing and subscription</h2>
+    <p>Available plans: Start (€100/mo), Pro (€200/mo), Network (€300/mo) — see the <a href="pricing.html">Pricing</a> page for details. New accounts get a free 3-day trial.</p>
+    <p>Payment is processed through a third-party payment provider (currently WayForPay). StayAI does not store your full card details — they're handled directly by the payment provider.</p>
+    <p>Your subscription renews automatically (charging the same plan) every month unless you cancel auto-renewal in your dashboard ("Cancel auto-renewal" button). Cancelling stops future charges; access continues until the end of the period you already paid for. Amounts already paid are non-refundable, except where required by applicable Ukrainian consumer-protection law.</p>
+
+    <h2>5. Owner's responsibilities</h2>
+    <ul>
+      <li>You're responsible for the legality of the content you feed into the Service — room descriptions, house rules, and any replies you approve or publish through the dashboard.</li>
+      <li>You're responsible for actually fulfilling bookings and obligations to the guest — StayAI only relays information and messages; the contractual relationship for the stay is directly between the Owner and the guest.</li>
+      <li>You may not use the Service for unlawful activity, fraud, spam, or processing special categories of personal data (e.g. guests' health data) without StayAI's prior written consent.</li>
+    </ul>
+
+    <h2>6. Use of artificial intelligence — limits of liability</h2>
+    <p>The AI agent's replies are based on the data you entered in your dashboard and may contain errors or inaccuracies, especially when that source data is incomplete or outdated.</p>
+    <p>The AI is not designed for emergencies (a threat to life or health, fire, a crime) — those require immediate human intervention. The Service supports handing off complex requests to a human (escalation), but the Owner is responsible for having their own emergency contact channel.</p>
+    <p>StayAI does not guarantee the AI model (provided by third-party vendors — see the Privacy Policy) will be error-free or uninterrupted, and, to the extent permitted by law, is not liable for damages caused by an incorrect AI reply, except in cases of StayAI's own wilful misconduct.</p>
+
+    <h2>7. Intellectual property</h2>
+    <p>The Service, its code, design and the StayAI trademark belong to StayAI. Data about your property — rooms, house rules, guest conversations — remains your property; we process it only to provide the Service.</p>
+
+    <h2>8. Limitation of liability</h2>
+    <p>The Service is provided "as is", without any guarantee of uninterrupted or error-free operation. To the extent permitted by Ukrainian law, StayAI is not liable for indirect, incidental or consequential damages, lost profit, or lost data arising from your use, or inability to use, the Service.</p>
+
+    <h2>9. Suspension and termination</h2>
+    <p>We may suspend dashboard access if your trial or subscription has ended without payment, if you breach these Terms, or on reasonable suspicion of fraudulent or unlawful use. You may stop using the Service at any time by cancelling your subscription and/or requesting account deletion via the contact details below.</p>
+
+    <h2>10. Changes to these Terms</h2>
+    <p>We may update these Terms from time to time. We'll announce material changes on the site or by email. Continuing to use the Service after changes take effect means you accept the updated version.</p>
+
+    <h2>11. Governing law</h2>
+    <p>These Terms are governed by the laws of Ukraine. Disputes are resolved through negotiation, or, failing that, in accordance with Ukrainian law.</p>
+
+    <h2>12. Contact</h2>
+    <p>Email: <a href="mailto:stayaiproject@gmail.com">stayaiproject@gmail.com</a><br>Telegram: <a href="https://t.me/StayAI_support" target="_blank" rel="noopener">@StayAI_support</a><br>Legal entity: <span class="legal-placeholder">to be added after FOP registration</span></p>
+    </div>
+
   </div>
 </section>
 <footer>
@@ -492,7 +596,7 @@ const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
 /* ============ StayAI — i18n ============ */
 const I18N = {
 uk: {
-  "meta.title":"StayAI — Контакти",
+  "meta.title":"StayAI — Умови використання",
   "nav.home":"Головна","nav.features":"Можливості","nav.how":"Як це працює","nav.pricing":"Тарифи",
   "nav.connect":"Підключити","nav.instructions":"Інструкція","nav.contacts":"Контакти","nav.cta":"Підключити","nav.terms":"Умови використання","nav.privacy":"Політика конфіденційності",
   "nav.login":"Увійти","nav.account":"Кабінет","nav.cabinet":"Особистий кабінет","nav.logout":"Вийти",
@@ -615,6 +719,7 @@ uk: {
   "step.s4.title":"Завантажте правила об'єкта","step.s4.desc":"Заїзд/виїзд, депозит, тварини, паркування — короткий текстовий файл з умовами, яких StayAI дотримуватиметься.",
   "step.s5.title":"Перевірте й запустіть","step.s5.desc":"Напишіть тестове повідомлення від імені гостя, перевірте відповідь і наявність — і увімкніть канал для реальних гостей.",
 
+  "terms.hero.kicker":"Юридична інформація","terms.hero.title":"Умови використання",
   "contacts.hero.kicker":"Контакти","contacts.hero.title":"Залишились питання?",
   "contacts.hero.desc":"Відповімо щодо підключення, тарифів або інтеграції з вашою системою бронювання.",
   "contact.email.label":"Пошта","contact.telegram.label":"Telegram",
@@ -624,7 +729,7 @@ uk: {
   "form.submit":"Надіслати повідомлення","form.sending":"Надсилаємо..."
 },
 en: {
-  "meta.title":"StayAI — Contact",
+  "meta.title":"StayAI — Terms of Service",
   "nav.home":"Home","nav.features":"Features","nav.how":"How it works","nav.pricing":"Pricing",
   "nav.connect":"Get connected","nav.instructions":"Setup guide","nav.contacts":"Contact","nav.cta":"Get connected","nav.terms":"Terms of Service","nav.privacy":"Privacy Policy",
   "nav.login":"Log in","nav.account":"Account","nav.cabinet":"Personal cabinet","nav.logout":"Log out",
@@ -747,6 +852,7 @@ en: {
   "step.s4.title":"Upload your house rules","step.s4.desc":"Check-in/out, deposit, pets, parking — a short text file with the terms StayAI will follow.",
   "step.s5.title":"Test and launch","step.s5.desc":"Send a test message as a guest, check the reply and availability — then switch the channel on for real guests.",
 
+  "terms.hero.kicker":"Legal","terms.hero.title":"Terms of Service",
   "contacts.hero.kicker":"Contact","contacts.hero.title":"Still have questions?",
   "contacts.hero.desc":"We'll help with setup, pricing, or integrating your booking system.",
   "contact.email.label":"Email","contact.telegram.label":"Telegram",
