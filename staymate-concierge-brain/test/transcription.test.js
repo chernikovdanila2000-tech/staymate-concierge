@@ -5,6 +5,7 @@ const {
   MAX_AUDIO_DURATION_SECONDS,
   TRANSCRIPTION_TIMEOUT_MS,
   TranscriptionError,
+  detectAudioMediaType,
   normalizeText,
   safeProviderReason,
   transcribeAudio,
@@ -62,6 +63,24 @@ test('rejects unsupported and oversize uploads before contacting the provider', 
     transcribeAudio({ ...configured, audio: Buffer.from('x'), mediaType: 'audio/ogg', durationSeconds: MAX_AUDIO_DURATION_SECONDS + 1 }),
     error => error.code === 'AUDIO_TOO_LONG'
   );
+});
+
+test('recognizes a valid voice container when Meta labels it octet-stream', async () => {
+  let request;
+  const ogg = Buffer.concat([Buffer.from('OggS'), Buffer.from('voice-bytes')]);
+  await transcribeAudio({
+    audio: ogg,
+    mediaType: 'application/octet-stream',
+    filename: 'attachment.bin',
+    apiKey: 'test-key',
+    fetchImpl: async (_url, options) => {
+      request = options;
+      return { ok: true, json: async () => ({ text: 'Привіт' }) };
+    },
+  });
+  assert.equal(detectAudioMediaType(ogg), 'audio/ogg');
+  assert.equal(request.body.get('file').type, 'audio/ogg');
+  assert.equal(request.body.get('file').name, 'attachment.ogg');
 });
 
 test('converts provider failures into safe customer-facing errors', async () => {

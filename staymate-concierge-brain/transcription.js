@@ -35,14 +35,44 @@ class TranscriptionError extends Error {
   }
 }
 
+function audioExtension(mediaType) {
+  return {
+    'audio/aac': 'aac',
+    'audio/flac': 'flac',
+    'audio/m4a': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+    'audio/webm': 'webm',
+  }[mediaType] || 'webm';
+}
+
 function safeFilename(filename, mediaType) {
-  const fallback = mediaType === 'audio/ogg' ? 'voice.ogg' : 'voice.webm';
-  const cleaned = String(filename || fallback).replace(/[^a-zA-Z0-9._-]/g, '_');
-  return cleaned.slice(0, 120) || fallback;
+  const extension = audioExtension(mediaType);
+  const cleaned = String(filename || 'voice').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const stem = cleaned.replace(/\.[a-zA-Z0-9]{1,8}$/, '').slice(0, 112) || 'voice';
+  return `${stem}.${extension}`;
 }
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+// Instagram's CDN occasionally labels a valid voice file as
+// application/octet-stream. Identify only well-known audio containers from
+// their binary signatures; an unknown file still remains rejected.
+function detectAudioMediaType(audio) {
+  if (!Buffer.isBuffer(audio) || audio.length < 4) return null;
+  if (audio.subarray(0, 4).equals(Buffer.from('OggS'))) return 'audio/ogg';
+  if (audio.subarray(0, 4).equals(Buffer.from('fLaC'))) return 'audio/flac';
+  if (audio.subarray(0, 4).equals(Buffer.from('RIFF')) && audio.subarray(8, 12).equals(Buffer.from('WAVE'))) return 'audio/wav';
+  if (audio.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) return 'audio/webm';
+  if (audio.subarray(0, 3).equals(Buffer.from('ID3')) || (audio[0] === 0xff && (audio[1] & 0xe0) === 0xe0)) return 'audio/mpeg';
+  if (audio.length >= 12 && audio.subarray(4, 8).equals(Buffer.from('ftyp'))) {
+    return audio.subarray(8, 12).equals(Buffer.from('M4A ')) ? 'audio/m4a' : 'audio/mp4';
+  }
+  return null;
 }
 
 // Provider messages may contain request-specific information. Keep production
@@ -86,12 +116,14 @@ async function transcribeAudio({
   if (Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) > MAX_AUDIO_DURATION_SECONDS) {
     throw new TranscriptionError('AUDIO_TOO_LONG', 'Голосове повідомлення занадто довге.');
   }
-  if (!SUPPORTED_MEDIA_TYPES.has(mediaType)) {
+  const detectedMediaType = detectAudioMediaType(audio);
+  const resolvedMediaType = detectedMediaType || mediaType;
+  if (!SUPPORTED_MEDIA_TYPES.has(resolvedMediaType)) {
     throw new TranscriptionError('UNSUPPORTED_MEDIA_TYPE', 'Этот формат голосового сообщения пока не поддерживается.');
   }
 
   const form = new FormData();
-  form.append('file', new Blob([audio], { type: mediaType }), safeFilename(filename, mediaType));
+  form.append('file', new Blob([audio], { type: resolvedMediaType }), safeFilename(filename, resolvedMediaType));
   form.append('model', String(model));
   // gpt-4o transcribe models only return JSON. Be explicit instead of relying
   // on endpoint defaults that can vary between provider versions.
@@ -151,6 +183,7 @@ module.exports = {
   TRANSCRIPTION_TIMEOUT_MS,
   SUPPORTED_MEDIA_TYPES,
   TranscriptionError,
+  detectAudioMediaType,
   normalizeText,
   safeProviderReason,
   transcribeAudio,
