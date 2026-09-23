@@ -119,6 +119,23 @@ function assertHttpsUrl(value, source) {
   return url.toString();
 }
 
+function filenameForMediaType(filename, mediaType) {
+  const extensions = {
+    'audio/aac': 'aac',
+    'audio/flac': 'flac',
+    'audio/m4a': 'm4a',
+    'audio/mpeg': 'mp3',
+    'audio/mp4': 'm4a',
+    'audio/ogg': 'ogg',
+    'audio/opus': 'ogg',
+    'audio/wav': 'wav',
+    'audio/webm': 'webm',
+  };
+  const extension = extensions[mediaType] || 'ogg';
+  const stem = String(filename || 'instagram-voice').replace(/\.[a-z0-9]{1,8}$/i, '');
+  return `${stem || 'instagram-voice'}.${extension}`;
+}
+
 /**
  * Downloads an Instagram audio attachment using only the temporary URL
  * supplied by Meta (or a metadata lookup for media IDs). The URL, token, and
@@ -171,12 +188,20 @@ async function downloadInstagramMedia(
     throw new TranscriptionError('AUDIO_TOO_LARGE', 'Голосове повідомлення занадто велике.');
   }
 
+  // Meta's download response is authoritative if Graph metadata is absent.
+  // A webhook attachment often omits MIME type; defaulting it to OGG before
+  // reading the response could label AAC/M4A bytes as OGG and make a valid
+  // OpenAI transcription request fail with 400.
+  const mediaType = normalizeMediaType(
+    metadata.mime_type || response.headers?.get?.('content-type') || media.mediaType
+  ) || 'audio/ogg';
+
   return {
     audio,
-    mediaType: normalizeMediaType(metadata.mime_type || media.mediaType || response.headers?.get?.('content-type')) || 'audio/ogg',
+    mediaType,
     fileSize: declaredSize || contentLength || audio.length,
     durationSeconds: Number(metadata.duration || media.durationSeconds || 0),
-    filename: media.filename || 'instagram-voice.ogg',
+    filename: filenameForMediaType(media.filename, mediaType),
   };
 }
 
@@ -274,6 +299,7 @@ module.exports = {
   parseInstagramEvents,
   parseInstagramAudioAttachment,
   normalizeMediaType,
+  filenameForMediaType,
   downloadInstagramMedia,
   prepareInstagramIncomingText,
   sendInstagramMessage,

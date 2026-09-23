@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const {
   downloadInstagramMedia,
+  filenameForMediaType,
   parseInstagramEvents,
   prepareInstagramIncomingText,
   sendInstagramMessage,
@@ -117,6 +118,19 @@ test('downloads temporary Instagram audio with the access token and keeps it in 
   assert.equal(media.mediaType, 'audio/ogg');
   assert.equal(requests[0].options.headers.Authorization, 'Bearer access-token');
   assert.equal(requests[0].options.redirect, 'error');
+});
+
+test('uses the downloaded media type and matching extension when the webhook MIME is missing or stale', async () => {
+  const media = await downloadInstagramMedia('access-token', {
+    url: 'https://cdn.instagram.example/audio', mediaType: 'audio/ogg', filename: 'voice.ogg',
+  }, 'v24.0', async () => new Response(new Uint8Array([1, 2, 3]), {
+    status: 200,
+    headers: { 'content-type': 'audio/mp4', 'content-length': '3' },
+  }));
+
+  assert.equal(media.mediaType, 'audio/mp4');
+  assert.equal(media.filename, 'voice.m4a');
+  assert.equal(filenameForMediaType('voice.ogg', 'audio/webm'), 'voice.webm');
 });
 
 test('prefers the official Graph media URL over an attachment wrapper when a media id exists', async () => {
