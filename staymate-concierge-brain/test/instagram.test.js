@@ -119,6 +119,36 @@ test('downloads temporary Instagram audio with the access token and keeps it in 
   assert.equal(requests[0].options.redirect, 'error');
 });
 
+test('prefers the official Graph media URL over an attachment wrapper when a media id exists', async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url, options });
+    if (url.includes('/media-123?fields=')) {
+      return new Response(JSON.stringify({
+        url: 'https://cdn.instagram.example/raw-audio',
+        mime_type: 'audio/ogg',
+        file_size: 4,
+        duration: 2,
+      }), { status: 200 });
+    }
+    return new Response(new Uint8Array([1, 2, 3, 4]), {
+      status: 200,
+      headers: { 'content-type': 'audio/ogg', 'content-length': '4' },
+    });
+  };
+
+  const media = await downloadInstagramMedia('access-token', {
+    mediaId: 'media-123',
+    url: 'https://cdn.instagram.example/attachment-wrapper',
+    mediaType: 'audio/ogg',
+  }, 'v24.0', fetchImpl);
+
+  assert.match(requests[0].url, /graph\.facebook\.com\/v24\.0\/media-123\?fields=/);
+  assert.equal(requests[1].url, 'https://cdn.instagram.example/raw-audio');
+  assert.equal(media.durationSeconds, 2);
+  assert.deepEqual([...media.audio], [1, 2, 3, 4]);
+});
+
 test('uses the shared transcription service result as ordinary incoming text for the AI pipeline', async () => {
   const text = await prepareInstagramIncomingText({
     event: { audio: { url: 'https://cdn.instagram.example/audio', durationSeconds: 4 } },

@@ -135,18 +135,26 @@ async function downloadInstagramMedia(
   }
 
   const headers = { Authorization: `Bearer ${accessToken}` };
-  let mediaUrl = media.url || '';
+  let mediaUrl = '';
   let metadata = {};
 
-  if (!mediaUrl && media.mediaId) {
+  // A messaging attachment may include both a preview/download URL and an
+  // immutable media ID. Prefer the documented Graph media lookup when the ID
+  // exists: attachment URLs can be short-lived wrappers rather than the raw
+  // audio bytes, which makes downstream transcription reject the payload.
+  if (media.mediaId) {
     const metadataResponse = await fetchImpl(
       `https://graph.facebook.com/${graphVersion}/${encodeURIComponent(media.mediaId)}?fields=url,mime_type,file_size,duration`,
       { headers }
     );
-    if (!metadataResponse.ok) throw new Error('Instagram media metadata request failed.');
-    metadata = await metadataResponse.json();
-    mediaUrl = metadata?.url || '';
+    if (metadataResponse.ok) {
+      metadata = await metadataResponse.json();
+      mediaUrl = metadata?.url || '';
+    } else if (!media.url) {
+      throw new Error('Instagram media metadata request failed.');
+    }
   }
+  mediaUrl = mediaUrl || media.url || '';
 
   const safeUrl = assertHttpsUrl(mediaUrl, 'media');
   const response = await fetchImpl(safeUrl, { headers, redirect: 'error' });
