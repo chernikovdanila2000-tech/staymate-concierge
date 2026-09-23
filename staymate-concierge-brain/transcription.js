@@ -9,6 +9,10 @@
 
 const MAX_AUDIO_BYTES = 20 * 1024 * 1024;
 const MAX_AUDIO_DURATION_SECONDS = 10 * 60;
+// A provider request must never hold a channel webhook open indefinitely.
+// Meta retries slow webhooks and a guest otherwise gets neither an answer nor
+// the safe fallback message.
+const TRANSCRIPTION_TIMEOUT_MS = 45 * 1000;
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const DEFAULT_MODEL = 'gpt-4o-mini-transcribe';
 const SUPPORTED_MEDIA_TYPES = new Set([
@@ -44,6 +48,7 @@ async function transcribeAudio({
   apiKey = process.env.TRANSCRIPTION_API_KEY || '',
   model = process.env.TRANSCRIPTION_MODEL || DEFAULT_MODEL,
   fetchImpl = globalThis.fetch,
+  timeoutMs = TRANSCRIPTION_TIMEOUT_MS,
 } = {}) {
   if (!apiKey) {
     throw new TranscriptionError('TRANSCRIPTION_NOT_CONFIGURED', 'Распознавание голосовых сообщений ещё не подключено.');
@@ -70,14 +75,27 @@ async function transcribeAudio({
   if (language) form.append('language', String(language).slice(0, 12));
 
   let response;
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const safeTimeoutMs = Number.isFinite(Number(timeoutMs)) && Number(timeoutMs) > 0
+    ? Number(timeoutMs)
+    : TRANSCRIPTION_TIMEOUT_MS;
+  const timeout = controller
+    ? setTimeout(() => controller.abort(), safeTimeoutMs)
+    : null;
   try {
     response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
+      ...(controller ? { signal: controller.signal } : {}),
     });
   } catch {
+    if (controller?.signal.aborted) {
+      throw new TranscriptionError('TRANSCRIPTION_TIMEOUT', 'Распознавание голосового сообщения заняло слишком много времени.');
+    }
     throw new TranscriptionError('TRANSCRIPTION_NETWORK_ERROR', 'Не удалось связаться с сервисом распознавания.');
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 
   let payload = {};
@@ -102,6 +120,7 @@ module.exports = {
   DEFAULT_MODEL,
   MAX_AUDIO_BYTES,
   MAX_AUDIO_DURATION_SECONDS,
+  TRANSCRIPTION_TIMEOUT_MS,
   SUPPORTED_MEDIA_TYPES,
   TranscriptionError,
   normalizeText,

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   MAX_AUDIO_BYTES,
   MAX_AUDIO_DURATION_SECONDS,
+  TRANSCRIPTION_TIMEOUT_MS,
   TranscriptionError,
   normalizeText,
   transcribeAudio,
@@ -69,4 +70,23 @@ test('converts provider failures into safe customer-facing errors', async () => 
     }),
     error => error.code === 'TRANSCRIPTION_PROVIDER_ERROR' && !error.message.includes('secret')
   );
+});
+
+test('aborts a stalled provider request instead of leaving the channel webhook waiting forever', async () => {
+  let receivedSignal;
+  await assert.rejects(
+    transcribeAudio({
+      audio: Buffer.from('voice'),
+      mediaType: 'audio/ogg',
+      apiKey: 'test-key',
+      timeoutMs: 5,
+      fetchImpl: async (_url, options) => new Promise((_, reject) => {
+        receivedSignal = options.signal;
+        options.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+      }),
+    }),
+    error => error instanceof TranscriptionError && error.code === 'TRANSCRIPTION_TIMEOUT'
+  );
+  assert.ok(receivedSignal?.aborted);
+  assert.equal(TRANSCRIPTION_TIMEOUT_MS, 45 * 1000);
 });
