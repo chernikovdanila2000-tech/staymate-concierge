@@ -1437,6 +1437,7 @@ const server =
                         console.error('[instagram] Voice processing failed:', {
                           code: error.code || 'VOICE_PROCESSING_ERROR',
                           ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                          ...(error.providerReason ? { providerReason: error.providerReason } : {}),
                         });
                         await sendInstagramMessage(
                           connection.accessToken,

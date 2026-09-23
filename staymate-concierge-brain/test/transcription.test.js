@@ -6,6 +6,7 @@ const {
   TRANSCRIPTION_TIMEOUT_MS,
   TranscriptionError,
   normalizeText,
+  safeProviderReason,
   transcribeAudio,
 } = require('../transcription');
 
@@ -42,6 +43,7 @@ test('sends valid audio to an OpenAI-compatible endpoint without exposing it in 
   assert.equal(request.url, 'https://transcriber.example/v1/audio/transcriptions');
   assert.equal(request.options.headers.Authorization, 'Bearer test-key');
   assert.equal(request.options.body.get('model'), 'test-model');
+  assert.equal(request.options.body.get('response_format'), 'json');
   assert.equal(request.options.body.get('language'), 'uk');
   assert.equal(request.options.body.get('file').type, 'audio/ogg');
 });
@@ -66,11 +68,19 @@ test('converts provider failures into safe customer-facing errors', async () => 
   await assert.rejects(
     transcribeAudio({
       audio: Buffer.from('voice'), mediaType: 'audio/ogg', apiKey: 'test-key',
-      fetchImpl: async () => ({ status: 429, ok: false, json: async () => ({ error: { message: 'secret provider detail' } }) }),
+      fetchImpl: async () => ({ status: 429, ok: false, json: async () => ({ error: { message: 'secret provider detail quota exceeded' } }) }),
     }),
     error => error.code === 'TRANSCRIPTION_PROVIDER_ERROR'
       && error.providerStatus === 429
+      && error.providerReason === 'provider_quota'
       && !error.message.includes('secret')
+  );
+});
+
+test('classifies a provider failure without retaining its message', () => {
+  assert.equal(
+    safeProviderReason({ error: { type: 'invalid_request_error', message: 'Invalid file format: secret URL omitted' } }),
+    'invalid_audio_payload'
   );
 });
 

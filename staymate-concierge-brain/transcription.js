@@ -21,7 +21,7 @@ const SUPPORTED_MEDIA_TYPES = new Set([
 ]);
 
 class TranscriptionError extends Error {
-  constructor(code, message, { providerStatus } = {}) {
+  constructor(code, message, { providerStatus, providerReason } = {}) {
     super(message);
     this.name = 'TranscriptionError';
     this.code = code;
@@ -31,6 +31,7 @@ class TranscriptionError extends Error {
     if (Number.isInteger(providerStatus) && providerStatus >= 100 && providerStatus <= 599) {
       this.providerStatus = providerStatus;
     }
+    if (providerReason) this.providerReason = providerReason;
   }
 }
 
@@ -42,6 +43,20 @@ function safeFilename(filename, mediaType) {
 
 function normalizeText(value) {
   return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+// Provider messages may contain request-specific information. Keep production
+// observability useful without persisting those messages or any media data.
+function safeProviderReason(payload) {
+  const error = payload && typeof payload === 'object' ? payload.error : null;
+  const source = `${error?.type || ''} ${error?.code || ''} ${error?.message || ''}`.toLowerCase();
+  if (/file|audio/.test(source) && /format|decode|corrupt|invalid/.test(source)) return 'invalid_audio_payload';
+  if (/model/.test(source) && /access|exist|available|found/.test(source)) return 'model_unavailable';
+  if (/response_format/.test(source)) return 'invalid_response_format';
+  if (/language/.test(source)) return 'invalid_language';
+  if (/quota|billing|credit|rate.limit/.test(source)) return 'provider_quota';
+  if (/api.key|authentication|unauthoriz/.test(source)) return 'provider_auth';
+  return error?.type === 'invalid_request_error' ? 'invalid_request' : undefined;
 }
 
 async function transcribeAudio({
@@ -78,6 +93,9 @@ async function transcribeAudio({
   const form = new FormData();
   form.append('file', new Blob([audio], { type: mediaType }), safeFilename(filename, mediaType));
   form.append('model', String(model));
+  // gpt-4o transcribe models only return JSON. Be explicit instead of relying
+  // on endpoint defaults that can vary between provider versions.
+  form.append('response_format', 'json');
   if (language) form.append('language', String(language).slice(0, 12));
 
   let response;
@@ -114,7 +132,7 @@ async function transcribeAudio({
     throw new TranscriptionError(
       'TRANSCRIPTION_PROVIDER_ERROR',
       'Сервис распознавания не смог обработать голосовое сообщение.',
-      { providerStatus: response.status }
+      { providerStatus: response.status, providerReason: safeProviderReason(payload) }
     );
   }
 
@@ -134,5 +152,6 @@ module.exports = {
   SUPPORTED_MEDIA_TYPES,
   TranscriptionError,
   normalizeText,
+  safeProviderReason,
   transcribeAudio,
 };
