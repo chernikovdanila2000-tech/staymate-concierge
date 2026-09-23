@@ -21,10 +21,16 @@ const SUPPORTED_MEDIA_TYPES = new Set([
 ]);
 
 class TranscriptionError extends Error {
-  constructor(code, message) {
+  constructor(code, message, { providerStatus } = {}) {
     super(message);
     this.name = 'TranscriptionError';
     this.code = code;
+    // Status is intentionally the only provider diagnostic retained. It lets
+    // operators distinguish credentials, billing and format errors without
+    // logging provider bodies, audio, or credentials.
+    if (Number.isInteger(providerStatus) && providerStatus >= 100 && providerStatus <= 599) {
+      this.providerStatus = providerStatus;
+    }
   }
 }
 
@@ -105,7 +111,11 @@ async function transcribeAudio({
     // Keep a customer-safe error below; do not expose a provider response.
   }
   if (!response.ok) {
-    throw new TranscriptionError('TRANSCRIPTION_PROVIDER_ERROR', 'Сервис распознавания не смог обработать голосовое сообщение.');
+    throw new TranscriptionError(
+      'TRANSCRIPTION_PROVIDER_ERROR',
+      'Сервис распознавания не смог обработать голосовое сообщение.',
+      { providerStatus: response.status }
+    );
   }
 
   const text = normalizeText(payload.text);

@@ -66,9 +66,11 @@ test('converts provider failures into safe customer-facing errors', async () => 
   await assert.rejects(
     transcribeAudio({
       audio: Buffer.from('voice'), mediaType: 'audio/ogg', apiKey: 'test-key',
-      fetchImpl: async () => ({ ok: false, json: async () => ({ error: { message: 'secret provider detail' } }) }),
+      fetchImpl: async () => ({ status: 429, ok: false, json: async () => ({ error: { message: 'secret provider detail' } }) }),
     }),
-    error => error.code === 'TRANSCRIPTION_PROVIDER_ERROR' && !error.message.includes('secret')
+    error => error.code === 'TRANSCRIPTION_PROVIDER_ERROR'
+      && error.providerStatus === 429
+      && !error.message.includes('secret')
   );
 });
 

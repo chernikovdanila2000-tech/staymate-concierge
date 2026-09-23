@@ -1434,7 +1434,10 @@ const server =
                       } catch (error) {
                         // Do not leave a guest without feedback when Meta's
                         // short-lived media URL or transcription fails.
-                        console.error('[instagram] Voice processing failed:', error.code || 'VOICE_PROCESSING_ERROR');
+                        console.error('[instagram] Voice processing failed:', {
+                          code: error.code || 'VOICE_PROCESSING_ERROR',
+                          ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                        });
                         await sendInstagramMessage(
                           connection.accessToken,
                           connection.instagramAccountId,
