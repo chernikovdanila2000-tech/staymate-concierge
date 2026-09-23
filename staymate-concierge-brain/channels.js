@@ -63,9 +63,9 @@ async function getTelegramToken(propertyId, property) {
   return (property && property.telegram_bot_token) || null;
 }
 
-async function getViberToken(propertyId) {
+async function getViberToken(propertyId, { includePending = false } = {}) {
   const channel = await getChannel(propertyId, 'viber');
-  if (channel && channel.connected && channel.credentials && channel.credentials.bot_token) {
+  if (channel && (includePending || channel.connected) && channel.credentials && channel.credentials.bot_token) {
     return channel.credentials.bot_token;
   }
   return null;

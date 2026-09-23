@@ -9,7 +9,25 @@
    звіртесь із актуальною документацією Viber.
    ============================================================ */
 
+const crypto = require('crypto');
+
 const VIBER_API_BASE = 'https://chatapi.viber.com/pa';
+const MAX_VIBER_TEXT_LENGTH = 7000;
+
+function safeEqual(left, right) {
+  const a = Buffer.from(String(left || ''), 'utf8');
+  const b = Buffer.from(String(right || ''), 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// Viber signs every callback with HMAC-SHA256(auth token, raw JSON body).
+// Verify before parsing or acknowledging a message so an arbitrary caller
+// cannot inject guest text into another hotel's AI conversation.
+function verifyViberSignature(rawBody, signatureHeader, botToken) {
+  if (!rawBody || !signatureHeader || !botToken) return false;
+  const expected = crypto.createHmac('sha256', botToken).update(rawBody, 'utf8').digest('hex');
+  return safeEqual(signatureHeader, expected);
+}
 
 /**
  * Дістає chatId (sender id) і текст повідомлення з "сирого" вебхука Viber.
@@ -41,12 +59,15 @@ async function sendViberMessage(botToken, receiverId, text, senderName = 'StayAI
     body: JSON.stringify({
       receiver: receiverId,
       type: 'text',
-      text,
+      text: String(text || '').slice(0, MAX_VIBER_TEXT_LENGTH),
       sender: { name: senderName.slice(0, 28) },
     }),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
+  if (!data || typeof data.status !== 'number') {
+    throw new Error(`Viber sendMessage failed: HTTP ${res.status}`);
+  }
   if (data.status !== 0) {
     throw new Error(`Viber sendMessage failed: ${data.status_message || data.status}`);
   }
@@ -68,8 +89,18 @@ async function setViberWebhook(botToken, publicUrl) {
     }),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
+  if (!data || typeof data.status !== 'number') {
+    throw new Error(`Viber setWebhook failed: HTTP ${res.status}`);
+  }
   return data;
 }
 
-module.exports = { parseViberUpdate, sendViberMessage, setViberWebhook };
+module.exports = {
+  safeEqual,
+  verifyViberSignature,
+  parseViberUpdate,
+  sendViberMessage,
+  setViberWebhook,
+  MAX_VIBER_TEXT_LENGTH,
+};

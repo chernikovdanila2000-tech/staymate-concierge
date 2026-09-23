@@ -9,6 +9,7 @@ const {
   setWebhook: setTelegramWebhook,
 } = require('./telegram');
 const {
+  verifyViberSignature,
   parseViberUpdate,
   sendViberMessage,
   setViberWebhook,
@@ -2163,6 +2164,13 @@ const server =
 
         readBody(req).then(
           async body => {
+            // The token is persisted before set_webhook is called so Viber's
+            // immediate availability callback can be authenticated too.
+            const signingToken = await getViberToken(propertyId, { includePending: true });
+            if (!signingToken || !verifyViberSignature(body, req.headers['x-viber-content-signature'], signingToken)) {
+              return sendJson(res, 401, { error: 'Invalid Viber webhook signature.' });
+            }
+
             res.writeHead(
               200,
               {
@@ -3478,6 +3486,25 @@ const server =
                   );
                   if (!result.ok) throw new Error(result.description || 'Telegram error');
                 } else {
+                  // Viber validates the URL immediately during set_webhook.
+                  // Store an encrypted pending connection first, so that
+                  // callback can be signature-checked instead of accepted
+                  // blindly or rejected before the token exists locally.
+                  const { error: pendingError } = await supabase
+                    .from('channels')
+                    .upsert(
+                      {
+                        property_id: propertyId,
+                        channel_type: 'viber',
+                        credentials: encryptCredentials(credentials),
+                        connected: false,
+                        status: 'connecting',
+                        status_detail: null,
+                      },
+                      { onConflict: 'property_id,channel_type' }
+                    );
+                  if (pendingError) throw new Error('Не вдалося зберегти канал.');
+                  invalidateChannel(propertyId, 'viber');
                   const result = await setViberWebhook(
                     credentials.bot_token,
                     `${API_BASE_URL}/webhook/viber/${propertyId}`
