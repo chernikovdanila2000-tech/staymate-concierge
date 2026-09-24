@@ -2076,7 +2076,13 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       .select('id');
     if (error || !deletedRows || !deletedRows.length) {
       msg.className = 'msg error';
-      msg.textContent = t('esc.deleteError', getLang());
+      // Показуємо конкретний текст помилки Supabase, якщо він є (напр.
+      // реальний збій запиту), а не лише "не вдалося" — щоб було видно,
+      // це саме мовчазне блокування RLS (deletedRows порожній, error немає)
+      // чи щось інше (error.message з конкретною причиною).
+      msg.textContent = error
+        ? `${t('esc.deleteError', getLang())} (${error.message || error.code || error})`
+        : t('esc.deleteError', getLang());
       return;
     }
     escalations = escalations.filter((e) => String(e.id) !== String(esc.id));
