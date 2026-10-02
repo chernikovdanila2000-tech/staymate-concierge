@@ -4,10 +4,12 @@ const crypto = require('crypto');
 const { runConciergeTurn } = require('./claude-client');
 const {
   parseTelegramUpdate,
+  downloadTelegramFile,
   sendTelegramMessage,
   setWebhook: setTelegramWebhook,
 } = require('./telegram');
 const {
+  verifyViberSignature,
   parseViberUpdate,
   sendViberMessage,
   setViberWebhook,
@@ -21,12 +23,15 @@ const {
 const {
   verifyInstagramSignature,
   parseInstagramEvents,
+  prepareInstagramIncomingText,
   sendInstagramMessage,
 } = require('./instagram');
 const {
   verifyWhatsAppSignature,
   parseWhatsAppEvents,
+  downloadWhatsAppMedia,
   sendWhatsAppMessage,
+  VOICE_PROCESSING_FALLBACK,
 } = require('./whatsapp');
 const { serveLegalPage } = require('./legal-pages');
 const {
@@ -35,6 +40,13 @@ const {
   invalidateChannel,
 } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
+const { isConversationTakenOver } = require('./takeover');
+const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
+const {
+  verifyMonobankToken,
+  fetchMonobankStatement,
+  findMatchingTransaction,
+} = require('./monobank');
 const {
   createSubscriptionInvoice,
   cancelRegularPayment,
@@ -219,6 +231,20 @@ async function getProperty(propertyId) {
   });
 
   return data;
+}
+
+// Once an employee has taken a conversation, new guest messages are still
+// preserved in its history, but the AI must stay silent until that employee
+// resolves the escalation in the cabinet.  A failed status lookup must not
+// take a production channel down, so it is logged and the normal flow stays
+// available.
+async function isTakenOverConversation(propertyId, channel, chatId) {
+  try {
+    return await isConversationTakenOver({ supabase, propertyId, channel, chatId });
+  } catch (error) {
+    console.error('[takeover] status check failed:', error.message);
+    return false;
+  }
 }
 
 /**
@@ -1136,6 +1162,11 @@ const server =
                         event.text,
                     });
 
+                    if (await isTakenOverConversation(connection.propertyId, 'messenger', event.senderId)) {
+                      await saveHistory(connection.propertyId, 'messenger', event.senderId, history);
+                      continue;
+                    }
+
                     const {
                       replyText,
                       updatedHistory,
@@ -1292,34 +1323,23 @@ const server =
               );
             }
 
-            console.log(
-              '[instagram] PAYLOAD:',
-              rawBody
-            );
-
             const events =
               parseInstagramEvents(
                 payload
               );
 
-            const accountId =
-              Array.isArray(
-                payload.entry
-              ) &&
-              payload.entry[0]
-                ? String(
-                    payload.entry[0]
-                      .id || ''
-                  )
-                : '';
-
             console.log(
               '[instagram] PARSED:',
               {
-                accountId,
                 eventsCount:
                   events.length,
-                events,
+                accountIds: [
+                  ...new Set(
+                    events.map(
+                      event => event.accountId
+                    )
+                  ),
+                ],
               }
             );
 
@@ -1331,14 +1351,10 @@ const server =
               }
             );
 
-            if (
-              !accountId ||
-              events.length === 0
-            ) {
+            if (events.length === 0) {
               console.error(
                 '[instagram] Nothing to process:',
                 {
-                  accountId,
                   eventsCount:
                     events.length,
                 }
@@ -1350,110 +1366,40 @@ const server =
             setImmediate(
               async () => {
                 try {
-                  console.log(
-                    '[instagram] BEFORE CONNECTION'
-                  );
-
-                  const connection =
-                    await resolveInstagramConnection(
-                      accountId
-                    );
-
-                  console.log(
-                    '[instagram] CONNECTION:',
-                    {
-                      found:
-                        !!connection,
-
-                      propertyId:
-                        connection
-                          ? connection.propertyId
-                          : null,
-
-                      instagramAccountId:
-                        connection
-                          ? connection.instagramAccountId
-                          : null,
-                    }
-                  );
-
-                  if (!connection) {
-                    console.error(
-                      `[instagram] No channel for ${accountId}`
-                    );
-
-                    return;
-                  }
-
-                  console.log(
-                    '[instagram] BEFORE PROPERTY:',
-                    connection.propertyId
-                  );
-
-                  const property =
-                    await getProperty(
-                      connection.propertyId
-                    );
-
-                  console.log(
-                    '[instagram] PROPERTY:',
-                    {
-                      found:
-                        !!property,
-
-                      hotelName:
-                        property
-                          ? property.hotel_name
-                          : null,
-
-                      subscriptionStatus:
-                        property
-                          ? property.subscription_status
-                          : null,
-
-                      trialEndsAt:
-                        property
-                          ? property.trial_ends_at
-                          : null,
-
-                      subscriptionActiveUntil:
-                        property
-                          ? property.subscription_active_until
-                          : null,
-                    }
-                  );
-
-                  if (!property) {
-                    console.error(
-                      '[instagram] Property not found:',
-                      connection.propertyId
-                    );
-
-                    return;
-                  }
-
-                  const access =
-                    computeAccess(
-                      property
-                    );
-
-                  console.log(
-                    '[instagram] ACCESS:',
-                    access
-                  );
-
-                  for (
-                    const event of events
-                  ) {
+                  for (const event of events) {
                     try {
+                      const connection =
+                        await resolveInstagramConnection(
+                          event.accountId
+                        );
+
+                      if (!connection) {
+                        console.error(
+                          '[instagram] No connected channel for account'
+                        );
+                        continue;
+                      }
+
+                      const property =
+                        await getProperty(
+                          connection.propertyId
+                        );
+
+                      if (!property) {
+                        console.error(
+                          '[instagram] Resolved property was not found'
+                        );
+                        continue;
+                      }
+
+                      const access = computeAccess(property);
+
                       console.log(
                         '[instagram] EVENT START:',
                         {
                           senderId:
                             event.senderId,
-
-                          text:
-                            event.text,
+                          accountId: event.accountId,
                         }
                       );
 
@@ -1483,6 +1429,34 @@ const server =
                         '[instagram] BEFORE HISTORY'
                       );
 
+                      let incomingText;
+                      try {
+                        incomingText = await prepareInstagramIncomingText({
+                          event,
+                          accessToken: connection.accessToken,
+                          graphVersion: META_GRAPH_VERSION,
+                        });
+                        if (event.audio) console.log('[instagram] Voice transcribed');
+                      } catch (error) {
+                        // Do not leave a guest without feedback when Meta's
+                        // short-lived media URL or transcription fails.
+                        console.error('[instagram] Voice processing failed:', {
+                          code: error.code || 'VOICE_PROCESSING_ERROR',
+                          ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                          ...(error.providerReason ? { providerReason: error.providerReason } : {}),
+                        });
+                        await sendInstagramMessage(
+                          connection.accessToken,
+                          connection.instagramAccountId,
+                          event.senderId,
+                          VOICE_PROCESSING_FALLBACK,
+                          META_GRAPH_VERSION
+                        );
+                        continue;
+                      }
+
+                      if (!incomingText) continue;
+
                       const history =
                         await getHistory(
                           connection.propertyId,
@@ -1504,9 +1478,13 @@ const server =
 
                       history.push({
                         role: 'user',
-                        content:
-                          event.text,
+                        content: incomingText,
                       });
+
+                      if (await isTakenOverConversation(connection.propertyId, 'instagram', event.senderId)) {
+                        await saveHistory(connection.propertyId, 'instagram', event.senderId, history);
+                        continue;
+                      }
 
                       console.log(
                         '[instagram] BEFORE AI'
@@ -1663,6 +1641,7 @@ const server =
             req.headers['x-hub-signature-256'],
             META_MESSENGER_APP_SECRET
           )) {
+            console.warn('[whatsapp] Rejected webhook with invalid signature');
             return sendJson(res, 401, { error: 'Invalid WhatsApp signature.' });
           }
 
@@ -1674,6 +1653,7 @@ const server =
           }
 
           const events = parseWhatsAppEvents(payload);
+          console.log('[whatsapp] Webhook received:', { messageEvents: events.length });
           sendJson(res, 200, { ok: true });
           if (events.length === 0) return;
 
@@ -1703,12 +1683,59 @@ const server =
                   continue;
                 }
 
+                let incomingText = event.text;
+                if (event.audio) {
+                  console.log('[whatsapp] Voice received');
+                  try {
+                    const media = await downloadWhatsAppMedia(
+                      connection.accessToken,
+                      event.audio.mediaId,
+                      connection.phoneNumberId,
+                      META_GRAPH_VERSION
+                    );
+                    if (media.audio.length > MAX_AUDIO_BYTES || (media.fileSize && media.fileSize > MAX_AUDIO_BYTES)) {
+                      await sendWhatsAppMessage(
+                        connection.accessToken,
+                        connection.phoneNumberId,
+                        event.senderId,
+                        'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.',
+                        META_GRAPH_VERSION
+                      );
+                      continue;
+                    }
+                    incomingText = await transcribeAudio({
+                      audio: media.audio,
+                      mediaType: media.mediaType || event.audio.mediaType,
+                      filename: 'whatsapp-voice.ogg',
+                    });
+                    console.log('[whatsapp] Voice transcribed');
+                  } catch (error) {
+                    // The webhook was accepted, but a temporary media or
+                    // transcription failure must not look like silence to a guest.
+                    console.error('[whatsapp] Voice processing error:', error && error.message ? error.message : error);
+                    await sendWhatsAppMessage(
+                      connection.accessToken,
+                      connection.phoneNumberId,
+                      event.senderId,
+                      VOICE_PROCESSING_FALLBACK,
+                      META_GRAPH_VERSION
+                    );
+                    continue;
+                  }
+                }
+                if (!incomingText) continue;
+
                 const history = await getHistory(
                   connection.propertyId,
                   'whatsapp',
                   event.senderId
                 );
-                history.push({ role: 'user', content: event.text });
+                history.push({ role: 'user', content: incomingText });
+
+                if (await isTakenOverConversation(connection.propertyId, 'whatsapp', event.senderId)) {
+                  await saveHistory(connection.propertyId, 'whatsapp', event.senderId, history);
+                  continue;
+                }
 
                 const { replyText, updatedHistory } = await runConciergeTurn(
                   history,
@@ -1729,6 +1756,7 @@ const server =
                   replyText,
                   META_GRAPH_VERSION
                 );
+                console.log('[whatsapp] Reply sent');
               } catch (error) {
                 console.error('[whatsapp] EVENT ERROR:', error && error.stack ? error.stack : error);
               }
@@ -1892,6 +1920,11 @@ const server =
               content: message,
             });
 
+            if (await isTakenOverConversation(propertyId, 'test', userId)) {
+              await saveHistory(propertyId, 'test', userId, history);
+              return sendJson(res, 200, { reply: '', takenOver: true });
+            }
+
             try {
               const {
                 replyText,
@@ -2006,7 +2039,7 @@ const server =
 
             const {
               chatId,
-              text,
+              voice,
             } = parsed;
 
             if (
@@ -2025,6 +2058,34 @@ const server =
               return;
             }
 
+            let text = parsed.text;
+            if (voice) {
+              console.info('[telegram] voice received');
+              if (voice.fileSize > MAX_AUDIO_BYTES) {
+                await sendTelegramMessage(botToken, chatId, 'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.');
+                return;
+              }
+              try {
+                const audio = await downloadTelegramFile(botToken, voice.fileId);
+                if (audio.length > MAX_AUDIO_BYTES) {
+                  await sendTelegramMessage(botToken, chatId, 'Голосове повідомлення занадто велике. Надішліть, будь ласка, коротше.');
+                  return;
+                }
+                text = await transcribeAudio({
+                  audio,
+                  mediaType: voice.mediaType,
+                  filename: 'telegram-voice.ogg',
+                });
+                console.info('[telegram] voice transcribed');
+              } catch (error) {
+                // Errors from transcription are already customer-safe.  Do
+                // not log raw audio, bot credentials, or provider responses.
+                console.error('[telegram voice]', error.code || 'VOICE_PROCESSING_ERROR');
+                await sendTelegramMessage(botToken, chatId, error.message || 'Не вдалося розпізнати голосове повідомлення.');
+                return;
+              }
+            }
+
             const history =
               await getHistory(
                 propertyId,
@@ -2036,6 +2097,11 @@ const server =
               role: 'user',
               content: text,
             });
+
+            if (await isTakenOverConversation(propertyId, 'telegram', chatId)) {
+              await saveHistory(propertyId, 'telegram', chatId, history);
+              return;
+            }
 
             try {
               const {
@@ -2065,6 +2131,7 @@ const server =
                 chatId,
                 replyText
               );
+              if (voice) console.info('[telegram] voice reply sent');
             } catch (error) {
               console.error(
                 '[telegram]',
@@ -2072,6 +2139,11 @@ const server =
               );
             }
           }
+        ).catch(error => {
+          // The webhook acknowledgement has already been sent to Telegram.
+          // Keep diagnostics safe: never include message content or tokens.
+          console.error('[telegram] processing failed:', error.code || 'UNEXPECTED_ERROR');
+        }
         );
 
         return;
@@ -2097,6 +2169,13 @@ const server =
 
         readBody(req).then(
           async body => {
+            // The token is persisted before set_webhook is called so Viber's
+            // immediate availability callback can be authenticated too.
+            const signingToken = await getViberToken(propertyId, { includePending: true });
+            if (!signingToken || !verifyViberSignature(body, req.headers['x-viber-content-signature'], signingToken)) {
+              return sendJson(res, 401, { error: 'Invalid Viber webhook signature.' });
+            }
+
             res.writeHead(
               200,
               {
@@ -2179,6 +2258,11 @@ const server =
               role: 'user',
               content: text,
             });
+
+            if (await isTakenOverConversation(propertyId, 'viber', chatId)) {
+              await saveHistory(propertyId, 'viber', chatId, history);
+              return;
+            }
 
             try {
               const {
@@ -2345,6 +2429,15 @@ const server =
               content:
                 String(message),
             });
+
+            if (await isTakenOverConversation(propertyId, 'website', sessionId)) {
+              await saveHistory(propertyId, 'website', sessionId, history);
+              return sendJson(res, 200, {
+                reply: '',
+                messageCount: history.length,
+                takenOver: true,
+              }, corsHeaders);
+            }
 
             try {
               const {
@@ -3398,6 +3491,25 @@ const server =
                   );
                   if (!result.ok) throw new Error(result.description || 'Telegram error');
                 } else {
+                  // Viber validates the URL immediately during set_webhook.
+                  // Store an encrypted pending connection first, so that
+                  // callback can be signature-checked instead of accepted
+                  // blindly or rejected before the token exists locally.
+                  const { error: pendingError } = await supabase
+                    .from('channels')
+                    .upsert(
+                      {
+                        property_id: propertyId,
+                        channel_type: 'viber',
+                        credentials: encryptCredentials(credentials),
+                        connected: false,
+                        status: 'connecting',
+                        status_detail: null,
+                      },
+                      { onConflict: 'property_id,channel_type' }
+                    );
+                  if (pendingError) throw new Error('Не вдалося зберегти канал.');
+                  invalidateChannel(propertyId, 'viber');
                   const result = await setViberWebhook(
                     credentials.bot_token,
                     `${API_BASE_URL}/webhook/viber/${propertyId}`
@@ -3427,6 +3539,38 @@ const server =
                 return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
               }
               invalidateChannel(propertyId, channelType);
+              return sendJson(res, 200, { ok: true, status: 'connected' }, corsHeaders);
+            }
+
+            // ---- Monobank: не канал месенджера, а джерело автоматичної
+            // перевірки оплати (Фаза 5 — пряма оплата гостя готелю, без
+            // мерчант-акаунта на стороні готелю). Токен перевіряється живим
+            // запитом до Monobank, зберігається так само, як токени ботів
+            // вище — тим самим шифруванням цілого об'єкта credentials.
+            if (channelType === 'monobank') {
+              if (!credentials.token) {
+                return sendJson(res, 400, { error: 'Потрібен credentials.token.' }, corsHeaders);
+              }
+              const check = await verifyMonobankToken(credentials.token);
+              if (!check.ok) {
+                return sendJson(res, 400, { error: check.error || 'Не вдалося перевірити токен Monobank.' }, corsHeaders);
+              }
+              const { error } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'monobank',
+                    credentials: encryptCredentials({ token: credentials.token }),
+                    connected: true,
+                    status: 'connected',
+                    status_detail: check.name || null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (error) return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              invalidateChannel(propertyId, 'monobank');
               return sendJson(res, 200, { ok: true, status: 'connected' }, corsHeaders);
             }
 
@@ -3714,12 +3858,91 @@ const server =
     }
   );
 
+// ---- Monobank: автоматична перевірка прямих переказів гостя готелю ----
+// (Фаза 5 — пряма оплата, без мерчант-акаунта на стороні готелю). Дивиться
+// лише броні з payment_method='card_transfer' і статусом pending_payment —
+// бронь через WayForPay підтверджується своїм вебхуком, цього циклу не
+// стосується.
+const MONOBANK_CHECK_INTERVAL_MS = 2 * 60 * 1000; // безпечний запас понад ліміт Monobank — 1 запит/60с на токен
+
+async function checkMonobankPaymentsForProperty(propertyId, token) {
+  const { data: pending, error } = await supabase
+    .from('bookings')
+    .select('id, total_price, payment_reference, created_at')
+    .eq('property_id', propertyId)
+    .eq('status', 'pending_payment')
+    .eq('payment_method', 'card_transfer');
+
+  if (error) {
+    console.error(`[monobank] bookings lookup failed for ${propertyId}:`, error.message);
+    return;
+  }
+  if (!pending || !pending.length) return;
+
+  const oldestCreatedMs = pending.reduce((min, b) => {
+    const t = new Date(b.created_at).getTime();
+    return Number.isFinite(t) && t < min ? t : min;
+  }, Date.now());
+  const fromSeconds = Math.floor(oldestCreatedMs / 1000) - 60;
+
+  let transactions;
+  try {
+    transactions = await fetchMonobankStatement(token, { fromSeconds });
+  } catch (error) {
+    console.error(`[monobank] statement fetch failed for ${propertyId}:`, error.message);
+    return;
+  }
+
+  for (const booking of pending) {
+    const match = findMatchingTransaction(transactions, {
+      totalPrice: booking.total_price,
+      reference: booking.payment_reference,
+    });
+    if (!match) continue;
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ status: 'paid' })
+      .eq('id', booking.id)
+      .eq('status', 'pending_payment'); // захист від подвійного спрацювання, якщо цикл десь наздогнав сам себе
+    if (updateError) {
+      console.error(`[monobank] failed to mark booking ${booking.id} paid:`, updateError.message);
+    }
+  }
+}
+
+async function runMonobankPaymentChecks() {
+  const { data: channels, error } = await supabase
+    .from('channels')
+    .select('property_id, credentials')
+    .eq('channel_type', 'monobank')
+    .eq('connected', true);
+  if (error || !channels || !channels.length) return;
+
+  for (const ch of channels) {
+    let token;
+    try {
+      token = decryptCredentials(ch.credentials).token;
+    } catch (decryptError) {
+      console.error(`[monobank] credential decrypt failed for ${ch.property_id}:`, decryptError.message);
+      continue;
+    }
+    if (!token) continue;
+    await checkMonobankPaymentsForProperty(ch.property_id, token);
+  }
+}
+
 server.listen(
   PORT,
   () => {
     console.log(
       `StayAI concierge server running on http://localhost:${PORT}`
     );
+
+    setInterval(() => {
+      runMonobankPaymentChecks().catch((error) => {
+        console.error('[monobank] payment check cycle failed:', error.message);
+      });
+    }, MONOBANK_CHECK_INTERVAL_MS);
 
     console.log(
       '[messenger] Configured:',

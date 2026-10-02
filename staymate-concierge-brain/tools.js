@@ -252,16 +252,45 @@ function createTools(propertyId, channel, chatId) {
     const nights = nightsBetween(check_in, check_out);
     const totalPrice = room.price_per_night * nights;
 
-    let paymentLink;
-    try {
-      ({ invoiceUrl: paymentLink } = await createWayForPayInvoice({
-        orderReference: bookingId,
-        productName: `${room.room_type} — ${nights} ${nights === 1 ? 'ніч' : 'ночі'} (${check_in} — ${check_out})`,
-        price: totalPrice,
-      }));
-    } catch (wfpError) {
-      console.error('[createBooking] WayForPay error:', wfpError.message);
-      return { ok: false, error: 'Технічна помилка при створенні посилання на оплату.' };
+    // Якщо готель вказав власні реквізити для прямого переказу (Фаза 5 —
+    // гроші йдуть одразу готелю, без нашого мерчант-акаунта), пропускаємо
+    // WayForPay повністю: гість переказує на картку/IBAN готелю напряму,
+    // а короткий reference-код у коментарі переказу дозволяє автоматичній
+    // перевірці Monobank (сервер, окремий цикл) зіставити платіж з цією
+    // бронню. Якщо реквізитів ще нема — лишаємо старий WayForPay-варіант,
+    // щоб не ламати готелі, які ним уже користуються.
+    const { data: property } = await supabase
+      .from('properties')
+      .select('payout_card, payout_iban, payout_recipient_name')
+      .eq('property_id', propertyId)
+      .maybeSingle();
+
+    const hasDirectPayout = !!(property && (property.payout_card || property.payout_iban));
+    let paymentLink = null;
+    let paymentMethod = 'wayforpay';
+    let paymentReference = null;
+    let paymentInstructions = null;
+
+    if (hasDirectPayout) {
+      paymentMethod = 'card_transfer';
+      paymentReference = bookingId.slice(0, 8);
+      const recipient = property.payout_recipient_name ? ` (${property.payout_recipient_name})` : '';
+      const details = [
+        property.payout_card ? `картка ${property.payout_card}` : null,
+        property.payout_iban ? `IBAN ${property.payout_iban}` : null,
+      ].filter(Boolean).join(' або ');
+      paymentInstructions = `Оплата переказом${recipient}: ${details}. Сума: ${totalPrice} грн. У коментарі до переказу обов'язково вкажіть код ${paymentReference} — без нього платіж не підтвердиться автоматично.`;
+    } else {
+      try {
+        ({ invoiceUrl: paymentLink } = await createWayForPayInvoice({
+          orderReference: bookingId,
+          productName: `${room.room_type} — ${nights} ${nights === 1 ? 'ніч' : 'ночі'} (${check_in} — ${check_out})`,
+          price: totalPrice,
+        }));
+      } catch (wfpError) {
+        console.error('[createBooking] WayForPay error:', wfpError.message);
+        return { ok: false, error: 'Технічна помилка при створенні посилання на оплату.' };
+      }
     }
 
     const { data: booking, error: insertError } = await supabase
@@ -275,8 +304,11 @@ function createTools(propertyId, channel, chatId) {
         guest_name,
         guest_contact,
         price_per_night: room.price_per_night,
+        total_price: totalPrice,
         status: 'pending_payment',
         payment_link: paymentLink,
+        payment_method: paymentMethod,
+        payment_reference: paymentReference,
       })
       .select()
       .single();
@@ -286,7 +318,7 @@ function createTools(propertyId, channel, chatId) {
       return { ok: false, error: 'Технічна помилка при створенні бронювання.' };
     }
 
-    return { ok: true, booking };
+    return { ok: true, booking, payment_instructions: paymentInstructions };
   }
 
   async function escalateToHuman({ reason, urgency }) {

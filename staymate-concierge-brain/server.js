@@ -43,6 +43,11 @@ const { getHistory, saveHistory } = require('./conversations');
 const { isConversationTakenOver } = require('./takeover');
 const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
 const {
+  verifyMonobankToken,
+  fetchMonobankStatement,
+  findMatchingTransaction,
+} = require('./monobank');
+const {
   createSubscriptionInvoice,
   cancelRegularPayment,
 } = require('./tools');
@@ -3537,6 +3542,38 @@ const server =
               return sendJson(res, 200, { ok: true, status: 'connected' }, corsHeaders);
             }
 
+            // ---- Monobank: не канал месенджера, а джерело автоматичної
+            // перевірки оплати (Фаза 5 — пряма оплата гостя готелю, без
+            // мерчант-акаунта на стороні готелю). Токен перевіряється живим
+            // запитом до Monobank, зберігається так само, як токени ботів
+            // вище — тим самим шифруванням цілого об'єкта credentials.
+            if (channelType === 'monobank') {
+              if (!credentials.token) {
+                return sendJson(res, 400, { error: 'Потрібен credentials.token.' }, corsHeaders);
+              }
+              const check = await verifyMonobankToken(credentials.token);
+              if (!check.ok) {
+                return sendJson(res, 400, { error: check.error || 'Не вдалося перевірити токен Monobank.' }, corsHeaders);
+              }
+              const { error } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'monobank',
+                    credentials: encryptCredentials({ token: credentials.token }),
+                    connected: true,
+                    status: 'connected',
+                    status_detail: check.name || null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (error) return sendJson(res, 500, { error: 'Не вдалося зберегти канал.' }, corsHeaders);
+              invalidateChannel(propertyId, 'monobank');
+              return sendJson(res, 200, { ok: true, status: 'connected' }, corsHeaders);
+            }
+
             // ---- WhatsApp / Instagram / Messenger: перевіряємо токен
             // живим запитом до Meta Graph API, а не просто зберігаємо
             // сліпо (Блок 4 — кнопка має РЕАЛЬНО підключати, не бути
@@ -3821,12 +3858,91 @@ const server =
     }
   );
 
+// ---- Monobank: автоматична перевірка прямих переказів гостя готелю ----
+// (Фаза 5 — пряма оплата, без мерчант-акаунта на стороні готелю). Дивиться
+// лише броні з payment_method='card_transfer' і статусом pending_payment —
+// бронь через WayForPay підтверджується своїм вебхуком, цього циклу не
+// стосується.
+const MONOBANK_CHECK_INTERVAL_MS = 2 * 60 * 1000; // безпечний запас понад ліміт Monobank — 1 запит/60с на токен
+
+async function checkMonobankPaymentsForProperty(propertyId, token) {
+  const { data: pending, error } = await supabase
+    .from('bookings')
+    .select('id, total_price, payment_reference, created_at')
+    .eq('property_id', propertyId)
+    .eq('status', 'pending_payment')
+    .eq('payment_method', 'card_transfer');
+
+  if (error) {
+    console.error(`[monobank] bookings lookup failed for ${propertyId}:`, error.message);
+    return;
+  }
+  if (!pending || !pending.length) return;
+
+  const oldestCreatedMs = pending.reduce((min, b) => {
+    const t = new Date(b.created_at).getTime();
+    return Number.isFinite(t) && t < min ? t : min;
+  }, Date.now());
+  const fromSeconds = Math.floor(oldestCreatedMs / 1000) - 60;
+
+  let transactions;
+  try {
+    transactions = await fetchMonobankStatement(token, { fromSeconds });
+  } catch (error) {
+    console.error(`[monobank] statement fetch failed for ${propertyId}:`, error.message);
+    return;
+  }
+
+  for (const booking of pending) {
+    const match = findMatchingTransaction(transactions, {
+      totalPrice: booking.total_price,
+      reference: booking.payment_reference,
+    });
+    if (!match) continue;
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({ status: 'paid' })
+      .eq('id', booking.id)
+      .eq('status', 'pending_payment'); // захист від подвійного спрацювання, якщо цикл десь наздогнав сам себе
+    if (updateError) {
+      console.error(`[monobank] failed to mark booking ${booking.id} paid:`, updateError.message);
+    }
+  }
+}
+
+async function runMonobankPaymentChecks() {
+  const { data: channels, error } = await supabase
+    .from('channels')
+    .select('property_id, credentials')
+    .eq('channel_type', 'monobank')
+    .eq('connected', true);
+  if (error || !channels || !channels.length) return;
+
+  for (const ch of channels) {
+    let token;
+    try {
+      token = decryptCredentials(ch.credentials).token;
+    } catch (decryptError) {
+      console.error(`[monobank] credential decrypt failed for ${ch.property_id}:`, decryptError.message);
+      continue;
+    }
+    if (!token) continue;
+    await checkMonobankPaymentsForProperty(ch.property_id, token);
+  }
+}
+
 server.listen(
   PORT,
   () => {
     console.log(
       `StayAI concierge server running on http://localhost:${PORT}`
     );
+
+    setInterval(() => {
+      runMonobankPaymentChecks().catch((error) => {
+        console.error('[monobank] payment check cycle failed:', error.message);
+      });
+    }, MONOBANK_CHECK_INTERVAL_MS);
 
     console.log(
       '[messenger] Configured:',

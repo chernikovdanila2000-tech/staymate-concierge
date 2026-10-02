@@ -14,6 +14,7 @@ const DEFAULT_STATE = {
   hotelInfo: null, // row from the `hotel_info` table for the current property
   escalations: [], // rows from the `escalations` table for the current property
   conversations: [], // rows from the `conversations` table: { property_id, channel, chat_id, messages }
+  bookings: [], // rows from the `bookings` table for the current property
   users: {}, // email -> { password, user }
   signInError: null,
   failNextRequest: null, // url substring to fail once
@@ -146,6 +147,7 @@ function buildClientSource() {
             if (table === 'channels') return { data: (st.channels || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'hotel_info') return { data: st.hotelInfo || null, error: null };
             if (table === 'escalations') return { data: (st.escalations || []).filter((r) => rowMatches(r, filters)), error: null };
+            if (table === 'bookings') return { data: (st.bookings || []).filter((r) => rowMatches(r, filters)), error: null };
             if (table === 'conversations') {
               const match = (st.conversations || []).find((r) => rowMatches(r, filters));
               return { data: match || null, error: null };
@@ -203,6 +205,9 @@ function buildClientSource() {
             }
             if (table === 'escalations') {
               st.escalations = (st.escalations || []).map((r) => (rowMatches(r, filters) ? { ...r, ...patch } : r));
+            }
+            if (table === 'bookings') {
+              st.bookings = (st.bookings || []).map((r) => (rowMatches(r, filters) ? { ...r, ...patch } : r));
             }
             __qaPersist();
             return { error: null };

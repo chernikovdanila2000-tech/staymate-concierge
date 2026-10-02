@@ -24,6 +24,46 @@ const HOTEL_INFO_LABELS = {
   additional_info: 'Додатково',
 };
 
+const DEFAULT_HOTEL_TIME_ZONE = 'Europe/Kyiv';
+
+function formatDateInTimeZone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+function addCalendarDays(isoDate, amount) {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + amount));
+  return next.toISOString().slice(0, 10);
+}
+
+/**
+ * Gives the model an unambiguous, guest-facing date anchor. A guest should
+ * never have to translate "tomorrow" into an ISO date themselves.
+ */
+function getDateContext({ now = new Date(), timeZone = process.env.DEFAULT_HOTEL_TIME_ZONE || DEFAULT_HOTEL_TIME_ZONE } = {}) {
+  let effectiveTimeZone = timeZone;
+  let today;
+  try {
+    today = formatDateInTimeZone(now, effectiveTimeZone);
+  } catch {
+    effectiveTimeZone = DEFAULT_HOTEL_TIME_ZONE;
+    today = formatDateInTimeZone(now, effectiveTimeZone);
+  }
+  return {
+    timeZone: effectiveTimeZone,
+    today,
+    tomorrow: addCalendarDays(today, 1),
+    dayAfterTomorrow: addCalendarDays(today, 2),
+  };
+}
+
 function formatHotelInfo(hotelInfo) {
   if (!hotelInfo) return '(Власник ще не заповнив цю інформацію в кабінеті.)';
   const lines = Object.entries(HOTEL_INFO_LABELS)
@@ -35,19 +75,40 @@ function formatHotelInfo(hotelInfo) {
   return lines.length ? lines.join('\n') : '(Власник ще не заповнив цю інформацію в кабінеті.)';
 }
 
-function buildSystemPrompt({ propertyName = 'демо-готель StayAI', checkInTime, checkOutTime, hotelInfo = null } = {}) {
+function buildSystemPrompt({ propertyName = 'демо-готель StayAI', checkInTime, checkOutTime, hotelInfo = null, now, timeZone } = {}) {
   // Явно передані checkInTime/checkOutTime мають пріоритет, інакше беремо
   // час із заповненої власником інформації про заклад, і тільки як останній
   // резерв — захардкоджені 14:00/12:00 (щоб демо-режим без даних не ламався).
   const effectiveCheckIn = checkInTime || (hotelInfo && hotelInfo.check_in_time) || '14:00';
   const effectiveCheckOut = checkOutTime || (hotelInfo && hotelInfo.check_out_time) || '12:00';
+  const dates = getDateContext({ now, timeZone });
   return `Ти — ШІ-адміністратор бронювання для "${propertyName}", який працює на платформі StayAI.
 Ти спілкуєшся з гостями напряму (через месенджер) від імені закладу.
+
+## Поточна дата для бронювань
+Зараз у часовому поясі закладу (${dates.timeZone}): ${dates.today}.
+- «сьогодні» / «today» = ${dates.today}
+- «завтра» / «tomorrow» = ${dates.tomorrow}
+- «післязавтра» / «day after tomorrow» = ${dates.dayAfterTomorrow}
+Коли гість називає відносні дати, самостійно перетвори їх на ці конкретні
+дати у форматі YYYY-MM-DD та використовуй їх для перевірки наявності й бронювання.
+Не проси гостя повторно назвати «точні дати», якщо фраза однозначна. Перед
+створенням бронювання коротко повтори зрозумілий період абсолютними датами.
 
 ## Інформація про заклад (єдине джерело правди про факти)
 Це ВСЯ інформація про заклад, яку тобі надав власник. Вона — єдине джерело правди про адресу,
 паркування, сніданок, Wi-Fi, тварин, правила, скасування, трансфер тощо:
 ${formatHotelInfo(hotelInfo)}
+
+ВАЖЛИВЕ РОЗМЕЖУВАННЯ: список номерів, ціни та наявність НЕ зберігаються
+у цьому розділі. На запитання про номери, ціни, кількість гостей або
+доступність ЗАВЖДИ викликай check_availability — навіть коли цей розділ
+порожній. Ніколи не передавай такий запит адміністрації лише через те,
+що тут бракує інформації.
+Попередні відповіді асистента та старі результати перевірок у діалозі
+не є джерелом правди: вони могли застаріти або бути помилковими. На КОЖНЕ
+нове запитання про номери, ціни чи наявність перевіряй каталог заново через
+check_availability, а не повторюй стару відповідь.
 
 Якщо гість питає про щось із цієї теми, а відповідного пункту немає у списку вище — це означає,
 що власник ще не вказав цю інформацію. НЕ вигадуй відповідь і не роби припущень "зазвичай буває".
@@ -85,8 +146,12 @@ ${formatHotelInfo(hotelInfo)}
    реальні вільні номери й ціни на конкретний період.
 3. Покажи 1-3 найбільш підходящі варіанти коротко (тип номера, ціна за ніч, що входить).
 4. Коли гість підтвердив вибір — запитай ім'я та контакт (телефон або email) для броні.
-5. Виклич create_booking, підтверди деталі та надішли гостю посилання на оплату
-   (посилання поверне інструмент — ніколи не вигадуй посилання сам).
+5. Виклич create_booking, підтверди деталі й надішли гостю спосіб оплати —
+   інструмент поверне АБО посилання на оплату (payment_link), АБО готовий
+   текст з реквізитами для переказу й кодом для коментаря
+   (payment_instructions), залежно від того, що налаштовано в готелі.
+   Передай гостю рівно те, що повернув інструмент, дослівно — ніколи не
+   вигадуй посилання чи реквізити сам.
 6. Стандартний час заїзду — ${effectiveCheckIn}, виїзду — ${effectiveCheckOut}, якщо гість не
    домовився про інше окремо.
 
@@ -109,4 +174,9 @@ ${formatHotelInfo(hotelInfo)}
   навіть якщо він прямо запитає — ввічливо переведи розмову назад до його запиту.`;
 }
 
-module.exports = { buildSystemPrompt, formatHotelInfo };
+module.exports = {
+  addCalendarDays,
+  buildSystemPrompt,
+  formatHotelInfo,
+  getDateContext,
+};

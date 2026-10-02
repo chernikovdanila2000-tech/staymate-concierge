@@ -822,3 +822,123 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     await expect(page.locator('.esc-row')).toHaveCount(1);
   });
 });
+
+test.describe('Dashboard — Bookings and direct payout (new feature)', () => {
+  // Phase 5 of the completion plan: guests pay the hotel directly (card/IBAN
+  // transfer), instead of through a shared WayForPay test merchant — the
+  // hotel pastes its own payout details in the cabinet, and create_booking
+  // on the backend then hands the guest a transfer reference instead of a
+  // WayForPay link. Monobank, if connected, confirms payment automatically;
+  // otherwise the owner confirms manually here.
+  const baseSession = { user: { id: 'u1', email: 'user@example.com', created_at: new Date().toISOString() } };
+  const baseProperty = {
+    property_id: 'p1', hotel_name: 'Test Hotel', subscription_status: 'active', subscription_plan: 'pro',
+    subscription_active_until: new Date(Date.now() + 28 * 86400000).toISOString(),
+  };
+
+  test('empty state when there are no bookings', async ({ page }) => {
+    await installBackendMock(page, { session: baseSession, property: baseProperty });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="bookings"]');
+    await expect(page.locator('#bkEmptyHint')).not.toHaveClass(/hidden/);
+    await expect(page.locator('.booking-row')).toHaveCount(0);
+  });
+
+  test('shows bookings with status, method and amount, newest handling included', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      bookings: [
+        {
+          id: 'bk1', booking_id: 'BKAAA111', property_id: 'p1', room_type: 'Studio',
+          check_in: '2026-10-10', check_out: '2026-10-12', guest_name: 'Danya', guest_contact: '+380111111111',
+          price_per_night: 3000, total_price: 6000, status: 'pending_payment',
+          payment_method: 'card_transfer', payment_reference: 'BKAAA111', created_at: new Date().toISOString(),
+        },
+        {
+          id: 'bk2', booking_id: 'BKBBB222', property_id: 'p1', room_type: 'Suite',
+          check_in: '2026-11-01', check_out: '2026-11-03', guest_name: 'Olena', guest_contact: 'olena@example.com',
+          price_per_night: 2000, total_price: 4000, status: 'paid',
+          payment_method: 'wayforpay', payment_reference: null, created_at: new Date().toISOString(),
+        },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="bookings"]');
+    await expect(page.locator('.booking-row')).toHaveCount(2);
+    await expect(page.locator('#bkEmptyHint')).toHaveClass(/hidden/);
+
+    const pendingRow = page.locator('.booking-row', { hasText: 'Danya' });
+    await expect(pendingRow).toContainText('Очікує оплати');
+    await expect(pendingRow).toContainText('6000');
+    await expect(pendingRow).toContainText('Переказ на картку/IBAN');
+    await expect(pendingRow.locator('.mark-paid-btn')).toBeVisible();
+
+    const paidRow = page.locator('.booking-row', { hasText: 'Olena' });
+    await expect(paidRow).toContainText('Оплачено');
+    await expect(paidRow).toContainText('WayForPay');
+    await expect(paidRow.locator('.mark-paid-btn')).toHaveCount(0);
+    await expect(paidRow).toHaveClass(/is-paid/);
+  });
+
+  test('marking a pending booking as paid updates it immediately and persists', async ({ page }) => {
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      bookings: [{
+        id: 'bk1', booking_id: 'BKAAA111', property_id: 'p1', room_type: 'Studio',
+        check_in: '2026-10-10', check_out: '2026-10-12', guest_name: 'Danya', guest_contact: '+380111111111',
+        price_per_night: 3000, total_price: 6000, status: 'pending_payment',
+        payment_method: 'card_transfer', payment_reference: 'BKAAA111', created_at: new Date().toISOString(),
+      }],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="bookings"]');
+    await page.click('.mark-paid-btn');
+    await expect(page.locator('.booking-row')).toContainText('Оплачено');
+    await expect(page.locator('.mark-paid-btn')).toHaveCount(0);
+
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('__qaState')).bookings);
+    expect(stored.find((b) => b.id === 'bk1').status).toBe('paid');
+  });
+
+  test('saving payout card/IBAN details persists and prefills on reload', async ({ page }) => {
+    await installBackendMock(page, { session: baseSession, property: baseProperty });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="channels"]');
+    await page.fill('#payoutCard', '5375411234567890');
+    await page.fill('#payoutIban', 'UA000000000000000000000000000');
+    await page.fill('#payoutRecipient', 'FOP Ivanenko');
+    await page.click('#savePayout');
+    await expect(page.locator('#msgPayout')).toContainText(/збережено/i);
+
+    await page.reload();
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="channels"]');
+    await expect(page.locator('#payoutCard')).toHaveValue('5375411234567890');
+    await expect(page.locator('#payoutIban')).toHaveValue('UA000000000000000000000000000');
+    await expect(page.locator('#payoutRecipient')).toHaveValue('FOP Ivanenko');
+  });
+
+  test('connecting Monobank shows it as connected and lets the owner disconnect', async ({ page }) => {
+    await installBackendMock(page, { session: baseSession, property: baseProperty });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="channels"]');
+    await expect(page.locator('#pill-monobank')).toContainText(/не підключено/i);
+
+    await page.fill('#tokenMonobank', 'uTestToken123');
+    await page.click('#connectMonobank');
+    await expect(page.locator('#pill-monobank')).toContainText(/підключено/i);
+    await expect(page.locator('#pill-monobank')).not.toContainText(/не підключено/i);
+    await expect(page.locator('#disconnectMonobank')).not.toHaveClass(/hidden/);
+
+    page.once('dialog', (d) => d.accept());
+    await page.click('#disconnectMonobank');
+    await expect(page.locator('#pill-monobank')).toContainText(/не підключено/i);
+  });
+});

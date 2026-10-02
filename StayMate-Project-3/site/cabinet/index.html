@@ -209,6 +209,13 @@ td.del-col button{background:none; border:none; color:var(--warn); font-size:18p
 .esc-msg.from-owner{background:var(--ink); color:var(--bg); float:right; margin-left:auto;}
 .esc-msg-clear{clear:both;}
 
+.booking-row{border:1px solid var(--line); border-radius:var(--radius-s); padding:14px 18px; margin-bottom:10px;}
+.booking-row.is-paid{opacity:.65;}
+.booking-row-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; flex-wrap:wrap;}
+.booking-row-main{font-size:14px; color:var(--ink);}
+.booking-row-meta{font-size:12px; color:var(--muted); margin-top:4px;}
+.booking-row .actions{margin-top:10px;}
+
 /* ---------- модалки (форма номера, масове завантаження) ---------- */
 .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; overflow-y:auto;}
 .modal-overlay.hidden{display:none;}
@@ -404,6 +411,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <div class="dash-tabs">
       <button class="dash-tab active" type="button" data-tab="overview" data-i18n="dash.tab.overview">Огляд</button>
       <button class="dash-tab" type="button" data-tab="channels" data-i18n="dash.tab.channels">Канали</button>
+      <button class="dash-tab" type="button" data-tab="bookings" data-i18n="dash.tab.bookings">Броні</button>
       <button class="dash-tab" type="button" data-tab="escalations"><span data-i18n="dash.tab.escalations">Ескалації</span><span class="esc-tab-badge hidden" id="escTabBadge">0</span></button>
     </div>
 
@@ -662,8 +670,49 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="msg" id="msgMessenger"></span>
         </div>
       </div>
+
+      <div class="channel-card" data-channel="monobank">
+        <div class="channel-head">
+          <span class="channel-name" data-i18n="ch.monobank.name">Monobank (автоперевірка оплати)</span>
+          <span class="status-pill off" id="pill-monobank">Не підключено</span>
+        </div>
+        <p class="hint" data-i18n="ch.monobank.hint">Якщо рахунок готелю — у Monobank, вставте особистий токен API (безкоштовно, без заявок: отримати на api.monobank.ua), і StayAI автоматично підтверджуватиме оплату бронювань гостем напряму на ваш рахунок.</p>
+        <label for="tokenMonobank" data-i18n="ch.monobank.tokenLabel">Токен API Monobank</label>
+        <input id="tokenMonobank" type="password" placeholder="uXXXXXXXXXXXXXXXXXXXXXXXXXXXX">
+        <div class="actions">
+          <button class="btn-primary" id="connectMonobank" data-i18n="common.connect">Підключити</button>
+          <button class="btn-danger hidden" id="disconnectMonobank" data-i18n="common.disconnect">Відключити</button>
+          <span class="msg" id="msgMonobank"></span>
+        </div>
+      </div>
+
+      <div class="channel-card" data-channel="payout">
+        <div class="channel-head">
+          <span class="channel-name" data-i18n="ch.payout.name">Реквізити для оплати</span>
+        </div>
+        <p class="hint" data-i18n="ch.payout.hint">Ці дані бот надсилає гостю, коли той готовий оплатити бронювання — гроші йдуть напряму на ваш рахунок, без посередників.</p>
+        <label for="payoutCard" data-i18n="ch.payout.cardLabel">Номер картки</label>
+        <input id="payoutCard" type="text" placeholder="5375 4112 3456 7890">
+        <label for="payoutIban" data-i18n="ch.payout.ibanLabel">IBAN (необов'язково)</label>
+        <input id="payoutIban" type="text" placeholder="UA00 0000 0000 0000 0000 0000 000">
+        <label for="payoutRecipient" data-i18n="ch.payout.recipientLabel">Ім'я отримувача</label>
+        <input id="payoutRecipient" type="text" placeholder="ФОП Іваненко Іван">
+        <div class="actions">
+          <button class="btn-primary" id="savePayout" data-i18n="common.save">Зберегти</button>
+          <span class="msg" id="msgPayout"></span>
+        </div>
+      </div>
     </div>
     </div><!-- /tabChannels -->
+
+    <div id="tabBookings" class="hidden">
+    <div class="card">
+      <h2 data-i18n="bk.title">Броні</h2>
+      <p class="hint" data-i18n="bk.hint">Бронювання, створені ШІ-адміністратором. Якщо гість платить переказом на картку/IBAN і у вас не підключено Monobank — підтвердьте оплату вручну, щойно побачите надходження у своєму банку.</p>
+      <div id="bkList"></div>
+      <p class="hint rooms-empty hidden" id="bkEmptyHint" data-i18n="bk.empty">Броней поки немає.</p>
+    </div>
+    </div><!-- /tabBookings -->
 
     <div id="tabEscalations" class="hidden">
     <div class="card">
@@ -810,7 +859,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "loading.checking":"Завантаження кабінету…","loading.error":"Не вдалося завантажити дані. Перевірте інтернет-з'єднання.","loading.retry":"Спробувати знову",
 
       "dash.lede":"Тут ви керуєте даними, які бачить і використовує ШІ-адміністратор у всіх підключених каналах.",
-      "dash.tab.overview":"Огляд","dash.tab.channels":"Канали","dash.tab.escalations":"Ескалації",
+      "dash.tab.overview":"Огляд","dash.tab.channels":"Канали","dash.tab.bookings":"Броні","dash.tab.escalations":"Ескалації",
 
       "esc.title":"Ескалації","esc.hint":"Звернення гостей, з якими ШІ-адміністратор не впорався сам і передав вам — тут ви бачите весь діалог і можете відповісти гостю напряму.",
       "esc.empty":"Ескалацій поки немає — усі звернення гостей ШІ-адміністратор обробляє сам.",
@@ -931,6 +980,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.messenger.name":"Facebook Messenger",
       "ch.messenger.hint":"Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.",
       "ch.messenger.hintConnected":"Підключено сторінку «{page}». Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.",
+      "ch.monobank.name":"Monobank (автоперевірка оплати)","ch.monobank.hint":"Якщо рахунок готелю — у Monobank, вставте особистий токен API (безкоштовно, без заявок: отримати на api.monobank.ua), і StayAI автоматично підтверджуватиме оплату бронювань гостем напряму на ваш рахунок.","ch.monobank.tokenLabel":"Токен API Monobank",
+      "ch.payout.name":"Реквізити для оплати","ch.payout.hint":"Ці дані бот надсилає гостю, коли той готовий оплатити бронювання — гроші йдуть напряму на ваш рахунок, без посередників.","ch.payout.cardLabel":"Номер картки","ch.payout.ibanLabel":"IBAN (необов'язково)","ch.payout.recipientLabel":"Ім'я отримувача",
+      "bk.title":"Броні","bk.hint":"Бронювання, створені ШІ-адміністратором. Якщо гість платить переказом на картку/IBAN і у вас не підключено Monobank — підтвердьте оплату вручну, щойно побачите надходження у своєму банку.","bk.empty":"Броней поки немає.",
+      "bk.status.pending_payment":"Очікує оплати","bk.status.paid":"Оплачено","bk.status.cancelled":"Скасовано",
+      "bk.method.transfer":"Переказ на картку/IBAN","bk.method.wayforpay":"WayForPay","bk.markPaid":"Позначити оплаченим","bk.currency":"грн",
       "ch.messenger.tokenLabel":"Page Access Token",
     },
     en: {
@@ -995,7 +1049,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "loading.checking":"Loading your cabinet…","loading.error":"Couldn't load your data. Check your internet connection.","loading.retry":"Try again",
 
       "dash.lede":"Here you manage the data the AI administrator sees and uses across every connected channel.",
-      "dash.tab.overview":"Overview","dash.tab.channels":"Channels","dash.tab.escalations":"Escalations",
+      "dash.tab.overview":"Overview","dash.tab.channels":"Channels","dash.tab.bookings":"Bookings","dash.tab.escalations":"Escalations",
 
       "esc.title":"Escalations","esc.hint":"Guest requests the AI administrator couldn't handle on its own and passed to you — you can see the whole conversation here and reply to the guest directly.",
       "esc.empty":"No escalations yet — the AI administrator is handling every guest request on its own.",
@@ -1116,6 +1170,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.messenger.name":"Facebook Messenger",
       "ch.messenger.hint":"Paste the Page Access Token of your hotel's page from Meta for Developers — the page ID will be detected automatically.",
       "ch.messenger.hintConnected":"Connected to page «{page}». Paste the Page Access Token of your hotel's page from Meta for Developers — the page ID will be detected automatically.",
+      "ch.monobank.name":"Monobank (automatic payment check)","ch.monobank.hint":"If your property's account is with Monobank, paste a personal API token (free, no application needed — get one at api.monobank.ua) and StayAI will automatically confirm booking payments guests send directly to your account.","ch.monobank.tokenLabel":"Monobank API token",
+      "ch.payout.name":"Payout details","ch.payout.hint":"This is what the bot sends the guest when they're ready to pay for a booking — the money goes straight to your account, no middleman.","ch.payout.cardLabel":"Card number","ch.payout.ibanLabel":"IBAN (optional)","ch.payout.recipientLabel":"Recipient name",
+      "bk.title":"Bookings","bk.hint":"Bookings created by the AI agent. If a guest pays by card/IBAN transfer and you haven't connected Monobank, confirm payment manually once you see it land in your bank.","bk.empty":"No bookings yet.",
+      "bk.status.pending_payment":"Awaiting payment","bk.status.paid":"Paid","bk.status.cancelled":"Cancelled",
+      "bk.method.transfer":"Card/IBAN transfer","bk.method.wayforpay":"WayForPay","bk.markPaid":"Mark as paid","bk.currency":"UAH",
       "ch.messenger.tokenLabel":"Page Access Token",
     },
   };
@@ -1155,6 +1214,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (typeof renderRooms === 'function' && currentProperty) renderRooms();
     if (typeof renderChannelsUI === 'function' && currentProperty) renderChannelsUI();
     if (typeof renderEscalationsList === 'function' && currentProperty) renderEscalationsList();
+    if (typeof renderBookingsList === 'function' && currentProperty) renderBookingsList();
     if (typeof renderSubscriptionCard === 'function' && currentProperty) renderSubscriptionCard();
     if (typeof renderBulkPreview === 'function' && bulkPreviewRows && bulkPreviewRows.length) renderBulkPreview();
     if (typeof applyAuthMode === 'function') applyAuthMode();
@@ -1833,6 +1893,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('dashHotelName').textContent = currentProperty.hotel_name;
     document.getElementById('dashName').value = currentProperty.hotel_name || '';
     document.getElementById('dashAddress').value = currentProperty.address || '';
+    document.getElementById('payoutCard').value = currentProperty.payout_card || '';
+    document.getElementById('payoutIban').value = currentProperty.payout_iban || '';
+    document.getElementById('payoutRecipient').value = currentProperty.payout_recipient_name || '';
     renderSubscriptionCard();
 
     // Раніше кабінет показувався лише ПІСЛЯ того, як відповідять усі чотири
@@ -1843,7 +1906,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     // час очікування. Тепер каркас кабінету показуємо одразу, а кожен розділ
     // підвантажується у фоні й самостійно перемальовується, щойно готовий.
     dashScreen.classList.remove('hidden');
-    Promise.all([reloadRooms(), loadHotelInfo(), fetchChannels(), fetchEscalations()])
+    Promise.all([reloadRooms(), loadHotelInfo(), fetchChannels(), fetchEscalations(), fetchBookings()])
       .catch((err) => console.error('Не вдалося завантажити дані кабінету:', err));
   }
 
@@ -1893,6 +1956,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       const tab = tabBtn.dataset.tab;
       document.getElementById('tabOverview').classList.toggle('hidden', tab !== 'overview');
       document.getElementById('tabChannels').classList.toggle('hidden', tab !== 'channels');
+      document.getElementById('tabBookings').classList.toggle('hidden', tab !== 'bookings');
       document.getElementById('tabEscalations').classList.toggle('hidden', tab !== 'escalations');
     });
   });
@@ -2213,6 +2277,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         ? t('ch.messenger.hintConnected', lang, { page: fb.credentials.page_name })
         : t('ch.messenger.hint', lang);
 
+    const mb = channelsByType.monobank;
+    const mbStatus = (mb && mb.status) || (mb && mb.connected ? 'connected' : 'disconnected');
+    setPill('monobank', mbStatus);
+    setDisconnectVisible('monobank', mbStatus === 'connected');
+    document.getElementById('tokenMonobank').placeholder = mbStatus === 'connected' ? secretPh : 'uXXXXXXXXXXXXXXXXXXXXXXXXXXXX';
+
     document.getElementById('widgetSnippet').textContent = buildWidgetSnippet();
   }
 
@@ -2289,12 +2359,102 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     connectChannel('messenger', {
       access_token: document.getElementById('fbToken').value.trim(),
     }, 'msgMessenger', ['access_token']));
+  onClickGuarded(document.getElementById('connectMonobank'), () =>
+    connectChannel('monobank', {
+      token: document.getElementById('tokenMonobank').value.trim(),
+    }, 'msgMonobank', ['token']));
 
   onClickGuarded(document.getElementById('disconnectTelegram'), () => disconnectChannel('telegram', 'msgTelegram'));
   onClickGuarded(document.getElementById('disconnectViber'), () => disconnectChannel('viber', 'msgViber'));
   onClickGuarded(document.getElementById('disconnectWhatsapp'), () => disconnectChannel('whatsapp', 'msgWhatsapp'));
   onClickGuarded(document.getElementById('disconnectInstagram'), () => disconnectChannel('instagram', 'msgInstagram'));
   onClickGuarded(document.getElementById('disconnectMessenger'), () => disconnectChannel('messenger', 'msgMessenger'));
+  onClickGuarded(document.getElementById('disconnectMonobank'), () => disconnectChannel('monobank', 'msgMonobank'));
+
+  onClickGuarded(document.getElementById('savePayout'), async () => {
+    const msg = document.getElementById('msgPayout');
+    msg.className = 'msg';
+    const payload = {
+      payout_card: document.getElementById('payoutCard').value.trim() || null,
+      payout_iban: document.getElementById('payoutIban').value.trim() || null,
+      payout_recipient_name: document.getElementById('payoutRecipient').value.trim() || null,
+    };
+    const { error } = await supabase
+      .from('properties')
+      .update(payload)
+      .eq('property_id', currentProperty.property_id);
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    Object.assign(currentProperty, payload);
+    msg.className = 'msg ok';
+    msg.textContent = t('common.saved', getLang());
+    setTimeout(() => { msg.textContent = ''; msg.className = 'msg'; }, 2500);
+  });
+
+  // ---- Броні (Фаза 5 — пряма оплата гостя готелю: гроші йдуть напряму на
+  // картку/IBAN готелю, без нашого мерчант-акаунта; Monobank, якщо
+  // підключений, підтверджує оплату сам — автоматична перевірка працює
+  // у фоні на сервері, тут лише читаємо вже проставлений статус) ----
+  let bookings = [];
+
+  async function fetchBookings() {
+    const { data } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('property_id', currentProperty.property_id)
+      .order('created_at', { ascending: false });
+    bookings = data || [];
+    renderBookingsList();
+  }
+
+  function renderBookingsList() {
+    const list = document.getElementById('bkList');
+    const emptyHint = document.getElementById('bkEmptyHint');
+    const lang = getLang();
+
+    if (!bookings.length) {
+      list.innerHTML = '';
+      emptyHint.classList.remove('hidden');
+      return;
+    }
+    emptyHint.classList.add('hidden');
+
+    list.innerHTML = bookings.map((b) => {
+      const isPaid = b.status === 'paid';
+      const total = b.total_price != null ? b.total_price : (b.price_per_night || 0);
+      const methodLabel = b.payment_method === 'card_transfer' ? t('bk.method.transfer', lang) : t('bk.method.wayforpay', lang);
+      return `
+        <div class="booking-row${isPaid ? ' is-paid' : ''}">
+          <div class="booking-row-head">
+            <span class="esc-badge ${isPaid ? 'status-resolved' : 'status-open'}">${t('bk.status.' + b.status, lang)}</span>
+            <span class="hint" style="font-size:12px;">${formatDate(b.created_at)}</span>
+          </div>
+          <div class="booking-row-main">${escapeHtml(b.room_type)} · ${escapeHtml(b.check_in)} — ${escapeHtml(b.check_out)} · ${total} ${t('bk.currency', lang)}</div>
+          <div class="booking-row-meta">${escapeHtml(b.guest_name)} · ${escapeHtml(b.guest_contact)} · ${methodLabel}</div>
+          ${isPaid ? '' : `<div class="actions"><button type="button" class="btn-secondary mark-paid-btn" data-id="${b.id}">${t('bk.markPaid', lang)}</button></div>`}
+        </div>
+      `;
+    }).join('');
+
+    list.querySelectorAll('.mark-paid-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const { error } = await supabase
+          .from('bookings')
+          .update({ status: 'paid' })
+          .eq('id', btn.dataset.id)
+          .eq('property_id', currentProperty.property_id);
+        btn.disabled = false;
+        if (error) return;
+        const booking = bookings.find((b) => String(b.id) === String(btn.dataset.id));
+        if (booking) booking.status = 'paid';
+        renderBookingsList();
+      });
+    });
+  }
 
   document.getElementById('copyWidget').addEventListener('click', () => {
     const text = document.getElementById('widgetSnippet').textContent;
