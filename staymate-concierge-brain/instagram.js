@@ -275,9 +275,23 @@ async function sendInstagramMessage(
   const body = await response.text();
 
   if (!response.ok) {
-    // Meta's body can contain customer or account metadata. Keep logs useful
-    // without copying external response contents into production logs.
-    console.error('[instagram] Send API error:', response.status);
+    // Meta's response can contain user/account metadata. Log only stable
+    // diagnostic codes so an authentication or permission failure can be
+    // distinguished without placing external payloads in production logs.
+    let graphError;
+    try {
+      const parsed = JSON.parse(body);
+      graphError = parsed?.error;
+    } catch {
+      // Keep the fallback deliberately content-free.
+    }
+
+    console.error('[instagram] Send API error:', {
+      status: response.status,
+      code: graphError?.code ?? null,
+      subcode: graphError?.error_subcode ?? null,
+      type: graphError?.type ?? null,
+    });
 
     throw new Error(
       `Instagram send failed: ${response.status}`
