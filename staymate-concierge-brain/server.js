@@ -18,7 +18,9 @@ const {
   safeEqual,
   verifyMessengerSignature,
   parseMessengerEvents,
+  prepareMessengerIncomingText,
   sendMessengerMessage,
+  VOICE_PROCESSING_FALLBACK: MESSENGER_VOICE_PROCESSING_FALLBACK,
 } = require('./messenger');
 const {
   verifyInstagramSignature,
@@ -1149,6 +1151,31 @@ const server =
 
                     if (!property) continue;
 
+                    let incomingText;
+                    try {
+                      incomingText = await prepareMessengerIncomingText({
+                        event,
+                        accessToken: connection.accessToken,
+                      });
+                      if (event.audio) console.log('[messenger] Voice transcribed');
+                    } catch (error) {
+                      // A temporary Meta media URL or transcription outage
+                      // must not leave the guest with apparent silence.
+                      console.error('[messenger] Voice processing failed:', {
+                        code: error.code || 'VOICE_PROCESSING_ERROR',
+                        ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                        ...(error.providerReason ? { providerReason: error.providerReason } : {}),
+                      });
+                      await sendMessengerMessage(
+                        connection.accessToken,
+                        event.senderId,
+                        MESSENGER_VOICE_PROCESSING_FALLBACK,
+                        META_GRAPH_VERSION
+                      );
+                      continue;
+                    }
+                    if (!incomingText) continue;
+
                     const history =
                       await getHistory(
                         connection.propertyId,
@@ -1158,8 +1185,7 @@ const server =
 
                     history.push({
                       role: 'user',
-                      content:
-                        event.text,
+                      content: incomingText,
                     });
 
                     if (await isTakenOverConversation(connection.propertyId, 'messenger', event.senderId)) {

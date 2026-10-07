@@ -5,6 +5,8 @@ const test = require('node:test');
 const {
   verifyMessengerSignature,
   parseMessengerEvents,
+  downloadMessengerMedia,
+  prepareMessengerIncomingText,
   sendMessengerMessage,
 } = require('../messenger');
 
@@ -72,6 +74,86 @@ test('sends a bounded response to the Messenger Graph API', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+test('parses a Messenger voice attachment without confusing it with an image', () => {
+  const events = parseMessengerEvents({
+    object: 'page',
+    entry: [{
+      id: 'page-a',
+      messaging: [
+        {
+          sender: { id: 'guest-a' },
+          message: {
+            attachments: [{
+              type: 'audio',
+              payload: {
+                url: 'https://lookaside.example.test/voice.ogg',
+                mime_type: 'audio/ogg',
+                file_size: 123,
+                duration: 3,
+              },
+            }],
+          },
+        },
+        { sender: { id: 'guest-a' }, message: { attachments: [{ type: 'image', payload: { url: 'https://example.test/image' } }] } },
+      ],
+    }],
+  });
+
+  assert.deepEqual(events, [{
+    pageId: 'page-a',
+    senderId: 'guest-a',
+    text: null,
+    audio: {
+      url: 'https://lookaside.example.test/voice.ogg',
+      mediaType: 'audio/ogg',
+      fileSize: 123,
+      durationSeconds: 3,
+      filename: 'messenger-voice.ogg',
+    },
+  }]);
+});
+
+test('downloads Messenger voice only from HTTPS and keeps a bounded in-memory buffer', async () => {
+  let request;
+  const media = await downloadMessengerMedia('page-token', {
+    url: 'https://lookaside.example.test/voice.ogg', mediaType: 'audio/ogg', filename: 'voice.ogg',
+  }, async (url, options) => {
+    request = { url, options };
+    return {
+      ok: true,
+      headers: { get: name => name === 'content-type' ? 'audio/ogg' : '4' },
+      arrayBuffer: async () => Buffer.from('OggS'),
+    };
+  });
+  assert.equal(request.url, 'https://lookaside.example.test/voice.ogg');
+  assert.equal(request.options.headers.Authorization, 'Bearer page-token');
+  assert.equal(media.mediaType, 'audio/ogg');
+  assert.equal(media.filename, 'voice.ogg');
+  assert.deepEqual(media.audio, Buffer.from('OggS'));
+  await assert.rejects(
+    () => downloadMessengerMedia('page-token', { url: 'http://example.test/voice.ogg' }, async () => null),
+    /must use HTTPS/
+  );
+});
+
+test('converts a Messenger voice event to the same user text pipeline', async () => {
+  let transcriptionRequest;
+  const text = await prepareMessengerIncomingText({
+    event: { audio: { url: 'https://lookaside.example.test/voice.ogg', mediaType: 'audio/ogg' } },
+    accessToken: 'page-token',
+    downloadMedia: async () => ({
+      audio: Buffer.from('OggS'), mediaType: 'audio/ogg', filename: 'voice.ogg', durationSeconds: 3,
+    }),
+    transcribe: async input => {
+      transcriptionRequest = input;
+      return 'Хочу забронировать номер';
+    },
+  });
+  assert.equal(text, 'Хочу забронировать номер');
+  assert.equal(transcriptionRequest.filename, 'voice.ogg');
+  assert.equal(transcriptionRequest.mediaType, 'audio/ogg');
 });
 
 test('surfaces a Graph API failure without treating it as a successful reply', async () => {
