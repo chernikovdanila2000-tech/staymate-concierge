@@ -72,6 +72,7 @@ const {
 } = require('./meta-verify');
 const { createClient } = require('@supabase/supabase-js');
 const { createVoiceCallService } = require('./voice-calls');
+const { VoiceTestService, hasVoiceTestAccess, testPageHtml } = require('./voice-test');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -80,6 +81,9 @@ const supabase = createClient(
 // Separate from chat-channel adapters. It remains inactive until dedicated voice
 // credentials are supplied in Railway and a verified phone number is mapped.
 const voiceCallService = createVoiceCallService({ supabase });
+// This is intentionally separate from production calling. It is disabled unless
+// a staging environment explicitly supplies both feature flag and access token.
+const voiceTestService = new VoiceTestService({ supabase });
 
 const WFP_MERCHANT_SECRET =
   process.env.WAYFORPAY_MERCHANT_SECRET ||
@@ -1008,6 +1012,28 @@ const server =
           res
         )
       ) {
+        return;
+      }
+
+      if (requestUrl.pathname === '/internal/voice-test') {
+        if (!voiceTestService.isReady()) return sendJson(res, 404, { error: 'not_found' });
+        if (!hasVoiceTestAccess(req.headers, voiceTestService.config.token)) {
+          return sendJson(res, 401, { error: 'authentication_required' }, { 'WWW-Authenticate': 'Basic realm="StayAI Voice Test", charset="UTF-8"' });
+        }
+        if (req.method !== 'GET') return sendJson(res, 405, { error: 'method_not_allowed' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' });
+        return res.end(testPageHtml());
+      }
+
+      if (requestUrl.pathname === '/internal/voice-test/session') {
+        if (!voiceTestService.isReady()) return sendJson(res, 404, { error: 'not_found' });
+        if (!hasVoiceTestAccess(req.headers, voiceTestService.config.token)) {
+          return sendJson(res, 401, { error: 'authentication_required' }, { 'WWW-Authenticate': 'Basic realm="StayAI Voice Test", charset="UTF-8"' });
+        }
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' });
+        readBody(req).then(sdp => voiceTestService.createSessionAnswer(sdp)).then(answer => {
+          res.writeHead(200, { 'Content-Type': 'application/sdp; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(answer);
+        }).catch(error => { console.error('[voice-test] session failed:', error.message); sendJson(res, error.status || 500, { error: 'voice_test_unavailable' }); });
         return;
       }
 
