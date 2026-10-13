@@ -71,11 +71,15 @@ const {
   verifyMessengerCredentials,
 } = require('./meta-verify');
 const { createClient } = require('@supabase/supabase-js');
+const { createVoiceCallService } = require('./voice-calls');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
+// Separate from chat-channel adapters. It remains inactive until dedicated voice
+// credentials are supplied in Railway and a verified phone number is mapped.
+const voiceCallService = createVoiceCallService({ supabase });
 
 const WFP_MERCHANT_SECRET =
   process.env.WAYFORPAY_MERCHANT_SECRET ||
@@ -1004,6 +1008,20 @@ const server =
           res
         )
       ) {
+        return;
+      }
+
+      // OpenAI Realtime sends signed SIP call events here. The actual RTP audio
+      // remains on the provider <-> OpenAI path; this process only controls the
+      // tenant-scoped sideband session and tools.
+      if (requestUrl.pathname === '/webhook/openai/voice' && req.method === 'POST') {
+        readBody(req)
+          .then(rawBody => voiceCallService.handleWebhook(rawBody, req.headers))
+          .then(result => sendJson(res, result.status, result.body))
+          .catch(error => {
+            console.error('[voice] webhook handler failed:', error.message);
+            sendJson(res, 500, { error: 'voice_webhook_failed' });
+          });
         return;
       }
 
@@ -3869,6 +3887,7 @@ const server =
           200,
           {
             ok: true,
+            voice: voiceCallService.health(),
           }
         );
       }
@@ -4011,5 +4030,12 @@ server.listen(
           !!META_INSTAGRAM_VERIFY_TOKEN,
       }
     );
+
+    console.log('[voice] Configured:', voiceCallService.health());
+    if (voiceCallService.isReady()) {
+      setInterval(() => {
+        voiceCallService.markStaleCalls().catch(error => console.error('[voice] stale-call cleanup failed:', error.message));
+      }, 60_000).unref();
+    }
   }
 );

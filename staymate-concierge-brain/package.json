@@ -13,6 +13,8 @@
     "@supabase/supabase-js": "^2.45.0",
     "busboy": "^1.6.0",
     "mammoth": "^1.12.3",
+    "openai": "^7.32.0",
+    "ws": "^8.22.0",
     "xlsx": "^0.18.5"
   },
   "license": "UNLICENSED",
