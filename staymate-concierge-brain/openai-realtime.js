@@ -18,8 +18,10 @@ class OpenAIRealtimeClient {
     return this.sdk.webhooks.unwrap(rawBody, headers);
   }
 
-  async request(path, method, body) {
-    const response = await this.fetch(`${API}/${encodeURIComponent(path)}`, {
+  async request(callId, action, method, body) {
+    // Encode the call id only. Encoding the complete path would turn the
+    // action separator into %2F and make OpenAI receive a different route.
+    const response = await this.fetch(`${API}/${encodeURIComponent(callId)}${action}`, {
       method,
       headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -28,11 +30,11 @@ class OpenAIRealtimeClient {
     return response.status === 204 ? null : response.json();
   }
 
-  acceptCall(callId, session) { return this.request(`${callId}/accept`, 'POST', session); }
-  referCall(callId, targetUri) { return this.request(`${callId}/refer`, 'POST', { target_uri: targetUri }); }
-  rejectCall(callId, statusCode = 486) { return this.request(`${callId}/reject`, 'POST', { status_code: statusCode }); }
+  acceptCall(callId, session) { return this.request(callId, '/accept', 'POST', session); }
+  referCall(callId, targetUri) { return this.request(callId, '/refer', 'POST', { target_uri: targetUri }); }
+  rejectCall(callId, statusCode = 486) { return this.request(callId, '/reject', 'POST', { status_code: statusCode }); }
   // The Realtime API uses POST /hangup (not HTTP DELETE) for SIP/WebRTC calls.
-  hangupCall(callId) { return this.request(`${callId}/hangup`, 'POST', {}); }
+  hangupCall(callId) { return this.request(callId, '/hangup', 'POST', {}); }
 
   openMonitor(callId, { onEvent, onError, onClose }) {
     const socket = new this.WebSocket(`wss://api.openai.com/v1/realtime?call_id=${encodeURIComponent(callId)}`, {
