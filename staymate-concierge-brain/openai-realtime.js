@@ -30,7 +30,9 @@ class OpenAIRealtimeClient {
 
   acceptCall(callId, session) { return this.request(`${callId}/accept`, 'POST', session); }
   referCall(callId, targetUri) { return this.request(`${callId}/refer`, 'POST', { target_uri: targetUri }); }
-  hangupCall(callId) { return this.request(callId, 'DELETE'); }
+  rejectCall(callId, statusCode = 486) { return this.request(`${callId}/reject`, 'POST', { status_code: statusCode }); }
+  // The Realtime API uses POST /hangup (not HTTP DELETE) for SIP/WebRTC calls.
+  hangupCall(callId) { return this.request(`${callId}/hangup`, 'POST', {}); }
 
   openMonitor(callId, { onEvent, onError, onClose }) {
     const socket = new this.WebSocket(`wss://api.openai.com/v1/realtime?call_id=${encodeURIComponent(callId)}`, {

@@ -16,7 +16,7 @@ test('normalizes SIP destination without retaining caller details', () => {
 
 test('uses an economical configurable realtime model and ten-minute pilot default', () => {
   const config = voiceConfig({ VOICE_ENABLED: 'true' });
-  assert.equal(config.model, 'gpt-realtime-mini');
+  assert.equal(config.model, 'gpt-realtime-2.1-mini');
   assert.equal(config.maxDurationSeconds, 600);
   assert.equal(config.vad.interrupt_response, true);
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
