@@ -21,6 +21,8 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.vad.interrupt_response, true);
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
+  assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
+  assert.equal(voiceConfig({ VOICE_OPENAI_API_KEY: 'voice-key', TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'voice-key');
 });
 
 test('converts the existing tenant-safe tools to Realtime function tools', () => {
