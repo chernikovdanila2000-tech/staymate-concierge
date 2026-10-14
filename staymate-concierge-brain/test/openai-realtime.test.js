@@ -41,3 +41,11 @@ test('keeps an OpenAI error code for safe operational diagnostics', async () => 
   });
   await assert.rejects(() => client.acceptCall('call-1', { type: 'realtime' }), error => error.status === 400 && error.providerCode === 'unsupported_value');
 });
+
+test('treats the documented empty 200 SIP accept response as success', async () => {
+  const client = new OpenAIRealtimeClient({
+    apiKey: 'test-key', webhookSecret: 'whsec_test',
+    fetchImpl: async () => ({ ok: true, status: 200, text: async () => '' }),
+  });
+  assert.equal(await client.acceptCall('call-1', { type: 'realtime' }), null);
+});

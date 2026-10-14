@@ -35,7 +35,12 @@ class OpenAIRealtimeClient {
       error.providerCode = typeof body?.error?.code === 'string' ? body.error.code : null;
       throw error;
     }
-    return response.status === 204 ? null : response.json();
+    // SIP call-control endpoints, including /accept, return 200 with an
+    // empty body. Treat every successful empty response as success instead
+    // of attempting JSON parsing and hanging up an already accepted call.
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
   }
 
   acceptCall(callId, session) { return this.request(callId, '/accept', 'POST', session); }
