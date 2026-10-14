@@ -6,7 +6,7 @@ process.env.SUPABASE_KEY ||= 'test-key';
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');
-const { VoiceCallService, normalizePhoneNumber, safeTransportCode, toRealtimeTools, voiceConfig } = require('../voice-calls');
+const { VoiceCallService, normalizePhoneNumber, safeTransportCode, toRealtimeTools, voiceConfig, voiceConversationRules } = require('../voice-calls');
 
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
@@ -20,11 +20,21 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.model, 'gpt-realtime-2.1-mini');
   assert.equal(config.maxDurationSeconds, 600);
   assert.equal(config.vad.interrupt_response, true);
+  assert.equal(config.vad.threshold, 0.35);
+  assert.equal(config.vad.silence_duration_ms, 350);
+  assert.equal(config.voiceSpeed, 1.05);
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
   assert.equal(voiceConfig({ VOICE_OPENAI_API_KEY: 'voice-key', TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'voice-key');
   assert.equal(voiceConfig({ VOICE_DEFAULT_PHONE_NUMBER: '+380441111111' }).defaultPhoneNumber, '+380441111111');
+});
+
+test('adds phone-only natural language and no-internal-process rules', () => {
+  const rules = voiceConversationRules('Hotel A');
+  assert.match(rules, /substantive request in Russian/i);
+  assert.match(rules, /NEVER mention a catalog/i);
+  assert.match(rules, /stop immediately and listen/i);
 });
 
 test('classifies a failed OpenAI request without publishing its message', () => {
@@ -62,6 +72,7 @@ test('accepts a mapped call with VAD barge-in and only its mapped tenant', async
   assert.equal(result.status, 200);
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].session.audio.input.turn_detection.interrupt_response, true);
+  assert.equal(accepted[0].session.audio.output.speed, 1.05);
   assert.equal(service.health().diagnostic.stage, 'accept_succeeded');
   assert.match(accepted[0].session.instructions, /ONLY Hotel A/);
   assert.doesNotMatch(accepted[0].session.instructions, /Hotel B/);

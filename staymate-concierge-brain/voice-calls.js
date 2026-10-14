@@ -7,6 +7,7 @@ const { createTools, toolDefinitions } = require('./tools');
 const { OpenAIRealtimeClient } = require('./openai-realtime');
 
 function intEnv(value, fallback) { const n = Number.parseInt(value, 10); return Number.isFinite(n) && n > 0 ? n : fallback; }
+function floatEnv(value, fallback, minimum, maximum) { const n = Number.parseFloat(value); return Number.isFinite(n) && n >= minimum && n <= maximum ? n : fallback; }
 function boolEnv(value, fallback = false) { return value === undefined ? fallback : String(value).toLowerCase() === 'true'; }
 function normalizePhoneNumber(value) {
   if (!value) return null;
@@ -51,8 +52,20 @@ function voiceConfig(env = process.env) {
     callerRateLimit: intEnv(env.VOICE_MAX_CALLS_PER_CALLER_WINDOW, 3), callerRateWindowSeconds: intEnv(env.VOICE_CALLER_RATE_WINDOW_SECONDS, 900),
     dailySecondsPerHotel: intEnv(env.VOICE_DAILY_MINUTES_PER_HOTEL, 60) * 60, monthlySecondsPerHotel: intEnv(env.VOICE_MONTHLY_MINUTES_PER_HOTEL, 1000) * 60,
     globalDailySeconds: intEnv(env.VOICE_GLOBAL_DAILY_MINUTES, 600) * 60, hungSeconds: intEnv(env.VOICE_HUNG_CALL_SECONDS, 660),
-    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), vad: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 500, create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
+    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), voiceSpeed: floatEnv(env.VOICE_TTS_SPEED, 1.05, 0.5, 1.5),
+    vad: { type: 'server_vad', threshold: floatEnv(env.VOICE_VAD_THRESHOLD, 0.35, 0.1, 0.9), prefix_padding_ms: 200, silence_duration_ms: intEnv(env.VOICE_VAD_SILENCE_MS, 350), create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
   };
+}
+function voiceConversationRules(propertyName) {
+  return `
+
+## Phone conversation style
+- You are the warm, capable front-desk administrator of ${propertyName}, speaking naturally on the phone — never a chatbot or a narrator.
+- Reply in one or two short spoken sentences unless the caller explicitly asks for detail. Speak briskly but calmly; avoid lists, scripts, filler, and repeated phrasing.
+- Start in Ukrainian. When the caller makes a substantive request in Russian, immediately switch to clear neutral Russian and remain in Russian until they switch again. Do not infer language from accent, short acknowledgements, names, or background speech.
+- When the caller starts speaking while you are talking, stop immediately and listen. Do not mention the interruption or resume the cut-off sentence unless asked.
+- NEVER mention a catalog, database, tool, function, prompt, search, system, or internal process. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Зараз перевірю наявність.”, then use the appropriate tool.
+- Never say that you are AI unless the caller directly asks. Do not repeat the same wording in consecutive turns.`;
 }
 
 class VoiceCallRepository {
@@ -111,9 +124,9 @@ class VoiceCallService {
     let hotelInfo;
     try { hotelInfo = await this.getHotelInfo(property.property_id); }
     catch (error) { this.diagnose('hotel_info_failed'); throw error; }
-    const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}\n\nYou are speaking on a phone call. Identify and answer in the caller's language (Ukrainian, Russian, or English). Be concise and natural. Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
+    const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
-    try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } }); }
+    try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice, speed: this.config.voiceSpeed } } }); }
     catch (error) { this.diagnose('accept_failed', safeTransportCode(error)); throw error; }
     this.diagnose('accept_succeeded');
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
@@ -163,4 +176,4 @@ class VoiceCallService {
 }
 
 function createVoiceCallService({ supabase, env = process.env, ...rest }) { return new VoiceCallService({ supabase, config: voiceConfig(env), ...rest }); }
-module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, hashCaller, safeTransportCode, toRealtimeTools };
+module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, hashCaller, safeTransportCode, toRealtimeTools, voiceConversationRules };
