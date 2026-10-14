@@ -92,14 +92,19 @@ class VoiceCallService {
     if (reservation.code === 'CALL_ALREADY_STARTED') return { status: 200, body: { received: true } };
     this.diagnose('reservation_succeeded');
     try { await this.startCall({ callId, reservation }); return { status: 200, body: { received: true } }; }
-    catch (error) { this.diagnose('startup_failed'); this.logger.error('[voice] failed to start call', error.message); await this.repo.finish({ p_call_id: callId, p_status: 'failed', p_outcome: 'startup_error', p_error_code: 'startup_error', p_transferred: false }).catch(() => {}); await this.client.hangupCall(callId).catch(() => {}); return { status: 200, body: { received: true } }; }
+    catch (error) { if (!this.lastDiagnostic.stage.endsWith('_failed')) this.diagnose('startup_failed'); this.logger.error('[voice] failed to start call', error.message); await this.repo.finish({ p_call_id: callId, p_status: 'failed', p_outcome: 'startup_error', p_error_code: 'startup_error', p_transferred: false }).catch(() => {}); await this.client.hangupCall(callId).catch(() => {}); return { status: 200, body: { received: true } }; }
   }
   async startCall({ callId, reservation }) {
-    const property = await this.repo.property(reservation.property_id);
-    const hotelInfo = await this.getHotelInfo(property.property_id);
+    let property;
+    try { property = await this.repo.property(reservation.property_id); }
+    catch (error) { this.diagnose('property_lookup_failed'); throw error; }
+    let hotelInfo;
+    try { hotelInfo = await this.getHotelInfo(property.property_id); }
+    catch (error) { this.diagnose('hotel_info_failed'); throw error; }
     const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}\n\nYou are speaking on a phone call. Identify and answer in the caller's language (Ukrainian, Russian, or English). Be concise and natural. Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
-    await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } });
+    try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } }); }
+    catch (error) { this.diagnose('accept_failed'); throw error; }
     this.diagnose('accept_succeeded');
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
     state.socket = this.client.openMonitor(callId, {

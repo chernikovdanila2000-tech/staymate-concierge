@@ -89,6 +89,14 @@ test('does not accept an unmapped or rate-limited call', async () => {
   assert.equal(result.status, 200); assert.equal(hungUp, 1); assert.equal(accepted, 0);
 });
 
+test('reports an OpenAI accept failure without exposing provider details', async () => {
+  const client = { unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-accept-failure', sip_headers: [{ name: 'To', value: '+380441111111' }] } }), acceptCall: async () => { throw new Error('OpenAI Realtime POST 400'); }, hangupCall: async () => {} };
+  const repo = { begin: async () => ({ ok: true, property_id: 'hotel-a' }), property: async () => ({ property_id: 'hotel-a', hotel_name: 'Hotel A' }), finish: async () => {} };
+  const service = new VoiceCallService({ repository: repo, realtimeClient: client, config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y' }), enabled: true, apiKey: 'x', webhookSecret: 'y' }, getHotelInfoImpl: async () => ({}), buildPromptImpl: () => 'prompt', toolsFactory: () => ({}), logger: { warn() {}, error() {} } });
+  await service.handleWebhook('{}', {});
+  assert.equal(service.health().diagnostic.stage, 'accept_failed');
+});
+
 test('human transfer never uses a caller-provided destination', async () => {
   let destination; let escalated = 0;
   const service = new VoiceCallService({ realtimeClient: { referCall: async (_, uri) => { destination = uri; } }, repository: { finish: async () => {} }, config: voiceConfig(), toolsFactory: () => ({ escalate_to_human: async () => { escalated++; } }), clearTimeoutImpl: () => {} });
