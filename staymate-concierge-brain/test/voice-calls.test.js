@@ -33,7 +33,7 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
 
 test('adds phone-only natural language and no-internal-process rules', () => {
   const rules = voiceConversationRules('Hotel A');
-  assert.match(rules, /substantive request in Russian/i);
+  assert.match(rules, /complete request in Russian/i);
   assert.match(rules, /Сколько стоит номер/);
   assert.match(rules, /NEVER mention a catalog/i);
   assert.match(rules, /stop immediately and listen/i);
