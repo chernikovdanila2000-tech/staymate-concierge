@@ -27,6 +27,16 @@ function hashCaller(value, secret) {
   if (!value) return null;
   return crypto.createHmac('sha256', secret || 'voice-caller-hash-not-for-production').update(value).digest('hex');
 }
+function safeTransportCode(error) {
+  if (error?.providerCode) return error.providerCode;
+  if (error?.status) return `http_${error.status}`;
+  const code = String(error?.cause?.code || error?.code || '').toUpperCase();
+  if (['ENOTFOUND', 'EAI_AGAIN'].includes(code)) return 'dns_failed';
+  if (['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT'].includes(code)) return 'network_timeout';
+  if (['ECONNRESET', 'ECONNREFUSED', 'UND_ERR_SOCKET'].includes(code)) return 'network_connection_failed';
+  if (code.startsWith('ERR_TLS')) return 'tls_failed';
+  return 'network_request_failed';
+}
 function toRealtimeTools(definitions) {
   return definitions.map(({ name, description, input_schema }) => ({ type: 'function', name, description, parameters: input_schema }));
 }
@@ -104,7 +114,7 @@ class VoiceCallService {
     const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}\n\nYou are speaking on a phone call. Identify and answer in the caller's language (Ukrainian, Russian, or English). Be concise and natural. Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } }); }
-    catch (error) { this.diagnose('accept_failed', error.providerCode || (error.status ? `http_${error.status}` : 'unknown')); throw error; }
+    catch (error) { this.diagnose('accept_failed', safeTransportCode(error)); throw error; }
     this.diagnose('accept_succeeded');
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
     state.socket = this.client.openMonitor(callId, {
@@ -153,4 +163,4 @@ class VoiceCallService {
 }
 
 function createVoiceCallService({ supabase, env = process.env, ...rest }) { return new VoiceCallService({ supabase, config: voiceConfig(env), ...rest }); }
-module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, hashCaller, toRealtimeTools };
+module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, hashCaller, safeTransportCode, toRealtimeTools };

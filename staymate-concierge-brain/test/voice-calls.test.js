@@ -6,7 +6,7 @@ process.env.SUPABASE_KEY ||= 'test-key';
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');
-const { VoiceCallService, normalizePhoneNumber, toRealtimeTools, voiceConfig } = require('../voice-calls');
+const { VoiceCallService, normalizePhoneNumber, safeTransportCode, toRealtimeTools, voiceConfig } = require('../voice-calls');
 
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
@@ -25,6 +25,12 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
   assert.equal(voiceConfig({ VOICE_OPENAI_API_KEY: 'voice-key', TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'voice-key');
   assert.equal(voiceConfig({ VOICE_DEFAULT_PHONE_NUMBER: '+380441111111' }).defaultPhoneNumber, '+380441111111');
+});
+
+test('classifies a failed OpenAI request without publishing its message', () => {
+  assert.equal(safeTransportCode({ cause: { code: 'ENOTFOUND' } }), 'dns_failed');
+  assert.equal(safeTransportCode({ status: 401 }), 'http_401');
+  assert.equal(safeTransportCode(new Error('private details')), 'network_request_failed');
 });
 
 test('uses an explicitly configured carrier number when SIP To contains only the OpenAI project URI', async () => {
