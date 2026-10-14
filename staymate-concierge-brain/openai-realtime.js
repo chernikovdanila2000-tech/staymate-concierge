@@ -26,7 +26,15 @@ class OpenAIRealtimeClient {
       headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    if (!response.ok) throw new Error(`OpenAI Realtime ${method} ${response.status}`);
+    if (!response.ok) {
+      const error = new Error(`OpenAI Realtime ${method} ${response.status}`);
+      error.status = response.status;
+      // A provider error code identifies the rejected parameter without
+      // retaining the response body (which can contain request context).
+      const body = await response.json().catch(() => null);
+      error.providerCode = typeof body?.error?.code === 'string' ? body.error.code : null;
+      throw error;
+    }
     return response.status === 204 ? null : response.json();
   }
 

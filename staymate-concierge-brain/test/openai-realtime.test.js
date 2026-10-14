@@ -33,3 +33,11 @@ test('Realtime SIP controls preserve the action path and encode only the call id
   ]);
   assert.deepEqual(JSON.parse(requests[1].options.body), { target_uri: 'sip:admin@example.com' });
 });
+
+test('keeps an OpenAI error code for safe operational diagnostics', async () => {
+  const client = new OpenAIRealtimeClient({
+    apiKey: 'test-key', webhookSecret: 'whsec_test',
+    fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ error: { code: 'unsupported_value' } }) }),
+  });
+  await assert.rejects(() => client.acceptCall('call-1', { type: 'realtime' }), error => error.status === 400 && error.providerCode === 'unsupported_value');
+});

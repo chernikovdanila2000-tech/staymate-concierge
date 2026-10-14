@@ -65,7 +65,7 @@ class VoiceCallService {
   }
   isReady() { return Boolean(this.config.enabled && this.client && this.config.apiKey && this.config.webhookSecret); }
   health() { return { enabled: this.config.enabled, configured: this.isReady(), provider: this.config.provider, model: this.config.model, diagnostic: this.lastDiagnostic }; }
-  diagnose(stage) { this.lastDiagnostic = { stage, at: new Date().toISOString() }; }
+  diagnose(stage, code = null) { this.lastDiagnostic = { stage, at: new Date().toISOString(), ...(code ? { code } : {}) }; }
   async handleWebhook(rawBody, headers) {
     if (!this.isReady()) return { status: 503, body: { error: 'voice_not_configured' } };
     let event;
@@ -104,7 +104,7 @@ class VoiceCallService {
     const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}\n\nYou are speaking on a phone call. Identify and answer in the caller's language (Ukrainian, Russian, or English). Be concise and natural. Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } }); }
-    catch (error) { this.diagnose('accept_failed'); throw error; }
+    catch (error) { this.diagnose('accept_failed', error.providerCode || (error.status ? `http_${error.status}` : 'unknown')); throw error; }
     this.diagnose('accept_succeeded');
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
     state.socket = this.client.openMonitor(callId, {
