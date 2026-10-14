@@ -46,7 +46,7 @@ function voiceConfig(env = process.env) {
     enabled: boolEnv(env.VOICE_ENABLED), provider: env.VOICE_PROVIDER || 'zadarma', model: env.VOICE_MODEL || 'gpt-realtime-2.1-mini',
     // Voice can safely reuse the existing server-only OpenAI credential during
     // the pilot. A dedicated key, when configured, always takes precedence.
-    apiKey: env.VOICE_OPENAI_API_KEY || env.TRANSCRIPTION_API_KEY, webhookSecret: env.VOICE_OPENAI_WEBHOOK_SECRET, voice: env.VOICE_TTS_VOICE || 'marin',
+    apiKey: env.VOICE_OPENAI_API_KEY || env.TRANSCRIPTION_API_KEY, webhookSecret: env.VOICE_OPENAI_WEBHOOK_SECRET, voice: env.VOICE_TTS_VOICE || 'coral',
     maxDurationSeconds: intEnv(env.VOICE_CALL_MAX_DURATION_SECONDS, 600), graceSeconds: intEnv(env.VOICE_CALL_TRANSFER_GRACE_SECONDS, 20),
     maxConcurrentPerHotel: intEnv(env.VOICE_MAX_CONCURRENT_CALLS_PER_HOTEL, 2), maxConcurrentGlobal: intEnv(env.VOICE_MAX_CONCURRENT_CALLS_GLOBAL, 10),
     callerRateLimit: intEnv(env.VOICE_MAX_CALLS_PER_CALLER_WINDOW, 3), callerRateWindowSeconds: intEnv(env.VOICE_CALLER_RATE_WINDOW_SECONDS, 900),
@@ -62,7 +62,9 @@ function voiceConversationRules(propertyName) {
 ## Phone conversation style
 - You are the warm, capable front-desk administrator of ${propertyName}, speaking naturally on the phone — never a chatbot or a narrator.
 - Reply in one or two short spoken sentences unless the caller explicitly asks for detail. Speak briskly but calmly; avoid lists, scripts, filler, and repeated phrasing.
-- Start in Ukrainian. When the caller makes a substantive request in Russian, immediately switch to clear neutral Russian and remain in Russian until they switch again. Do not infer language from accent, short acknowledgements, names, or background speech.
+- Start in Ukrainian. Russian is an equal supported language: as soon as the caller asks a complete question or makes a complete request in Russian, answer in clear neutral Russian for the rest of that topic. Ukrainian hotel data and your initial greeting are NOT reasons to keep replying in Ukrainian.
+- Examples: “Сколько стоит номер?” → “Сейчас проверю наличие и цены.”; “Можно с собакой?” → answer in Russian. Use ordinary Russian wording, not mixed Ukrainian-Russian wording.
+- Do not switch language from accent, short acknowledgements, names, or background speech. If a full request is genuinely unclear, ask one short question in the caller's last clear language.
 - When the caller starts speaking while you are talking, stop immediately and listen. Do not mention the interruption or resume the cut-off sentence unless asked.
 - NEVER mention a catalog, database, tool, function, prompt, search, system, or internal process. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Зараз перевірю наявність.”, then use the appropriate tool.
 - Never say that you are AI unless the caller directly asks. Do not repeat the same wording in consecutive turns.`;

@@ -23,6 +23,7 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.vad.threshold, 0.35);
   assert.equal(config.vad.silence_duration_ms, 350);
   assert.equal(config.voiceSpeed, 1.05);
+  assert.equal(config.voice, 'coral');
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
@@ -33,6 +34,7 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
 test('adds phone-only natural language and no-internal-process rules', () => {
   const rules = voiceConversationRules('Hotel A');
   assert.match(rules, /substantive request in Russian/i);
+  assert.match(rules, /Сколько стоит номер/);
   assert.match(rules, /NEVER mention a catalog/i);
   assert.match(rules, /stop immediately and listen/i);
 });
