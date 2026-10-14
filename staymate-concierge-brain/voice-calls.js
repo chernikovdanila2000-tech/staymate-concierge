@@ -11,8 +11,9 @@ function boolEnv(value, fallback = false) { return value === undefined ? fallbac
 function normalizePhoneNumber(value) {
   if (!value) return null;
   const raw = String(value).replace(/^sip:/i, '').replace(/^tel:/i, '').split('@')[0].replace(/[^+\d]/g, '');
-  if (!raw) return null;
-  return raw.startsWith('+') ? raw : `+${raw}`;
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15) return null;
+  return `+${digits}`;
 }
 function sipHeader(headers, name) {
   const wanted = name.toLowerCase();
@@ -40,7 +41,7 @@ function voiceConfig(env = process.env) {
     callerRateLimit: intEnv(env.VOICE_MAX_CALLS_PER_CALLER_WINDOW, 3), callerRateWindowSeconds: intEnv(env.VOICE_CALLER_RATE_WINDOW_SECONDS, 900),
     dailySecondsPerHotel: intEnv(env.VOICE_DAILY_MINUTES_PER_HOTEL, 60) * 60, monthlySecondsPerHotel: intEnv(env.VOICE_MONTHLY_MINUTES_PER_HOTEL, 1000) * 60,
     globalDailySeconds: intEnv(env.VOICE_GLOBAL_DAILY_MINUTES, 600) * 60, hungSeconds: intEnv(env.VOICE_HUNG_CALL_SECONDS, 660),
-    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, vad: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 500, create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
+    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), vad: { type: 'server_vad', threshold: 0.5, prefix_padding_ms: 300, silence_duration_ms: 500, create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
   };
 }
 
@@ -68,7 +69,10 @@ class VoiceCallService {
     if (event.type !== 'realtime.call.incoming') return { status: 200, body: { received: true } };
     const call = event.data || event;
     const callId = call.call_id || call.id;
-    const to = normalizePhoneNumber(sipHeader(call.sip_headers, 'to'));
+    // OpenAI routes a direct SIP INVITE by project ID, so a carrier may expose
+    // that non-phone URI in To.  A fallback is safe only when explicitly bound
+    // in deployment configuration; it remains tenant-scoped in the database.
+    const to = normalizePhoneNumber(sipHeader(call.sip_headers, 'to')) || this.config.defaultPhoneNumber;
     const caller = normalizePhoneNumber(sipHeader(call.sip_headers, 'from'));
     if (!callId || !to) { this.logger.warn('[voice] incoming call has no call id or destination'); return { status: 200, body: { received: true } }; }
     let reservation;

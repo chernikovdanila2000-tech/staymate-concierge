@@ -11,6 +11,7 @@ const { VoiceCallService, normalizePhoneNumber, toRealtimeTools, voiceConfig } =
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
   assert.equal(normalizePhoneNumber('tel:380441234567'), '+380441234567');
+  assert.equal(normalizePhoneNumber('sip:proj_AJV3lMNB4yT4ITo42ScEZMmC@sip.api.openai.com'), null);
   assert.equal(normalizePhoneNumber(''), null);
 });
 
@@ -23,6 +24,19 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
   assert.equal(voiceConfig({ VOICE_OPENAI_API_KEY: 'voice-key', TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'voice-key');
+  assert.equal(voiceConfig({ VOICE_DEFAULT_PHONE_NUMBER: '+380441111111' }).defaultPhoneNumber, '+380441111111');
+});
+
+test('uses an explicitly configured carrier number when SIP To contains only the OpenAI project URI', async () => {
+  let suppliedTo;
+  const service = new VoiceCallService({
+    repository: { begin: async input => { suppliedTo = input.p_to_number; return { ok: false, code: 'NO_MAPPING' }; } },
+    realtimeClient: { unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-project-uri', sip_headers: [{ name: 'To', value: 'sip:proj_AJV3lMNB4yT4ITo42ScEZMmC@sip.api.openai.com' }] } }), hangupCall: async () => {}, acceptCall: async () => {} },
+    config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y', VOICE_DEFAULT_PHONE_NUMBER: '+380443002819' }), enabled: true, apiKey: 'x', webhookSecret: 'y' },
+    logger: { warn() {}, error() {} },
+  });
+  await service.handleWebhook('{}', {});
+  assert.equal(suppliedTo, '+380443002819');
 });
 
 test('converts the existing tenant-safe tools to Realtime function tools', () => {
