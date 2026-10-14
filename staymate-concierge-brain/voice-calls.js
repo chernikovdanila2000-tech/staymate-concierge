@@ -95,12 +95,25 @@ class VoiceCallService {
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } });
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
-    state.socket = this.client.openMonitor(callId, { onEvent: event => this.onEvent(state, event), onError: error => this.logger.warn('[voice] sideband error', error.message), onClose: () => this.finishCall(state, 'completed', 'call_closed').catch(() => {}) });
+    state.socket = this.client.openMonitor(callId, {
+      // A SIP call can be accepted before the caller says anything.  Start with
+      // an audible greeting when the sideband is ready so the caller is never
+      // left in silence waiting for the first VAD turn.
+      onOpen: () => {
+        if (state.finished || !state.socket || state.socket.readyState !== state.socket.OPEN) return;
+        this.logger.info?.('[voice] sideband connected; starting greeting', callId);
+        state.socket.send(JSON.stringify({ type: 'response.create', response: { instructions: `Immediately give one short, warm greeting in Ukrainian. Introduce yourself as the virtual administrator for ${property.hotel_name} and ask how you can help. Then wait for the caller; use their language for all later replies.` } }));
+      },
+      onEvent: event => this.onEvent(state, event),
+      onError: error => this.logger.warn('[voice] sideband error', error.message),
+      onClose: () => this.finishCall(state, 'completed', 'call_closed').catch(() => {}),
+    });
     state.limitTimer = this.setTimeout(() => this.beginLimitTransfer(state), Math.max(1000, (this.config.maxDurationSeconds - this.config.graceSeconds) * 1000));
     state.hangupTimer = this.setTimeout(() => this.forceEnd(state), this.config.maxDurationSeconds * 1000);
     this.calls.set(callId, state);
   }
   onEvent(state, event) {
+    if (event.type === 'error') this.logger.error('[voice] realtime error', event.error?.message || JSON.stringify(event));
     if (event.type === 'input_audio_buffer.speech_started') { state.bargeIns += 1; return; } // OpenAI VAD interrupts output server-side.
     const item = event.item || event.response?.output?.find?.(o => o.type === 'function_call');
     if (event.type === 'response.function_call_arguments.done') this.handleToolCall(state, event.name, event.call_id, event.arguments).catch(error => this.logger.error('[voice] tool failed', error.message));

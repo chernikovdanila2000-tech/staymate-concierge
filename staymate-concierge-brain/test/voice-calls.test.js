@@ -62,6 +62,23 @@ test('accepts a mapped call with VAD barge-in and only its mapped tenant', async
   assert.equal(service.calls.get('call-1').bargeIns, 1);
 });
 
+test('starts an audible greeting only after the sideband is connected', async () => {
+  const socket = new EventEmitter(); socket.OPEN = 1; socket.readyState = 1; const sent = []; socket.send = payload => sent.push(JSON.parse(payload)); socket.close = () => {};
+  let sidebandOptions;
+  const client = {
+    unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-greeting', sip_headers: [{ name: 'To', value: 'sip:+380441111111@voice' }] } }),
+    acceptCall: async () => {}, openMonitor: (_, options) => { sidebandOptions = options; return socket; }, hangupCall: async () => {}, referCall: async () => {},
+  };
+  const repo = { begin: async () => ({ ok: true, property_id: 'hotel-a', admin_transfer_uri: null }), property: async () => ({ property_id: 'hotel-a', hotel_name: 'Hotel A' }), finish: async () => {} };
+  const service = new VoiceCallService({ repository: repo, realtimeClient: client, config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y' }), enabled: true, apiKey: 'x', webhookSecret: 'y' }, getHotelInfoImpl: async () => ({}), buildPromptImpl: () => 'prompt', toolsFactory: () => ({}), setTimeoutImpl: () => ({}), clearTimeoutImpl: () => {}, logger: { info() {}, warn() {}, error() {} } });
+  await service.handleWebhook('{}', {});
+  assert.equal(sent.length, 0);
+  sidebandOptions.onOpen();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].type, 'response.create');
+  assert.match(sent[0].response.instructions, /Hotel A/);
+});
+
 test('does not accept an unmapped or rate-limited call', async () => {
   let hungUp = 0; let accepted = 0;
   const service = new VoiceCallService({ repository: { begin: async () => ({ ok: false, code: 'HOTEL_DAILY_LIMIT' }) }, realtimeClient: { unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-limit', sip_headers: [{ name: 'To', value: '+380441111111' }] } }), hangupCall: async () => { hungUp++; }, acceptCall: async () => { accepted++; } }, config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y' }), enabled: true, apiKey: 'x', webhookSecret: 'y' }, logger: { warn() {}, error() {} } });
