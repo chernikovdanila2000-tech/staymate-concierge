@@ -6,7 +6,7 @@ process.env.SUPABASE_KEY ||= 'test-key';
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');
-const { VoiceCallService, normalizePhoneNumber, safeTransportCode, toRealtimeTools, voiceConfig, voiceConversationRules } = require('../voice-calls');
+const { VoiceCallService, normalizePhoneNumber, normalizeEmail, safeTransportCode, toRealtimeTools, voiceConfig, voiceConversationRules } = require('../voice-calls');
 
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
@@ -20,8 +20,8 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.model, 'gpt-realtime-2.1-mini');
   assert.equal(config.maxDurationSeconds, 600);
   assert.equal(config.vad.interrupt_response, true);
-  assert.equal(config.vad.threshold, 0.35);
-  assert.equal(config.vad.silence_duration_ms, 350);
+  assert.equal(config.vad.threshold, 0.60);
+  assert.equal(config.vad.silence_duration_ms, 400);
   assert.equal(config.voiceSpeed, 1.05);
   assert.equal(config.voice, 'coral');
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
@@ -31,12 +31,23 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(voiceConfig({ VOICE_DEFAULT_PHONE_NUMBER: '+380441111111' }).defaultPhoneNumber, '+380441111111');
 });
 
+test('uses a higher VAD threshold by default while preserving a deliberate tuning override', () => {
+  assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: '0.72' }).vad.threshold, 0.72);
+  assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: 'noise' }).vad.threshold, 0.60);
+});
+
+test('validates a payment email without retaining malformed caller input', () => {
+  assert.equal(normalizeEmail(' Guest@Example.com '), 'guest@example.com');
+  assert.equal(normalizeEmail('not an email'), null);
+});
+
 test('adds phone-only natural language and no-internal-process rules', () => {
   const rules = voiceConversationRules('Hotel A');
   assert.match(rules, /complete request in Russian/i);
   assert.match(rules, /Сколько стоит номер/);
   assert.match(rules, /NEVER mention a catalog/i);
-  assert.match(rules, /stop immediately and listen/i);
+  assert.match(rules, /stop and listen/i);
+  assert.match(rules, /send_payment_link/i);
 });
 
 test('classifies a failed OpenAI request without publishing its message', () => {
@@ -122,4 +133,18 @@ test('human transfer never uses a caller-provided destination', async () => {
   const state = { callId: 'call-transfer', propertyId: 'hotel-a', adminTransferUri: 'tel:+380441111111', toolCalls: new Set() };
   const result = await service.transferToHuman(state, { reason: 'please call +1999', destination: 'tel:+1999' });
   assert.equal(result.transferred, true); assert.equal(destination, 'tel:+380441111111'); assert.equal(escalated, 1);
+});
+
+test('emails a created phone-booking payment link only to a confirmed valid address', async () => {
+  const sent = [];
+  const service = new VoiceCallService({
+    realtimeClient: {}, repository: {}, config: { ...voiceConfig(), paymentEmailDeliveryEnabled: true },
+    sendPaymentEmailImpl: async message => { sent.push(message); }, logger: { error() {} },
+  });
+  const state = { hotelName: 'Hotel A', paymentLinks: new Map([['BK123', 'https://pay.example/BK123']]) };
+  assert.deepEqual(await service.deliverPaymentLink(state, { booking_id: 'BK123', email: 'Guest@Example.com' }), { ok: true, delivery: 'email', recipient: 'guest@example.com' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].paymentLink, 'https://pay.example/BK123');
+  assert.deepEqual(await service.deliverPaymentLink(state, { booking_id: 'BK123', email: 'nope' }), { ok: false, error: 'valid_email_required' });
+  assert.deepEqual(await service.deliverPaymentLink(state, { booking_id: 'OTHER', email: 'guest@example.com' }), { ok: false, error: 'online_payment_link_unavailable' });
 });

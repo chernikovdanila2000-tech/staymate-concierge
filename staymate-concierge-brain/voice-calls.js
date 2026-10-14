@@ -53,8 +53,21 @@ function voiceConfig(env = process.env) {
     dailySecondsPerHotel: intEnv(env.VOICE_DAILY_MINUTES_PER_HOTEL, 60) * 60, monthlySecondsPerHotel: intEnv(env.VOICE_MONTHLY_MINUTES_PER_HOTEL, 1000) * 60,
     globalDailySeconds: intEnv(env.VOICE_GLOBAL_DAILY_MINUTES, 600) * 60, hungSeconds: intEnv(env.VOICE_HUNG_CALL_SECONDS, 660),
     callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), voiceSpeed: floatEnv(env.VOICE_TTS_SPEED, 1.05, 0.5, 1.5),
-    vad: { type: 'server_vad', threshold: floatEnv(env.VOICE_VAD_THRESHOLD, 0.35, 0.1, 0.9), prefix_padding_ms: 200, silence_duration_ms: intEnv(env.VOICE_VAD_SILENCE_MS, 350), create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
+    // Telephone lines carry persistent background noise.  0.35 reacts to
+    // rustle and breathing as if the caller had taken the floor; 0.60 keeps
+    // genuine speech barge-in while filtering that ordinary line noise.
+    vad: { type: 'server_vad', threshold: floatEnv(env.VOICE_VAD_THRESHOLD, 0.60, 0.1, 0.9), prefix_padding_ms: 250, silence_duration_ms: intEnv(env.VOICE_VAD_SILENCE_MS, 400), create_response: true, interrupt_response: true, idle_timeout_ms: intEnv(env.VOICE_IDLE_TIMEOUT_SECONDS, 30) * 1000 },
+    paymentEmailDeliveryEnabled: boolEnv(env.VOICE_PAYMENT_EMAIL_DELIVERY_ENABLED, true), paymentEmailApiKey: env.RESEND_API_KEY || '', paymentEmailFrom: env.RESEND_FROM_EMAIL || 'StayAI <noreply@stayai.online>',
   };
+}
+
+function normalizeEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : null;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 }
 function voiceConversationRules(propertyName) {
   return `
@@ -65,8 +78,9 @@ function voiceConversationRules(propertyName) {
 - Start in Ukrainian. Russian is an equal supported language: as soon as the caller asks a complete question or makes a complete request in Russian, answer in clear neutral Russian for the rest of that topic. Ukrainian hotel data and your initial greeting are NOT reasons to keep replying in Ukrainian.
 - Examples: “Сколько стоит номер?” → “Сейчас проверю наличие и цены.”; “Можно с собакой?” → answer in Russian. Use ordinary Russian wording, not mixed Ukrainian-Russian wording.
 - Do not switch language from accent, short acknowledgements, names, or background speech. If a full request is genuinely unclear, ask one short question in the caller's last clear language.
-- When the caller starts speaking while you are talking, stop immediately and listen. Do not mention the interruption or resume the cut-off sentence unless asked.
+- When the caller starts speaking while you are talking, stop and listen. Ignore ordinary telephone-line rustle, breathing, and a single very short noise; only a clear spoken phrase is an interruption. Do not mention the interruption or resume the cut-off sentence unless asked.
 - NEVER mention a catalog, database, tool, function, prompt, search, system, or internal process. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Зараз перевірю наявність.”, then use the appropriate tool.
+- For a phone booking that needs online payment, ask for the guest's email, repeat it once for confirmation, create the booking, then call send_payment_link. Say that the link was sent only after that tool confirms delivery. Never read a payment URL aloud.
 - Never say that you are AI unless the caller directly asks. Do not repeat the same wording in consecutive turns.`;
 }
 
@@ -79,11 +93,12 @@ class VoiceCallRepository {
 }
 
 class VoiceCallService {
-  constructor({ supabase, config = voiceConfig(), realtimeClient, repository, logger = console, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout, getHotelInfoImpl = getHotelInfo, buildPromptImpl = buildSystemPrompt, toolsFactory = createTools }) {
+  constructor({ supabase, config = voiceConfig(), realtimeClient, repository, logger = console, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout, getHotelInfoImpl = getHotelInfo, buildPromptImpl = buildSystemPrompt, toolsFactory = createTools, sendPaymentEmailImpl }) {
     this.config = config; this.repo = repository || new VoiceCallRepository(supabase); this.logger = logger;
     this.client = realtimeClient || (config.apiKey && config.webhookSecret ? new OpenAIRealtimeClient({ apiKey: config.apiKey, webhookSecret: config.webhookSecret }) : null);
     this.calls = new Map(); this.setTimeout = setTimeoutImpl; this.clearTimeout = clearTimeoutImpl;
     this.getHotelInfo = getHotelInfoImpl; this.buildPrompt = buildPromptImpl; this.toolsFactory = toolsFactory;
+    this.sendPaymentEmail = sendPaymentEmailImpl || this.defaultSendPaymentEmail.bind(this);
     // Staging-safe operational trace.  It intentionally keeps no SIP headers,
     // call IDs, audio, transcripts, or provider error details.
     this.lastDiagnostic = { stage: 'idle', at: null };
@@ -127,11 +142,11 @@ class VoiceCallService {
     try { hotelInfo = await this.getHotelInfo(property.property_id); }
     catch (error) { this.diagnose('hotel_info_failed'); throw error; }
     const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
-    const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
+    const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'send_payment_link', description: 'Email the already-created online payment link for this phone booking. Call only after create_booking succeeded and the caller confirmed an email address.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, email: { type: 'string' } }, required: ['booking_id', 'email'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice, speed: this.config.voiceSpeed } } }); }
     catch (error) { this.diagnose('accept_failed', safeTransportCode(error)); throw error; }
     this.diagnose('accept_succeeded');
-    const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
+    const state = { callId, propertyId: property.property_id, hotelName: property.hotel_name, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0, paymentLinks: new Map(), bookingReference: null };
     state.socket = this.client.openMonitor(callId, {
       // A SIP call can be accepted before the caller says anything.  Start with
       // an audible greeting when the sideband is ready so the caller is never
@@ -163,8 +178,44 @@ class VoiceCallService {
     let args = {}; try { args = typeof rawArgs === 'string' ? JSON.parse(rawArgs || '{}') : rawArgs || {}; } catch { args = {}; }
     let output;
     if (name === 'transfer_to_human') output = await this.transferToHuman(state, args);
-    else { const tools = this.toolsFactory(state.propertyId, 'phone', state.callId); output = tools[name] ? await tools[name](args) : { error: 'unknown_tool' }; }
+    else if (name === 'send_payment_link') output = await this.deliverPaymentLink(state, args);
+    else {
+      const tools = this.toolsFactory(state.propertyId, 'phone', state.callId);
+      output = tools[name] ? await tools[name](args) : { error: 'unknown_tool' };
+      if (name === 'create_booking' && output?.ok && output.booking?.booking_id) {
+        state.bookingReference = output.booking.booking_id;
+        if (output.booking.payment_link) state.paymentLinks.set(output.booking.booking_id, output.booking.payment_link);
+      }
+    }
     if (state.socket?.readyState === state.socket.OPEN) { state.socket.send(JSON.stringify({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: toolCallId, output: JSON.stringify(output) } })); if (!state.transferred) state.socket.send(JSON.stringify({ type: 'response.create' })); }
+  }
+  async deliverPaymentLink(state, { booking_id: bookingId, email } = {}) {
+    const recipient = normalizeEmail(email);
+    const paymentLink = state.paymentLinks.get(bookingId);
+    if (!recipient) return { ok: false, error: 'valid_email_required' };
+    if (!paymentLink) return { ok: false, error: 'online_payment_link_unavailable' };
+    if (!this.config.paymentEmailDeliveryEnabled) return { ok: false, error: 'payment_email_delivery_disabled' };
+    try {
+      await this.sendPaymentEmail({ to: recipient, bookingId, paymentLink, hotelName: state.hotelName });
+      return { ok: true, delivery: 'email', recipient };
+    } catch (error) {
+      this.logger.error('[voice] payment-link delivery failed', error.message);
+      return { ok: false, error: 'payment_email_delivery_failed' };
+    }
+  }
+  async defaultSendPaymentEmail({ to, bookingId, paymentLink, hotelName }) {
+    if (!this.config.paymentEmailApiKey) throw new Error('payment email is not configured');
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.config.paymentEmailApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: this.config.paymentEmailFrom,
+        to: [to],
+        subject: `Оплата бронювання ${bookingId} — ${hotelName}`,
+        html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#17181b"><h2>${escapeHtml(hotelName)}</h2><p>Ваше бронювання <b>${escapeHtml(bookingId)}</b> створено.</p><p><a href="${escapeHtml(paymentLink)}" style="display:inline-block;padding:12px 18px;background:#111827;color:#fff;text-decoration:none;border-radius:6px">Оплатити бронювання</a></p><p>Посилання дійсне протягом часу, вказаного при бронюванні.</p></div>`,
+      }),
+    });
+    if (!response.ok) throw new Error(`Resend HTTP ${response.status}`);
   }
   async transferToHuman(state, { reason = 'caller_request', urgency = 'normal' } = {}) {
     const tools = this.toolsFactory(state.propertyId, 'phone', state.callId); await tools.escalate_to_human({ reason, urgency }).catch(() => {});
@@ -173,9 +224,9 @@ class VoiceCallService {
   }
   beginLimitTransfer(state) { if (!state.transferred && state.socket?.readyState === state.socket.OPEN) state.socket.send(JSON.stringify({ type: 'response.create', response: { instructions: 'Briefly explain that the call time is ending and you will now connect the caller with the hotel administrator.' } })); }
   async forceEnd(state) { if (state.transferred) return; if (state.adminTransferUri) await this.transferToHuman(state, { reason: 'call_time_limit', urgency: 'normal' }).catch(() => {}); else { await this.client.hangupCall(state.callId).catch(() => {}); await this.finishCall(state, 'completed', 'time_limit'); } }
-  async finishCall(state, status, outcome) { if (state.finished) return; state.finished = true; this.clearTimeout(state.limitTimer); this.clearTimeout(state.hangupTimer); this.calls.delete(state.callId); await this.repo.finish({ p_call_id: state.callId, p_status: status, p_outcome: outcome, p_error_code: null, p_transferred: Boolean(state.transferred) }).catch(error => this.logger.error('[voice] finish failed', error.message)); try { state.socket?.close(); } catch {} }
+  async finishCall(state, status, outcome) { if (state.finished) return; state.finished = true; this.clearTimeout(state.limitTimer); this.clearTimeout(state.hangupTimer); this.calls.delete(state.callId); const analytics = [`barge_ins=${state.bargeIns || 0}`]; if (state.bookingReference) analytics.push(`booking=${state.bookingReference}`); await this.repo.finish({ p_call_id: state.callId, p_status: status, p_outcome: `${outcome};${analytics.join(';')}`, p_error_code: null, p_transferred: Boolean(state.transferred) }).catch(error => this.logger.error('[voice] finish failed', error.message)); try { state.socket?.close(); } catch {} }
   async markStaleCalls() { await this.repo.stale(this.config.hungSeconds); }
 }
 
 function createVoiceCallService({ supabase, env = process.env, ...rest }) { return new VoiceCallService({ supabase, config: voiceConfig(env), ...rest }); }
-module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, hashCaller, safeTransportCode, toRealtimeTools, voiceConversationRules };
+module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, normalizeEmail, hashCaller, safeTransportCode, toRealtimeTools, voiceConversationRules };
