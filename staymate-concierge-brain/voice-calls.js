@@ -59,14 +59,19 @@ class VoiceCallService {
     this.client = realtimeClient || (config.apiKey && config.webhookSecret ? new OpenAIRealtimeClient({ apiKey: config.apiKey, webhookSecret: config.webhookSecret }) : null);
     this.calls = new Map(); this.setTimeout = setTimeoutImpl; this.clearTimeout = clearTimeoutImpl;
     this.getHotelInfo = getHotelInfoImpl; this.buildPrompt = buildPromptImpl; this.toolsFactory = toolsFactory;
+    // Staging-safe operational trace.  It intentionally keeps no SIP headers,
+    // call IDs, audio, transcripts, or provider error details.
+    this.lastDiagnostic = { stage: 'idle', at: null };
   }
   isReady() { return Boolean(this.config.enabled && this.client && this.config.apiKey && this.config.webhookSecret); }
-  health() { return { enabled: this.config.enabled, configured: this.isReady(), provider: this.config.provider, model: this.config.model }; }
+  health() { return { enabled: this.config.enabled, configured: this.isReady(), provider: this.config.provider, model: this.config.model, diagnostic: this.lastDiagnostic }; }
+  diagnose(stage) { this.lastDiagnostic = { stage, at: new Date().toISOString() }; }
   async handleWebhook(rawBody, headers) {
     if (!this.isReady()) return { status: 503, body: { error: 'voice_not_configured' } };
     let event;
     try { event = await this.client.unwrapWebhook(rawBody, headers); } catch (error) { this.logger.warn('[voice] rejected webhook', error.message); return { status: 400, body: { error: 'invalid_voice_webhook' } }; }
     if (event.type !== 'realtime.call.incoming') return { status: 200, body: { received: true } };
+    this.diagnose('webhook_received');
     const call = event.data || event;
     const callId = call.call_id || call.id;
     // OpenAI routes a direct SIP INVITE by project ID, so a carrier may expose
@@ -78,15 +83,16 @@ class VoiceCallService {
     let reservation;
     try {
       reservation = await this.repo.begin({ p_provider: this.config.provider, p_provider_call_id: callId, p_to_number: to, p_caller_hash: hashCaller(caller, this.config.callerHashSecret), p_model: this.config.model, p_reserve_seconds: this.config.maxDurationSeconds, p_max_concurrent_per_hotel: this.config.maxConcurrentPerHotel, p_max_global: this.config.maxConcurrentGlobal, p_rate_per_caller: this.config.callerRateLimit, p_rate_window_seconds: this.config.callerRateWindowSeconds, p_daily_limit_seconds: this.config.dailySecondsPerHotel, p_monthly_limit_seconds: this.config.monthlySecondsPerHotel, p_global_daily_limit_seconds: this.config.globalDailySeconds });
-    } catch (error) { this.logger.error('[voice] call reservation failed', error.message); return { status: 500, body: { error: 'voice_reservation_failed' } }; }
+    } catch (error) { this.diagnose('reservation_failed'); this.logger.error('[voice] call reservation failed', error.message); return { status: 500, body: { error: 'voice_reservation_failed' } }; }
     if (!reservation?.ok) {
       if (typeof this.client.rejectCall === 'function') await this.client.rejectCall(callId, 486).catch(() => this.client.hangupCall(callId).catch(() => {}));
       else await this.client.hangupCall(callId).catch(() => {});
-      this.logger.warn('[voice] incoming call rejected', reservation?.code); return { status: 200, body: { received: true } };
+      this.diagnose('call_rejected'); this.logger.warn('[voice] incoming call rejected', reservation?.code); return { status: 200, body: { received: true } };
     }
     if (reservation.code === 'CALL_ALREADY_STARTED') return { status: 200, body: { received: true } };
+    this.diagnose('reservation_succeeded');
     try { await this.startCall({ callId, reservation }); return { status: 200, body: { received: true } }; }
-    catch (error) { this.logger.error('[voice] failed to start call', error.message); await this.repo.finish({ p_call_id: callId, p_status: 'failed', p_outcome: 'startup_error', p_error_code: 'startup_error', p_transferred: false }).catch(() => {}); await this.client.hangupCall(callId).catch(() => {}); return { status: 200, body: { received: true } }; }
+    catch (error) { this.diagnose('startup_failed'); this.logger.error('[voice] failed to start call', error.message); await this.repo.finish({ p_call_id: callId, p_status: 'failed', p_outcome: 'startup_error', p_error_code: 'startup_error', p_transferred: false }).catch(() => {}); await this.client.hangupCall(callId).catch(() => {}); return { status: 200, body: { received: true } }; }
   }
   async startCall({ callId, reservation }) {
     const property = await this.repo.property(reservation.property_id);
@@ -94,6 +100,7 @@ class VoiceCallService {
     const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}\n\nYou are speaking on a phone call. Identify and answer in the caller's language (Ukrainian, Russian, or English). Be concise and natural. Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice } } });
+    this.diagnose('accept_succeeded');
     const state = { callId, propertyId: property.property_id, adminTransferUri: reservation.admin_transfer_uri, toolCalls: new Set(), transferred: false, bargeIns: 0 };
     state.socket = this.client.openMonitor(callId, {
       // A SIP call can be accepted before the caller says anything.  Start with
@@ -102,11 +109,13 @@ class VoiceCallService {
       onOpen: () => {
         if (state.finished || !state.socket || state.socket.readyState !== state.socket.OPEN) return;
         this.logger.info?.('[voice] sideband connected; starting greeting', callId);
+        this.diagnose('sideband_connected');
         state.socket.send(JSON.stringify({ type: 'response.create', response: { instructions: `Immediately give one short, warm greeting in Ukrainian. Introduce yourself as the virtual administrator for ${property.hotel_name} and ask how you can help. Then wait for the caller; use their language for all later replies.` } }));
+        this.diagnose('greeting_requested');
       },
       onEvent: event => this.onEvent(state, event),
-      onError: error => this.logger.warn('[voice] sideband error', error.message),
-      onClose: () => this.finishCall(state, 'completed', 'call_closed').catch(() => {}),
+      onError: error => { this.diagnose('sideband_error'); this.logger.warn('[voice] sideband error', error.message); },
+      onClose: () => { this.diagnose('sideband_closed'); this.finishCall(state, 'completed', 'call_closed').catch(() => {}); },
     });
     state.limitTimer = this.setTimeout(() => this.beginLimitTransfer(state), Math.max(1000, (this.config.maxDurationSeconds - this.config.graceSeconds) * 1000));
     state.hangupTimer = this.setTimeout(() => this.forceEnd(state), this.config.maxDurationSeconds * 1000);
@@ -114,7 +123,7 @@ class VoiceCallService {
   }
   onEvent(state, event) {
     if (event.type === 'error') this.logger.error('[voice] realtime error', event.error?.message || JSON.stringify(event));
-    if (event.type === 'input_audio_buffer.speech_started') { state.bargeIns += 1; return; } // OpenAI VAD interrupts output server-side.
+    if (event.type === 'input_audio_buffer.speech_started') { this.diagnose('input_audio_detected'); state.bargeIns += 1; return; } // OpenAI VAD interrupts output server-side.
     const item = event.item || event.response?.output?.find?.(o => o.type === 'function_call');
     if (event.type === 'response.function_call_arguments.done') this.handleToolCall(state, event.name, event.call_id, event.arguments).catch(error => this.logger.error('[voice] tool failed', error.message));
     else if (event.type === 'response.output_item.done' && item?.type === 'function_call') this.handleToolCall(state, item.name, item.call_id, item.arguments).catch(error => this.logger.error('[voice] tool failed', error.message));

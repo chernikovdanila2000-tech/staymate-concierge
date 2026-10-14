@@ -56,10 +56,12 @@ test('accepts a mapped call with VAD barge-in and only its mapped tenant', async
   assert.equal(result.status, 200);
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].session.audio.input.turn_detection.interrupt_response, true);
+  assert.equal(service.health().diagnostic.stage, 'accept_succeeded');
   assert.match(accepted[0].session.instructions, /ONLY Hotel A/);
   assert.doesNotMatch(accepted[0].session.instructions, /Hotel B/);
   service.onEvent(service.calls.get('call-1'), { type: 'input_audio_buffer.speech_started' });
   assert.equal(service.calls.get('call-1').bargeIns, 1);
+  assert.equal(service.health().diagnostic.stage, 'input_audio_detected');
 });
 
 test('starts an audible greeting only after the sideband is connected', async () => {
@@ -77,6 +79,7 @@ test('starts an audible greeting only after the sideband is connected', async ()
   assert.equal(sent.length, 1);
   assert.equal(sent[0].type, 'response.create');
   assert.match(sent[0].response.instructions, /Hotel A/);
+  assert.equal(service.health().diagnostic.stage, 'greeting_requested');
 });
 
 test('does not accept an unmapped or rate-limited call', async () => {
