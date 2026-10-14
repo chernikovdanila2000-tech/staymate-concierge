@@ -6,7 +6,7 @@ process.env.SUPABASE_KEY ||= 'test-key';
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');
-const { VoiceCallService, normalizePhoneNumber, normalizeEmail, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConfig, voiceConversationRules } = require('../voice-calls');
+const { VoiceCallService, normalizePhoneNumber, normalizeEmail, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConfig, voiceConversationRules, detectConversationLanguage, explicitLanguageSwitch } = require('../voice-calls');
 
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
@@ -24,6 +24,8 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.vad.silence_duration_ms, 400);
   assert.equal(config.voiceSpeed, 1.0);
   assert.equal(config.voice, 'marin');
+  assert.equal(config.languageLockTranscription, true);
+  assert.equal(config.languageLockTranscriptionModel, 'gpt-transcribe');
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
@@ -34,6 +36,15 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
 test('uses a higher VAD threshold by default while preserving a deliberate tuning override', () => {
   assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: '0.72' }).vad.threshold, 0.72);
   assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: 'noise' }).vad.threshold, 0.60);
+});
+
+test('keeps a server-side language lock and changes it only on an explicit request', () => {
+  assert.equal(detectConversationLanguage('Сколько стоит номер на завтра?'), 'ru');
+  assert.equal(detectConversationLanguage('Чи є номер на сьогодні?'), 'uk');
+  assert.equal(detectConversationLanguage('Do you have a room tonight?'), 'en');
+  assert.equal(detectConversationLanguage('ага', 'ru'), null);
+  assert.equal(detectConversationLanguage('давайте українською', 'ru'), 'uk');
+  assert.equal(explicitLanguageSwitch('Can we speak English?'), 'en');
 });
 
 test('validates a payment email without retaining malformed caller input', () => {
@@ -96,13 +107,31 @@ test('accepts a mapped call with VAD barge-in and only its mapped tenant', async
   assert.equal(result.status, 200);
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].session.audio.input.turn_detection.interrupt_response, true);
+  assert.deepEqual(accepted[0].session.audio.input.transcription.languages, ['uk', 'ru', 'en']);
   assert.equal(accepted[0].session.audio.output.speed, 1.0);
   assert.equal(service.health().diagnostic.stage, 'accept_succeeded');
   assert.match(accepted[0].session.instructions, /ONLY Hotel A/);
   assert.doesNotMatch(accepted[0].session.instructions, /Hotel B/);
   service.onEvent(service.calls.get('call-1'), { type: 'input_audio_buffer.speech_started' });
-  assert.equal(service.calls.get('call-1').bargeIns, 1);
+  assert.equal(service.calls.get('call-1').bargeIns, 0);
+  assert.equal(service.calls.get('call-1').callerTurns, 1);
   assert.equal(service.health().diagnostic.stage, 'input_audio_detected');
+});
+
+test('updates the Realtime session when a full caller transcription establishes language', async () => {
+  const sent = [];
+  const socket = { OPEN: 1, readyState: 1, send: payload => sent.push(JSON.parse(payload)) };
+  const service = new VoiceCallService({ realtimeClient: {}, repository: {}, config: voiceConfig(), logger: { warn() {}, error() {} } });
+  const state = { socket, instructions: 'base', conversationLanguage: 'unknown' };
+  await service.updateConversationLanguage(state, 'Сколько стоит номер на завтра?');
+  assert.equal(state.conversationLanguage, 'ru');
+  assert.equal(sent[0].type, 'session.update');
+  assert.match(sent[0].session.instructions, /Russian \(ru\)/);
+  await service.updateConversationLanguage(state, 'Чи є номер?');
+  assert.equal(sent.length, 1);
+  await service.updateConversationLanguage(state, 'давайте українською');
+  assert.equal(state.conversationLanguage, 'uk');
+  assert.equal(sent.length, 2);
 });
 
 test('starts an audible greeting only after the sideband is connected', async () => {
