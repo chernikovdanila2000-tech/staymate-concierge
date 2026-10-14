@@ -41,18 +41,44 @@ function safeTransportCode(error) {
 function toRealtimeTools(definitions) {
   return definitions.map(({ name, description, input_schema }) => ({ type: 'function', name, description, parameters: input_schema }));
 }
+function phoneToolDefinitions(definitions) {
+  return definitions.map(definition => {
+    if (definition.name !== 'check_availability') return definition;
+    return {
+      ...definition,
+      // The shared chat description uses an internal content-management term.
+      // Phone callers must never hear it, so the Realtime model gets a
+      // separate, guest-facing description.
+      description: 'Check the hotel room types, prices, and availability for the requested dates. Use it before quoting availability or prices.',
+    };
+  });
+}
+function phoneAvailabilityOutput(output) {
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return output;
+  const { note, ...rest } = output;
+  if (!Array.isArray(rest.available_rooms)) return output;
+  return {
+    ...rest,
+    availability_result: rest.available_rooms.length ? 'options_available' : 'no_options_available',
+  };
+}
+function phoneInstructions(instructions) {
+  // Keep the shared Messenger prompt untouched while removing its internal
+  // terminology from the prompt actually handed to the phone model.
+  return String(instructions || '').replace(/каталог\w*/giu, 'перелік номерів');
+}
 function voiceConfig(env = process.env) {
   return {
     enabled: boolEnv(env.VOICE_ENABLED), provider: env.VOICE_PROVIDER || 'zadarma', model: env.VOICE_MODEL || 'gpt-realtime-2.1-mini',
     // Voice can safely reuse the existing server-only OpenAI credential during
     // the pilot. A dedicated key, when configured, always takes precedence.
-    apiKey: env.VOICE_OPENAI_API_KEY || env.TRANSCRIPTION_API_KEY, webhookSecret: env.VOICE_OPENAI_WEBHOOK_SECRET, voice: env.VOICE_TTS_VOICE || 'coral',
+    apiKey: env.VOICE_OPENAI_API_KEY || env.TRANSCRIPTION_API_KEY, webhookSecret: env.VOICE_OPENAI_WEBHOOK_SECRET, voice: env.VOICE_TTS_VOICE || 'marin',
     maxDurationSeconds: intEnv(env.VOICE_CALL_MAX_DURATION_SECONDS, 600), graceSeconds: intEnv(env.VOICE_CALL_TRANSFER_GRACE_SECONDS, 20),
     maxConcurrentPerHotel: intEnv(env.VOICE_MAX_CONCURRENT_CALLS_PER_HOTEL, 2), maxConcurrentGlobal: intEnv(env.VOICE_MAX_CONCURRENT_CALLS_GLOBAL, 10),
     callerRateLimit: intEnv(env.VOICE_MAX_CALLS_PER_CALLER_WINDOW, 3), callerRateWindowSeconds: intEnv(env.VOICE_CALLER_RATE_WINDOW_SECONDS, 900),
     dailySecondsPerHotel: intEnv(env.VOICE_DAILY_MINUTES_PER_HOTEL, 60) * 60, monthlySecondsPerHotel: intEnv(env.VOICE_MONTHLY_MINUTES_PER_HOTEL, 1000) * 60,
     globalDailySeconds: intEnv(env.VOICE_GLOBAL_DAILY_MINUTES, 600) * 60, hungSeconds: intEnv(env.VOICE_HUNG_CALL_SECONDS, 660),
-    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), voiceSpeed: floatEnv(env.VOICE_TTS_SPEED, 1.05, 0.5, 1.5),
+    callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), voiceSpeed: floatEnv(env.VOICE_TTS_SPEED, 1.0, 0.5, 1.5),
     // Telephone lines carry persistent background noise.  0.35 reacts to
     // rustle and breathing as if the caller had taken the floor; 0.60 keeps
     // genuine speech barge-in while filtering that ordinary line noise.
@@ -75,13 +101,13 @@ function voiceConversationRules(propertyName) {
 ## Phone conversation style
 - You are the warm, capable front-desk administrator of ${propertyName}, speaking naturally on the phone — never a chatbot or a narrator.
 - Reply in one or two short spoken sentences unless the caller explicitly asks for detail. Speak briskly but calmly; avoid lists, scripts, filler, and repeated phrasing.
-- Start in Ukrainian. Russian is an equal supported language: as soon as the caller asks a complete question or makes a complete request in Russian, answer in clear neutral Russian for the rest of that topic. Ukrainian hotel data and your initial greeting are NOT reasons to keep replying in Ukrainian.
+- Start in Ukrainian. LANGUAGE LOCK: as soon as the caller says one complete question or request in Russian, use clear neutral Russian for EVERY later reply in this call, unless the caller explicitly asks to switch languages. Ukrainian hotel facts, tool results, labels, your initial greeting, and any mixed filler are NEVER a reason to switch back to Ukrainian.
 - Examples: “Сколько стоит номер?” → “Сейчас проверю наличие и цены.”; “Можно с собакой?” → answer in Russian. Use ordinary Russian wording, not mixed Ukrainian-Russian wording.
-- Do not switch language from accent, short acknowledgements, names, or background speech. If a full request is genuinely unclear, ask one short question in the caller's last clear language.
+- Do not switch language from accent, short acknowledgements, names, or background speech. If a full request is genuinely unclear, ask one short question in the caller's last clear language. Before every spoken reply, silently check the language lock; do not translate it from tool output.
 - When the caller starts speaking while you are talking, stop and listen. Ignore ordinary telephone-line rustle, breathing, and a single very short noise; only a clear spoken phrase is an interruption. Do not mention the interruption or resume the cut-off sentence unless asked.
-- NEVER mention a catalog, database, tool, function, prompt, search, system, or internal process. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Зараз перевірю наявність.”, then use the appropriate tool.
+- NEVER mention a catalogue, catalog, database, tool, function, prompt, search, system, internal process, source, or lookup. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Сейчас уточню наличие.”, then use the appropriate tool.
 - For a phone booking that needs online payment, ask for the guest's email, repeat it once for confirmation, create the booking, then call send_payment_link. Say that the link was sent only after that tool confirms delivery. Never read a payment URL aloud.
-- Never say that you are AI unless the caller directly asks. Do not repeat the same wording in consecutive turns.`;
+- Sound like an attentive person in a real call: use contractions and simple everyday phrasing, vary acknowledgements naturally, and do not use formal written-language constructions. Never say that you are AI unless the caller directly asks. Do not repeat the same wording in consecutive turns.`;
 }
 
 class VoiceCallRepository {
@@ -104,7 +130,7 @@ class VoiceCallService {
     this.lastDiagnostic = { stage: 'idle', at: null };
   }
   isReady() { return Boolean(this.config.enabled && this.client && this.config.apiKey && this.config.webhookSecret); }
-  health() { return { enabled: this.config.enabled, configured: this.isReady(), provider: this.config.provider, model: this.config.model, diagnostic: this.lastDiagnostic }; }
+  health() { return { enabled: this.config.enabled, configured: this.isReady(), provider: this.config.provider, model: this.config.model, voice: this.config.voice, diagnostic: this.lastDiagnostic }; }
   diagnose(stage, code = null) { this.lastDiagnostic = { stage, at: new Date().toISOString(), ...(code ? { code } : {}) }; }
   async handleWebhook(rawBody, headers) {
     if (!this.isReady()) return { status: 503, body: { error: 'voice_not_configured' } };
@@ -141,8 +167,8 @@ class VoiceCallService {
     let hotelInfo;
     try { hotelInfo = await this.getHotelInfo(property.property_id); }
     catch (error) { this.diagnose('hotel_info_failed'); throw error; }
-    const instructions = `${this.buildPrompt({ propertyName: property.hotel_name, hotelInfo })}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
-    const tools = [...toRealtimeTools(toolDefinitions), { type: 'function', name: 'send_payment_link', description: 'Email the already-created online payment link for this phone booking. Call only after create_booking succeeded and the caller confirmed an email address.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, email: { type: 'string' } }, required: ['booking_id', 'email'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
+    const instructions = `${phoneInstructions(this.buildPrompt({ propertyName: property.hotel_name, hotelInfo }))}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
+    const tools = [...toRealtimeTools(phoneToolDefinitions(toolDefinitions)), { type: 'function', name: 'send_payment_link', description: 'Email the already-created online payment link for this phone booking. Call only after create_booking succeeded and the caller confirmed an email address.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, email: { type: 'string' } }, required: ['booking_id', 'email'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
     try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input: { turn_detection: this.config.vad }, output: { voice: this.config.voice, speed: this.config.voiceSpeed } } }); }
     catch (error) { this.diagnose('accept_failed', safeTransportCode(error)); throw error; }
     this.diagnose('accept_succeeded');
@@ -182,6 +208,7 @@ class VoiceCallService {
     else {
       const tools = this.toolsFactory(state.propertyId, 'phone', state.callId);
       output = tools[name] ? await tools[name](args) : { error: 'unknown_tool' };
+      if (name === 'check_availability') output = phoneAvailabilityOutput(output);
       if (name === 'create_booking' && output?.ok && output.booking?.booking_id) {
         state.bookingReference = output.booking.booking_id;
         if (output.booking.payment_link) state.paymentLinks.set(output.booking.booking_id, output.booking.payment_link);
@@ -229,4 +256,4 @@ class VoiceCallService {
 }
 
 function createVoiceCallService({ supabase, env = process.env, ...rest }) { return new VoiceCallService({ supabase, config: voiceConfig(env), ...rest }); }
-module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, normalizeEmail, hashCaller, safeTransportCode, toRealtimeTools, voiceConversationRules };
+module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, normalizeEmail, hashCaller, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConversationRules };

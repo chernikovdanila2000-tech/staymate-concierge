@@ -6,7 +6,7 @@ process.env.SUPABASE_KEY ||= 'test-key';
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');
-const { VoiceCallService, normalizePhoneNumber, normalizeEmail, safeTransportCode, toRealtimeTools, voiceConfig, voiceConversationRules } = require('../voice-calls');
+const { VoiceCallService, normalizePhoneNumber, normalizeEmail, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConfig, voiceConversationRules } = require('../voice-calls');
 
 test('normalizes SIP destination without retaining caller details', () => {
   assert.equal(normalizePhoneNumber('sip:+380 (44) 123-45-67@example.com'), '+380441234567');
@@ -22,8 +22,8 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.vad.interrupt_response, true);
   assert.equal(config.vad.threshold, 0.60);
   assert.equal(config.vad.silence_duration_ms, 400);
-  assert.equal(config.voiceSpeed, 1.05);
-  assert.equal(config.voice, 'coral');
+  assert.equal(config.voiceSpeed, 1.0);
+  assert.equal(config.voice, 'marin');
   assert.equal(voiceConfig({ VOICE_MODEL: 'chosen-model', VOICE_CALL_MAX_DURATION_SECONDS: '42' }).model, 'chosen-model');
   assert.equal(voiceConfig({ VOICE_CALL_MAX_DURATION_SECONDS: '42' }).maxDurationSeconds, 42);
   assert.equal(voiceConfig({ TRANSCRIPTION_API_KEY: 'server-only-key' }).apiKey, 'server-only-key');
@@ -43,11 +43,21 @@ test('validates a payment email without retaining malformed caller input', () =>
 
 test('adds phone-only natural language and no-internal-process rules', () => {
   const rules = voiceConversationRules('Hotel A');
-  assert.match(rules, /complete request in Russian/i);
+  assert.match(rules, /LANGUAGE LOCK/);
   assert.match(rules, /Сколько стоит номер/);
   assert.match(rules, /NEVER mention a catalog/i);
   assert.match(rules, /stop and listen/i);
   assert.match(rules, /send_payment_link/i);
+  assert.match(rules, /LANGUAGE LOCK/);
+});
+
+test('removes catalogue terminology from phone prompts, tool descriptions, and availability results', () => {
+  const phoneTools = phoneToolDefinitions([{ name: 'check_availability', description: 'показати каталог', input_schema: { type: 'object' } }]);
+  assert.doesNotMatch(phoneTools[0].description, /каталог/i);
+  assert.doesNotMatch(phoneInstructions('Перевір каталог номерів.'), /каталог/i);
+  assert.deepEqual(phoneAvailabilityOutput({ check_in: null, check_out: null, available_rooms: [{ room_type: 'Standard' }], note: 'Каталог показано' }), {
+    check_in: null, check_out: null, available_rooms: [{ room_type: 'Standard' }], availability_result: 'options_available',
+  });
 });
 
 test('classifies a failed OpenAI request without publishing its message', () => {
@@ -85,7 +95,7 @@ test('accepts a mapped call with VAD barge-in and only its mapped tenant', async
   assert.equal(result.status, 200);
   assert.equal(accepted.length, 1);
   assert.equal(accepted[0].session.audio.input.turn_detection.interrupt_response, true);
-  assert.equal(accepted[0].session.audio.output.speed, 1.05);
+  assert.equal(accepted[0].session.audio.output.speed, 1.0);
   assert.equal(service.health().diagnostic.stage, 'accept_succeeded');
   assert.match(accepted[0].session.instructions, /ONLY Hotel A/);
   assert.doesNotMatch(accepted[0].session.instructions, /Hotel B/);
