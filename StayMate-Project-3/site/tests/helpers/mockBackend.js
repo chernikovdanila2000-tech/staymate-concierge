@@ -342,10 +342,10 @@ async function installBackendMock(page, initialState = {}) {
 
   // Backend API (Railway). Cover every /api/* route the frontend calls.
   await page.route('**/api/create-subscription-invoice', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-invoice', orderId: 'SUBMOCK', priceEur: 100 }) })
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-invoice', orderId: 'SUBMOCK', priceUah: 4999 }) })
   );
   await page.route('**/api/create-trial-invoice', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-trial-invoice', orderId: 'TRLMOCK', priceEur: 100 }) })
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-trial-invoice', orderId: 'TRLMOCK', priceUah: 4999 }) })
   );
   await page.route('**/api/cancel-auto-renew', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, wayforpayConfirmed: false }) })

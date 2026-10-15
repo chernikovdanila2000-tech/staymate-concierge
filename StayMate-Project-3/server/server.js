@@ -2852,7 +2852,7 @@ const server =
             try {
               const {
                 invoiceUrl,
-                priceEur,
+                priceUah,
               } =
                 await createSubscriptionInvoice(
                   {
@@ -2882,8 +2882,8 @@ const server =
                     status:
                       'pending',
 
-                    amount_eur:
-                      priceEur,
+                    amount_uah:
+                      priceUah,
                   });
 
               if (error) {
@@ -2904,7 +2904,7 @@ const server =
                 {
                   invoiceUrl,
                   orderId,
-                  priceEur,
+                  priceUah,
                 },
                 corsHeaders
               );
@@ -3018,7 +3018,7 @@ const server =
             try {
               const {
                 invoiceUrl,
-                priceEur,
+                priceUah,
               } =
                 await createSubscriptionInvoice(
                   {
@@ -3051,8 +3051,8 @@ const server =
                     status:
                       'pending',
 
-                    amount_eur:
-                      priceEur,
+                    amount_uah:
+                      priceUah,
 
                     is_trial_card:
                       true,
@@ -3091,7 +3091,7 @@ const server =
                 {
                   invoiceUrl,
                   orderId,
-                  priceEur,
+                  priceUah,
                 },
                 corsHeaders
               );

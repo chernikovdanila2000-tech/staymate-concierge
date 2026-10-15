@@ -123,15 +123,14 @@ async function cancelRegularPayment(orderReference) {
 }
 
 /**
- * Тарифи підписки StayAI — ціна в EUR, як заявлено на сайті. Рахунок
- * виставляється одразу в EUR (WayForPay підтримує мультивалютність) —
- * конвертацію в гривні на картці клієнта робить сам банк-емітент за своїм
- * курсом, StayAI курс валют не рахує і не відстежує.
+ * Тарифи підписки StayAI — ціна в гривнях (UAH), як заявлено на сайті.
+ * Рахунок виставляється одразу в UAH через WayForPay — без валютної
+ * конвертації для українських клієнтів.
  */
 const SUBSCRIPTION_PLANS = {
-  start: { label: 'Старт', priceEur: 100 },
-  pro: { label: 'Профі', priceEur: 200 },
-  network: { label: 'Мережа', priceEur: 300 },
+  start: { label: 'Старт', priceUah: 4999 },
+  pro: { label: 'Профі', priceUah: 9999 },
+  network: { label: 'Мережа', priceUah: 14999 },
 };
 
 async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRenewDateBegin }) {
@@ -143,15 +142,15 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
   const { invoiceUrl } = await createWayForPayInvoice({
     orderReference: orderId,
     productName: `StayAI — тариф «${planInfo.label}» ${propertyName || ''}`.trim(),
-    price: planInfo.priceEur,
-    currency: 'EUR',
+    price: planInfo.priceUah,
+    currency: 'UAH',
     serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
     // Якщо передано autoRenewDateBegin — це підключення картки одразу при
     // старті пробного періоду: перше фактичне списання станеться саме
     // тоді (закінчення тріалу), а не зараз.
     regular: autoRenewDateBegin ? { mode: 'monthly', dateBegin: autoRenewDateBegin } : undefined,
   });
-  return { invoiceUrl, priceEur: planInfo.priceEur };
+  return { invoiceUrl, priceUah: planInfo.priceUah };
 }
 
 /**

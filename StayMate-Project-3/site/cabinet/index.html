@@ -385,11 +385,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     <p class="lede" id="gateLede">Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.</p>
     <div class="card">
       <h2 data-i18n="gate.chooseTariff">Оберіть тариф</h2>
-      <p class="hint" data-i18n="gate.planRowHint">Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.</p>
+      <p class="hint" data-i18n="gate.planRowHint">Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.</p>
       <div class="plan-row" id="gatePlanRow">
-        <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">€100 / міс</span></div>
-        <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">€200 / міс</span></div>
-        <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">€300 / міс</span></div>
+        <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">4999 ₴ / міс</span></div>
+        <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">9999 ₴ / міс</span></div>
+        <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">14999 ₴ / міс</span></div>
       </div>
       <div class="actions">
         <button class="btn-primary" id="gatePayBtn" data-i18n="gate.payBtn">Оплатити обраний тариф</button>
@@ -427,9 +427,9 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       </div>
       <div class="hidden" id="subPlanPicker" style="margin-top:18px;">
         <div class="plan-row" id="subPlanRow">
-          <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">€100 / міс</span></div>
-          <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">€200 / міс</span></div>
-          <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">€300 / міс</span></div>
+          <div class="plan-opt" data-plan="start"><b data-i18n="planCard.start.name">Старт</b><span data-i18n="planCard.start.price">4999 ₴ / міс</span></div>
+          <div class="plan-opt" data-plan="pro"><b data-i18n="planCard.pro.name">Профі</b><span data-i18n="planCard.pro.price">9999 ₴ / міс</span></div>
+          <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">14999 ₴ / міс</span></div>
         </div>
         <div class="actions">
           <button class="btn-primary" id="subPayBtn" data-i18n="sub.payBtn">Оплатити обраний тариф</button>
@@ -808,7 +808,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "acct.resetSent":"Перевірте пошту — надіслали лист для скидання пароля.",
       "acct.logout":"Вийти з акаунту","acct.ariaLabel":"Акаунт",
       "sub.active":"Активна","sub.inactive":"Не активна","sub.trial":"Пробний період","sub.until":"до","sub.daysShort":"дн.",
-      "plan.start":"Старт (€100/міс)","plan.pro":"Профі (€200/міс)","plan.network":"Мережа (€300/міс)",
+      "plan.start":"Старт (4999₴/міс)","plan.pro":"Профі (9999₴/міс)","plan.network":"Мережа (14999₴/міс)",
 
       "auth.title.signin":"Вхід у кабінет","auth.title.signup":"Реєстрація",
       "auth.hint":"Керуйте номерами та ШІ-ботом свого готелю.",
@@ -840,7 +840,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboard.err.nameRequired":"Вкажіть назву готелю.",
 
       "gate.chooseTariff":"Оберіть тариф",
-      "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в євро, конвертацію в гривні (якщо картка не євро) робить ваш банк.",
+      "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.",
       "gate.payBtn":"Оплатити обраний тариф",
       "gate.disclosure.default":"Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).",
       "gate.useTrialBtn":"Скористатися пробним періодом замість цього","gate.signOutBtn":"Вийти з акаунту",
@@ -889,9 +889,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "sub.noPlanSelected":"Спершу оберіть тариф.",
       "sub.creatingTrialLink":"Створюємо посилання для підключення картки...",
       "sub.creatingInvoice":"Створюємо рахунок на оплату...",
-      "planCard.start.name":"Старт","planCard.start.price":"€100 / міс",
-      "planCard.pro.name":"Профі","planCard.pro.price":"€200 / міс",
-      "planCard.network.name":"Мережа","planCard.network.price":"€300 / міс",
+      "planCard.start.name":"Старт","planCard.start.price":"4999 ₴ / міс",
+      "planCard.pro.name":"Профі","planCard.pro.price":"9999 ₴ / міс",
+      "planCard.network.name":"Мережа","planCard.network.price":"14999 ₴ / міс",
 
       "hotel.title":"Дані готелю","hotel.hint":"Це ім'я ШІ-адміністратор називає гостям.",
       "hotel.nameLabel":"Назва","hotel.addressLabel":"Адреса",
@@ -998,7 +998,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "acct.resetSent":"Check your inbox — we sent a password reset email.",
       "acct.logout":"Log out","acct.ariaLabel":"Account",
       "sub.active":"Active","sub.inactive":"Inactive","sub.trial":"Trial period","sub.until":"until","sub.daysShort":"d.",
-      "plan.start":"Start (€100/mo)","plan.pro":"Pro (€200/mo)","plan.network":"Network (€300/mo)",
+      "plan.start":"Start (4999₴/mo)","plan.pro":"Pro (9999₴/mo)","plan.network":"Network (14999₴/mo)",
 
       "auth.title.signin":"Log in to your cabinet","auth.title.signup":"Sign up",
       "auth.hint":"Manage your hotel's rooms and AI bot.",
@@ -1030,7 +1030,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboard.err.nameRequired":"Enter your hotel's name.",
 
       "gate.chooseTariff":"Choose a plan",
-      "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in euros — your bank handles the conversion to hryvnia if your card isn't in euros.",
+      "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in Ukrainian hryvnia (UAH).",
       "gate.payBtn":"Pay for selected plan",
       "gate.disclosure.default":"Payment is handled by WayForPay. Once payment is confirmed, access to the cabinet is restored automatically (usually within a minute).",
       "gate.useTrialBtn":"Use the trial period instead","gate.signOutBtn":"Log out",
@@ -1079,9 +1079,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "sub.noPlanSelected":"Please choose a plan first.",
       "sub.creatingTrialLink":"Creating a link to link your card...",
       "sub.creatingInvoice":"Creating a payment invoice...",
-      "planCard.start.name":"Start","planCard.start.price":"€100 / mo",
-      "planCard.pro.name":"Pro","planCard.pro.price":"€200 / mo",
-      "planCard.network.name":"Network","planCard.network.price":"€300 / mo",
+      "planCard.start.name":"Start","planCard.start.price":"4999 ₴ / mo",
+      "planCard.pro.name":"Pro","planCard.pro.price":"9999 ₴ / mo",
+      "planCard.network.name":"Network","planCard.network.price":"14999 ₴ / mo",
 
       "hotel.title":"Hotel details","hotel.hint":"This is the name the AI administrator gives guests.",
       "hotel.nameLabel":"Name","hotel.addressLabel":"Address",
