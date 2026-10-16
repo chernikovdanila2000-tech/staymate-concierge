@@ -27,17 +27,20 @@
 - ElevenLabs SIP message capture is enabled on the imported number to aid
   diagnostics.
 
+## Active SIP test route
+
+- Zadarma External Server now points to
+  `+380443002819@sip.rtc.elevenlabs.io:5061;transport=tls`.
+- Zadarma accepted and displayed the TLS URI after saving.
+- Keep the previous OpenAI URI private and restore it immediately if the
+  ElevenLabs telephone test fails.
+
 ## Pending real-phone test
 
-1. Sign in to Zadarma and change **External Server → Server address** for the
-   test number to the ElevenLabs TLS target. Enter the number as the SIP user
-   and the ElevenLabs TLS host on port 5061; retain the previous OpenAI URI for
-   immediate rollback. The exact value must be checked against the Zadarma
-   field validation before saving, because it accepts `user@server[:port]`.
-2. Call `+380443002819` from an iPhone and confirm the ElevenLabs greeting.
-3. If it fails, inspect ElevenLabs SIP messages first, then immediately restore
+1. Call `+380443002819` from an iPhone and confirm the ElevenLabs greeting.
+2. If it fails, inspect ElevenLabs SIP messages first, then immediately restore
    the previous OpenAI URI in Zadarma.
-4. Only after a successful call tighten TLS/SRTP/source restrictions as
+3. Only after a successful call tighten TLS/SRTP/source restrictions as
    supported by the carrier's actual SDP/SIP signaling.
 
 ## Do not claim yet
