@@ -52,6 +52,7 @@ const {
 const {
   createSubscriptionInvoice,
   cancelRegularPayment,
+  createTools,
 } = require('./tools');
 const {
   extractRoomsFromFile,
@@ -851,6 +852,49 @@ function readBody(req) {
   );
 }
 
+// ElevenAgents webhook tools are intentionally isolated from the OpenAI SIP
+// path.  The endpoint is dormant until a staging-only shared secret and a
+// property id are supplied.  It exposes the existing tenant-scoped booking
+// tools; no hotel data or credentials are duplicated in ElevenLabs.
+function safeSecretEqual(left, right) {
+  const a = Buffer.from(String(left || ''));
+  const b = Buffer.from(String(right || ''));
+  return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+}
+
+function elevenToolConfig() {
+  return {
+    secret: process.env.ELEVENLABS_TOOL_WEBHOOK_SECRET || '',
+    propertyId: String(process.env.ELEVENLABS_PROPERTY_ID || '').trim(),
+  };
+}
+
+async function handleElevenLabsTool(req, res, toolName) {
+  const config = elevenToolConfig();
+  if (!config.secret || !config.propertyId) {
+    return sendJson(res, 404, { error: 'not_found' });
+  }
+  if (!safeSecretEqual(req.headers['x-stayai-tool-secret'], config.secret)) {
+    return sendJson(res, 401, { error: 'authentication_required' });
+  }
+  let payload;
+  try {
+    payload = JSON.parse(await readBody(req) || '{}');
+  } catch {
+    return sendJson(res, 400, { error: 'invalid_json' });
+  }
+  const tools = createTools(config.propertyId, 'elevenlabs', 'elevenlabs-webhook');
+  const tool = tools[toolName];
+  if (!tool) return sendJson(res, 404, { error: 'unknown_tool' });
+  try {
+    const result = await tool(payload);
+    return sendJson(res, 200, result);
+  } catch (error) {
+    console.error(`[elevenlabs] ${toolName} failed:`, error.message);
+    return sendJson(res, 502, { error: 'tool_unavailable' });
+  }
+}
+
 async function sendSignInNotification(
   email
 ) {
@@ -1048,6 +1092,22 @@ const server =
             console.error('[voice] webhook handler failed:', error.message);
             sendJson(res, 500, { error: 'voice_webhook_failed' });
           });
+        return;
+      }
+
+      // ElevenAgents uses these three narrowly-scoped webhook tools in the
+      // isolated voice staging environment.  They share the mature StayAI
+      // implementations and can never operate without both a server secret
+      // and an explicitly selected tenant.
+      const elevenToolMatch = requestUrl.pathname.match(
+        /^\/webhook\/elevenlabs\/tools\/(check_availability|create_booking|escalate_to_human)$/
+      );
+      if (elevenToolMatch) {
+        if (req.method !== 'POST') return sendJson(res, 405, { error: 'method_not_allowed' });
+        handleElevenLabsTool(req, res, elevenToolMatch[1]).catch(error => {
+          console.error('[elevenlabs] tool webhook failed:', error.message);
+          sendJson(res, 500, { error: 'tool_webhook_failed' });
+        });
         return;
       }
 
