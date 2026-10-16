@@ -866,12 +866,26 @@ function elevenToolConfig() {
   return {
     secret: process.env.ELEVENLABS_TOOL_WEBHOOK_SECRET || '',
     propertyId: String(process.env.ELEVENLABS_PROPERTY_ID || '').trim(),
+    phoneNumber: process.env.ELEVENLABS_PHONE_NUMBER || '+380443002819',
   };
+}
+
+async function resolveElevenLabsPropertyId(config) {
+  if (config.propertyId) return config.propertyId;
+  const { data, error } = await supabase
+    .from('voice_phone_numbers')
+    .select('property_id')
+    .eq('provider', 'zadarma')
+    .eq('phone_number', config.phoneNumber)
+    .eq('enabled', true)
+    .maybeSingle();
+  if (error || !data?.property_id) return null;
+  return String(data.property_id);
 }
 
 async function handleElevenLabsTool(req, res, toolName) {
   const config = elevenToolConfig();
-  if (!config.secret || !config.propertyId) {
+  if (!config.secret) {
     return sendJson(res, 404, { error: 'not_found' });
   }
   if (!safeSecretEqual(req.headers['x-stayai-tool-secret'], config.secret)) {
@@ -883,7 +897,9 @@ async function handleElevenLabsTool(req, res, toolName) {
   } catch {
     return sendJson(res, 400, { error: 'invalid_json' });
   }
-  const tools = createTools(config.propertyId, 'elevenlabs', 'elevenlabs-webhook');
+  const propertyId = await resolveElevenLabsPropertyId(config);
+  if (!propertyId) return sendJson(res, 503, { error: 'property_not_configured' });
+  const tools = createTools(propertyId, 'elevenlabs', 'elevenlabs-webhook');
   const tool = tools[toolName];
   if (!tool) return sendJson(res, 404, { error: 'unknown_tool' });
   try {
