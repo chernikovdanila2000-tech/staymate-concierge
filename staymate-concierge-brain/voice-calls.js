@@ -69,6 +69,8 @@ function phoneInstructions(instructions) {
 }
 
 const LANGUAGE_NAMES = { uk: 'Ukrainian', ru: 'Russian', en: 'English' };
+const UK_LANGUAGE_SIGNALS = /(які|який|номери|потріб(?:но|ен)|сьогодні|скільки|можна|буде|людин|кошту(?:є|ють)|заброню(?:вати|ватися)|бронювання|підкаж(?:іть|и)|будь\s+ласка|мені|ціна|ціни|готель)/gu;
+const RU_LANGUAGE_SIGNALS = /(какие|какой|номера|нуж(?:ен|но)|сегодня|сколько|можно|будет|человек|стоит|заброниров(?:ать|ать)|бронь|подскаж(?:ите|и)|пожалуйста|мне|цена|цены|отель)/gu;
 function explicitLanguageSwitch(text) {
   const value = String(text || '').toLowerCase();
   if (/(на\s+русском|по[-\s]?русски|русск(?:ий|ом|ую)|російськ(?:ою|ою\s+мовою))/u.test(value)) return 'ru';
@@ -89,8 +91,11 @@ function detectConversationLanguage(text, currentLanguage = 'unknown') {
   const cyrillic = (value.match(/[\u0400-\u04ff]/g) || []).length;
   if (latin >= 6 && latin > cyrillic * 2) return 'en';
   if (!cyrillic) return null;
-  if (/[іїєґ]/u.test(value) || /(потріб|сьогодні|скільки|можна|буде|людин|кошту|броню|підкаж|будь\s+ласка)/u.test(value)) return 'uk';
-  if (/(нужн|сегодня|сколько|можно|будет|человек|стоит|заброниров|подскаж|пожалуйста|говорите)/u.test(value)) return 'ru';
+  if (/[іїєґ]/u.test(value)) return 'uk';
+  const ukSignals = (value.match(UK_LANGUAGE_SIGNALS) || []).length;
+  const ruSignals = (value.match(RU_LANGUAGE_SIGNALS) || []).length;
+  if (ukSignals > ruSignals && ukSignals > 0) return 'uk';
+  if (ruSignals > ukSignals && ruSignals > 0) return 'ru';
   return null;
 }
 function languageLockInstruction(language) {

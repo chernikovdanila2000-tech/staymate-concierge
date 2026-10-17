@@ -42,6 +42,8 @@ test('detects a clear supported language both at the start and later in a call',
   assert.equal(detectConversationLanguage('Сколько стоит номер на завтра?'), 'ru');
   assert.equal(detectConversationLanguage('Чи є номер на сьогодні?'), 'uk');
   assert.equal(detectConversationLanguage('Do you have a room tonight?'), 'en');
+  assert.equal(detectConversationLanguage('Какие у вас номера?'), 'ru');
+  assert.equal(detectConversationLanguage('Які у вас номери?'), 'uk');
   assert.equal(detectConversationLanguage('ага', 'ru'), null);
   assert.equal(detectConversationLanguage('I want to book a room for tomorrow.', 'ru'), 'en');
   assert.equal(detectConversationLanguage('Я хочу забронировать номер на завтра.', 'uk'), 'ru');
