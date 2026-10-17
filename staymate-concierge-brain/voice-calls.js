@@ -210,6 +210,7 @@ class VoiceCallService {
     catch (error) { this.diagnose('hotel_info_failed'); throw error; }
     const instructions = `${phoneInstructions(this.buildPrompt({ propertyName: property.hotel_name, hotelInfo }))}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
     const tools = [...toRealtimeTools(phoneToolDefinitions(toolDefinitions)), { type: 'function', name: 'send_payment_sms', description: 'Queue an SMS with the already-created payment link. Call only after create_booking succeeded, the caller dictated the mobile number, you repeated it, and the caller explicitly agreed in this call. Never use SIP Caller ID as the number.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: ['booking_id', 'phone', 'consent'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
+    if (this.smsService?.config?.bookingTemplates?.uk) tools.push({ type: 'function', name: 'send_booking_sms', description: 'Queue the approved booking-confirmation SMS. Call only after create_booking succeeded, the caller dictated and confirmed the phone number, and explicitly agreed to receive SMS in this call.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: ['booking_id', 'phone', 'consent'], additionalProperties: false } });
     const input = { turn_detection: this.config.vad };
     // This ASR result is processed only in memory to set the conversation
     // language.  It is not logged or saved with the call record.
@@ -277,6 +278,7 @@ class VoiceCallService {
     if (name === 'transfer_to_human') output = await this.transferToHuman(state, args);
     else if (name === 'send_payment_link') output = await this.deliverPaymentLink(state, args);
     else if (name === 'send_payment_sms') output = await this.deliverPaymentSms(state, args);
+    else if (name === 'send_booking_sms') output = await this.deliverBookingSms(state, args);
     else {
       const tools = this.toolsFactory(state.propertyId, 'phone', state.callId);
       output = tools[name] ? await tools[name](args) : { error: 'unknown_tool' };
@@ -307,6 +309,13 @@ class VoiceCallService {
     if (!this.smsService) return { ok: false, error: 'sms_delivery_not_configured' };
     try { return await this.smsService.createPaymentSms({ propertyId: state.propertyId, bookingId, phone, callId: state.callId, language: state.conversationLanguage === 'unknown' ? 'uk' : state.conversationLanguage, consent: consent === true, phoneSource: 'spoken_confirmed' }); }
     catch (error) { this.logger.error('[voice] payment SMS preparation failed', error.message); return { ok: false, error: 'payment_sms_unavailable' }; }
+  }
+  async deliverBookingSms(state, { booking_id: bookingId, phone, consent } = {}) {
+    if (!this.smsService) return { ok: false, error: 'sms_delivery_not_configured' };
+    const language = state.conversationLanguage === 'unknown' ? 'uk' : state.conversationLanguage;
+    const text = this.smsService.config?.bookingTemplates?.[language] || this.smsService.config?.bookingTemplates?.uk;
+    try { return await this.smsService.createBookingSms({ propertyId: state.propertyId, bookingId, phone, callId: state.callId, language, consent: consent === true, phoneSource: 'spoken_confirmed', text }); }
+    catch (error) { this.logger.error('[voice] booking SMS preparation failed', error.message); return { ok: false, error: 'booking_sms_unavailable' }; }
   }
   async defaultSendPaymentEmail({ to, bookingId, paymentLink, hotelName }) {
     if (!this.config.paymentEmailApiKey) throw new Error('payment email is not configured');

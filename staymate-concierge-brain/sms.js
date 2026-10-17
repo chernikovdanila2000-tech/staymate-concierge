@@ -26,7 +26,7 @@ function safeEqual(a, b) { const x = Buffer.from(String(a || '')); const y = Buf
 function statusFromDlr(status) { const v = String(status || '').toUpperCase(); if (['DELIVRD', 'DELIVERED', 'READ'].includes(v)) return 'DELIVERED'; if (['EXPIRED', 'UNDELIV', 'UNDELIVERED', 'REJECTD', 'FAILED'].includes(v)) return 'FAILED'; if (['SENT', 'ACCEPTED', 'QUEUED'].includes(v)) return v === 'SENT' ? 'SENT' : 'ACCEPTED'; return 'UNKNOWN'; }
 
 function smsConfig(env = process.env) {
-  return { enabled: bool(env.SMS_ENABLED), primary: (env.SMS_PRIMARY_PROVIDER || 'turbosms').toLowerCase(), fallback: (env.SMS_FALLBACK_PROVIDER || 'mobizon').toLowerCase(), sender: env.SMS_SENDER || '', turboToken: env.TURBOSMS_API_TOKEN || '', turboWebhookSecret: env.TURBOSMS_WEBHOOK_SECRET || '', turboEnabled: bool(env.TURBOSMS_ENABLED, true), mobizonKey: env.MOBIZON_API_KEY || '', mobizonWebhookSecret: env.MOBIZON_WEBHOOK_SECRET || '', mobizonEnabled: bool(env.MOBIZON_ENABLED, true), paymentBaseUrl: (env.PAYMENT_LINK_BASE_URL || '').replace(/\/$/, ''), invoiceAllowedHosts: String(env.PAYMENT_INVOICE_ALLOWED_HOSTS || 'pay.mbnk.biz,pay.monobank.ua').split(',').map(x => x.trim()).filter(Boolean), estimatedSegmentCost: Number(env.SMS_ESTIMATED_SEGMENT_COST_UAH || 0) };
+  return { enabled: bool(env.SMS_ENABLED), primary: (env.SMS_PRIMARY_PROVIDER || 'turbosms').toLowerCase(), fallback: (env.SMS_FALLBACK_PROVIDER || 'mobizon').toLowerCase(), sender: env.SMS_SENDER || '', turboToken: env.TURBOSMS_API_TOKEN || '', turboWebhookSecret: env.TURBOSMS_WEBHOOK_SECRET || '', turboEnabled: bool(env.TURBOSMS_ENABLED, true), mobizonKey: env.MOBIZON_API_KEY || '', mobizonWebhookSecret: env.MOBIZON_WEBHOOK_SECRET || '', mobizonEnabled: bool(env.MOBIZON_ENABLED, true), bookingTemplates: { uk: env.SMS_BOOKING_TEMPLATE_UK || '', ru: env.SMS_BOOKING_TEMPLATE_RU || '', en: env.SMS_BOOKING_TEMPLATE_EN || '' }, paymentBaseUrl: (env.PAYMENT_LINK_BASE_URL || '').replace(/\/$/, ''), invoiceAllowedHosts: String(env.PAYMENT_INVOICE_ALLOWED_HOSTS || 'pay.mbnk.biz,pay.monobank.ua').split(',').map(x => x.trim()).filter(Boolean), estimatedSegmentCost: Number(env.SMS_ESTIMATED_SEGMENT_COST_UAH || 0) };
 }
 
 class TurboSmsProvider {
@@ -72,6 +72,17 @@ class SmsNotificationService {
     if (!this.config.enabled) return { ok: false, error: 'sms_delivery_disabled' };
     if (!this.config.paymentBaseUrl) return { ok: false, error: 'payment_link_base_url_not_configured' };
     const { data, error } = await this.supabase.rpc('sms_prepare_payment_link', { p_property_id: propertyId, p_booking_id: bookingId, p_phone: normalized, p_call_id: callId || null, p_language: language, p_phone_source: phoneSource, p_payment_base_url: this.config.paymentBaseUrl, p_allowed_hosts: this.config.invoiceAllowedHosts });
+    if (error) throw error; return data;
+  }
+  // Generic transactional SMS deliberately has no dependency on Monobank or a
+  // payment URL.  Product code supplies an approved template; the outbox then
+  // gives it the same idempotency, rate/restart safety and delivery tracking.
+  async createBookingSms({ propertyId, bookingId, phone, callId, language = 'uk', consent = false, phoneSource = 'spoken_confirmed', text }) {
+    const normalized = normalizeSmsPhone(phone); const body = String(text || '').trim();
+    if (!consent || !normalized) return { ok: false, error: !consent ? 'guest_consent_required' : 'valid_phone_required' };
+    if (!this.config.enabled) return { ok: false, error: 'sms_delivery_disabled' };
+    if (!body || body.length > 459) return { ok: false, error: 'approved_sms_template_required' };
+    const { data, error } = await this.supabase.rpc('sms_queue_transactional', { p_property_id: propertyId, p_booking_id: bookingId, p_phone: normalized, p_call_id: callId || null, p_language: language, p_phone_source: phoneSource, p_text: body });
     if (error) throw error; return data;
   }
 }

@@ -39,3 +39,8 @@ test('fallback is used only after a definitive primary rejection', async () => {
   const service = new SmsNotificationService({ supabase, config: { enabled: true, primary: 'turbosms', fallback: 'mobizon', turboEnabled: true, mobizonEnabled: true, turboToken: 't', mobizonKey: 'm', estimatedSegmentCost: 0 }, providers: { turbosms: { sendPaymentLink: async () => ({ accepted: false, definitive: true, status: 'rejected' }) }, mobizon: { sendPaymentLink: async () => ({ accepted: true, providerMessageId: 'm2', status: 'ACCEPTED' }) } } });
   await service.processOne(); assert.equal(calls.filter(c => c.name === 'sms_finish_outbox')[0].args.p_provider, 'mobizon');
 });
+test('a normal booking SMS is queued without a payment URL or Monobank dependency', async () => {
+  let call; const service = new SmsNotificationService({ supabase: { rpc: async (name, args) => { call = { name, args }; return { data: { ok: true, status: 'QUEUED' } }; } }, config: { enabled: true } });
+  const result = await service.createBookingSms({ propertyId: 'hotel-a', bookingId: 'BK1', phone: '0501234567', consent: true, text: 'StayAI: Ваше бронювання створено.' });
+  assert.equal(result.ok, true); assert.equal(call.name, 'sms_queue_transactional'); assert.equal(call.args.p_phone, '+380501234567');
+});
