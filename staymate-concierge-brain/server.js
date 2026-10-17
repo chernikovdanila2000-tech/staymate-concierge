@@ -74,6 +74,7 @@ const {
 const { createClient } = require('@supabase/supabase-js');
 const { createVoiceCallService } = require('./voice-calls');
 const { VoiceTestService, hasVoiceTestAccess, testPageHtml } = require('./voice-test');
+const { SmsNotificationService, verifyTurboWebhook, verifyMobizonWebhook, statusFromDlr } = require('./sms');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -81,7 +82,8 @@ const supabase = createClient(
 );
 // Separate from chat-channel adapters. It remains inactive until dedicated voice
 // credentials are supplied in Railway and a verified phone number is mapped.
-const voiceCallService = createVoiceCallService({ supabase });
+const smsNotificationService = new SmsNotificationService({ supabase });
+const voiceCallService = createVoiceCallService({ supabase, smsService: smsNotificationService });
 // This is intentionally separate from production calling. It is disabled unless
 // a staging environment explicitly supplies both feature flag and access token.
 const voiceTestService = new VoiceTestService({ supabase });
@@ -1096,6 +1098,37 @@ const server =
         }).catch(error => { console.error('[voice-test] session failed:', error.message); sendJson(res, error.status || 500, { error: 'voice_test_unavailable' }); });
         return;
       }
+
+      // Opaque, one-time-purpose payment URL.  No token is logged, exposed to
+      // analytics, or allowed to redirect anywhere except the invoice URL
+      // stored by the server for this pending booking.
+      const paymentTokenMatch = requestUrl.pathname.match(/^\/p\/([A-Za-z0-9_-]{32,})$/);
+      if (req.method === 'GET' && paymentTokenMatch) {
+        const tokenHash = crypto.createHash('sha256').update(paymentTokenMatch[1]).digest('hex');
+        supabase.from('payment_link_tokens').select('invoice_url,expires_at,opened_at,open_count,booking_id,property_id').eq('token_hash', tokenHash).maybeSingle().then(async ({ data, error }) => {
+          if (error || !data || new Date(data.expires_at) <= new Date()) return sendJson(res, 410, { error: 'payment_link_expired' }, { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+          const { data: booking } = await supabase.from('bookings').select('status,payment_link').eq('property_id', data.property_id).eq('booking_id', data.booking_id).maybeSingle();
+          if (!booking || booking.status !== 'pending_payment' || booking.payment_link !== data.invoice_url) return sendJson(res, 410, { error: 'payment_link_unavailable' }, { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+          await supabase.from('payment_link_tokens').update({ opened_at: data.opened_at || new Date().toISOString(), open_count: (data.open_count || 0) + 1 }).eq('token_hash', tokenHash);
+          res.writeHead(302, { Location: data.invoice_url, 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' }); res.end();
+        }).catch(() => sendJson(res, 500, { error: 'payment_link_unavailable' }));
+        return;
+      }
+
+      async function handleSmsWebhook(provider, rawBody) {
+        let payload; try { payload = JSON.parse(rawBody); } catch { return { status: 400, body: { error: 'invalid_json' } }; }
+        const verified = provider === 'turbosms' ? verifyTurboWebhook(payload, process.env.TURBOSMS_WEBHOOK_SECRET) : verifyMobizonWebhook(payload, process.env.MOBIZON_WEBHOOK_SECRET);
+        if (!verified) return { status: 403, body: { error: 'invalid_signature' } };
+        const eventId = provider === 'turbosms' ? payload.id : payload.eventId;
+        const detail = payload.data || {};
+        const messageId = provider === 'turbosms' ? detail.message_id : detail.messageId;
+        if (!eventId || !messageId) return { status: 400, body: { error: 'invalid_payload' } };
+        const { error } = await supabase.rpc('sms_record_dlr', { p_provider: provider, p_event_id: String(eventId), p_provider_message_id: String(messageId), p_status: statusFromDlr(detail.status), p_payload: payload });
+        if (error) throw error;
+        return { status: 200, body: { received: true } };
+      }
+      if (req.method === 'POST' && requestUrl.pathname === '/webhook/sms/turbosms') { readBody(req).then(body => handleSmsWebhook('turbosms', body)).then(result => sendJson(res, result.status, result.body)).catch(() => sendJson(res, 500, { error: 'webhook_persistence_failed' })); return; }
+      if (req.method === 'POST' && requestUrl.pathname === '/webhook/sms/mobizon') { readBody(req).then(body => handleSmsWebhook('mobizon', body)).then(result => sendJson(res, result.status, result.body)).catch(() => sendJson(res, 500, { error: 'webhook_persistence_failed' })); return; }
 
       // OpenAI Realtime sends signed SIP call events here. The actual RTP audio
       // remains on the provider <-> OpenAI path; this process only controls the
@@ -4090,6 +4123,13 @@ server.listen(
         console.error('[monobank] payment check cycle failed:', error.message);
       });
     }, MONOBANK_CHECK_INTERVAL_MS);
+
+    // A lease in Postgres makes this safe with multiple Railway instances and
+    // recovers abandoned work after a restart.  The worker never retries an
+    // indeterminate provider request, preventing duplicate guest SMS.
+    setInterval(() => {
+      smsNotificationService.processOne().catch(error => console.error('[sms] outbox cycle failed:', error.message));
+    }, 5000);
 
     console.log(
       '[messenger] Configured:',

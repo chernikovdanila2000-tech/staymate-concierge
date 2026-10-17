@@ -59,7 +59,7 @@ test('adds phone-only natural language and no-internal-process rules', () => {
   assert.match(rules, /NEVER expose any internal data source/i);
   assert.doesNotMatch(rules, /catalog/i);
   assert.match(rules, /stop and listen/i);
-  assert.match(rules, /send_payment_link/i);
+  assert.match(rules, /send_payment_sms/i);
   assert.match(rules, /LANGUAGE LOCK/);
 });
 
