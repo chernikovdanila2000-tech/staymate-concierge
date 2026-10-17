@@ -48,6 +48,8 @@ const {
   verifyMonobankToken,
   fetchMonobankStatement,
   findMatchingTransaction,
+  getMonobankMerchantPublicKey,
+  verifyMonobankAcquiringSignature,
 } = require('./monobank');
 const {
   createSubscriptionInvoice,
@@ -164,6 +166,9 @@ const META_WHATSAPP_PROPERTY_ID =
   process.env.META_WHATSAPP_PROPERTY_ID || '';
 
 const PORT = process.env.PORT || 3000;
+const MONOBANK_ACQUIRING_TOKEN = process.env.MONOBANK_ACQUIRING_TOKEN || '';
+let monobankMerchantPublicKey = null;
+let monobankMerchantPublicKeyAt = 0;
 
 const propertyCache = new Map();
 const PROPERTY_CACHE_TTL_MS = 60 * 1000;
@@ -1129,6 +1134,26 @@ const server =
       }
       if (req.method === 'POST' && requestUrl.pathname === '/webhook/sms/turbosms') { readBody(req).then(body => handleSmsWebhook('turbosms', body)).then(result => sendJson(res, result.status, result.body)).catch(() => sendJson(res, 500, { error: 'webhook_persistence_failed' })); return; }
       if (req.method === 'POST' && requestUrl.pathname === '/webhook/sms/mobizon') { readBody(req).then(body => handleSmsWebhook('mobizon', body)).then(result => sendJson(res, result.status, result.body)).catch(() => sendJson(res, 500, { error: 'webhook_persistence_failed' })); return; }
+
+      if (req.method === 'POST' && requestUrl.pathname === '/webhook/monobank/acquiring') {
+        readBody(req).then(async rawBody => {
+          if (!MONOBANK_ACQUIRING_TOKEN) return sendJson(res, 503, { error: 'monobank_acquiring_not_configured' });
+          if (!monobankMerchantPublicKey || Date.now() - monobankMerchantPublicKeyAt > 6 * 60 * 60 * 1000) {
+            monobankMerchantPublicKey = await getMonobankMerchantPublicKey(MONOBANK_ACQUIRING_TOKEN); monobankMerchantPublicKeyAt = Date.now();
+          }
+          if (!verifyMonobankAcquiringSignature(rawBody, req.headers['x-sign'], monobankMerchantPublicKey)) return sendJson(res, 403, { error: 'invalid_monobank_signature' });
+          const event = JSON.parse(rawBody);
+          if (!event.invoiceId || !event.reference) return sendJson(res, 400, { error: 'invalid_monobank_event' });
+          // Only Monobank's signed terminal success event may transition this
+          // exact invoice from pending to paid. SMS delivery can never do so.
+          if (event.status === 'success') {
+            const { error } = await supabase.from('bookings').update({ status: 'paid' }).eq('booking_id', String(event.reference)).eq('payment_method', 'monobank_acquiring').eq('payment_reference', String(event.invoiceId)).eq('status', 'pending_payment');
+            if (error) throw error;
+          }
+          return sendJson(res, 200, { received: true });
+        }).catch(error => { console.error('[monobank acquiring] webhook failed:', error.message); sendJson(res, 500, { error: 'monobank_webhook_failed' }); });
+        return;
+      }
 
       // OpenAI Realtime sends signed SIP call events here. The actual RTP audio
       // remains on the provider <-> OpenAI path; this process only controls the

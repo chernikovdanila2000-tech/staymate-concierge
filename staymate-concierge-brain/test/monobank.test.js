@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction } = require('../monobank');
+const { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, verifyMonobankAcquiringSignature } = require('../monobank');
+const crypto = require('crypto');
 
 function fakeFetch(responses) {
   let call = 0;
@@ -95,4 +96,23 @@ test('findMatchingTransaction returns null when the reference is not in the comm
   const transactions = [{ amount: 50000, comment: 'no code here' }];
   const match = findMatchingTransaction(transactions, { totalPrice: 500, reference: 'SM-AB12X' });
   assert.equal(match, null);
+});
+
+test('createMonobankInvoice uses the acquiring endpoint and only accepts Mono payment hosts', async () => {
+  let request;
+  const result = await createMonobankInvoice('merchant-token', { amountKopecks: 12345, reference: 'BK123', destination: 'Hotel', webHookUrl: 'https://api.example/webhook/monobank/acquiring', redirectUrl: 'https://stayai.online', fetchImpl: async (url, options) => {
+    request = { url, options }; return { ok: true, status: 200, json: async () => ({ invoiceId: 'inv1', pageUrl: 'https://pay.mbnk.biz/inv1' }) };
+  } });
+  assert.equal(result.invoiceId, 'inv1');
+  assert.equal(request.url, 'https://api.monobank.ua/api/merchant/invoice/create');
+  assert.equal(request.options.headers['X-Token'], 'merchant-token');
+  assert.equal(JSON.parse(request.options.body).amount, 12345);
+});
+
+test('verifies acquiring webhook body with ECDSA X-Sign', () => {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const body = '{"invoiceId":"inv1","status":"success"}';
+  const signature = crypto.sign('sha256', Buffer.from(body), privateKey).toString('base64');
+  assert.equal(verifyMonobankAcquiringSignature(body, signature, publicKey.export({ type: 'spki', format: 'pem' })), true);
+  assert.equal(verifyMonobankAcquiringSignature('{}', signature, publicKey.export({ type: 'spki', format: 'pem' })), false);
 });

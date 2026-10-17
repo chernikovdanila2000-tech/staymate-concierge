@@ -4,12 +4,13 @@
    інструментів, прив'язаних до конкретного готелю. Кожен виклик
    check_availability / create_booking / escalate_to_human працює
    тільки з даними цього property_id (rooms/bookings/escalations
-   у Supabase). create_booking також створює рахунок на оплату
-   через WayForPay.
+   у Supabase). create_booking створює рахунок виключно через
+   Monobank acquiring.
    ============================================================ */
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const { createMonobankInvoice } = require('./monobank');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -24,6 +25,7 @@ const WFP_API_URL = 'https://api.wayforpay.com/api';
 // Публічний домен САМОГО СЕРВЕРА (Railway) — сюди WayForPay надсилає webhook
 // про оплату. Це НЕ маркетинговий сайт (Netlify) — там цього роуту немає.
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
+const MONOBANK_ACQUIRING_TOKEN = process.env.MONOBANK_ACQUIRING_TOKEN || '';
 
 function nightsBetween(checkIn, checkOut) {
   const ms = new Date(checkOut) - new Date(checkIn);
@@ -252,45 +254,19 @@ function createTools(propertyId, channel, chatId) {
     const nights = nightsBetween(check_in, check_out);
     const totalPrice = room.price_per_night * nights;
 
-    // Якщо готель вказав власні реквізити для прямого переказу (Фаза 5 —
-    // гроші йдуть одразу готелю, без нашого мерчант-акаунта), пропускаємо
-    // WayForPay повністю: гість переказує на картку/IBAN готелю напряму,
-    // а короткий reference-код у коментарі переказу дозволяє автоматичній
-    // перевірці Monobank (сервер, окремий цикл) зіставити платіж з цією
-    // бронню. Якщо реквізитів ще нема — лишаємо старий WayForPay-варіант,
-    // щоб не ламати готелі, які ним уже користуються.
-    const { data: property } = await supabase
-      .from('properties')
-      .select('payout_card, payout_iban, payout_recipient_name')
-      .eq('property_id', propertyId)
-      .maybeSingle();
-
-    const hasDirectPayout = !!(property && (property.payout_card || property.payout_iban));
-    let paymentLink = null;
-    let paymentMethod = 'wayforpay';
-    let paymentReference = null;
-    let paymentInstructions = null;
-
-    if (hasDirectPayout) {
-      paymentMethod = 'card_transfer';
-      paymentReference = bookingId.slice(0, 8);
-      const recipient = property.payout_recipient_name ? ` (${property.payout_recipient_name})` : '';
-      const details = [
-        property.payout_card ? `картка ${property.payout_card}` : null,
-        property.payout_iban ? `IBAN ${property.payout_iban}` : null,
-      ].filter(Boolean).join(' або ');
-      paymentInstructions = `Оплата переказом${recipient}: ${details}. Сума: ${totalPrice} грн. У коментарі до переказу обов'язково вкажіть код ${paymentReference} — без нього платіж не підтвердиться автоматично.`;
-    } else {
-      try {
-        ({ invoiceUrl: paymentLink } = await createWayForPayInvoice({
-          orderReference: bookingId,
-          productName: `${room.room_type} — ${nights} ${nights === 1 ? 'ніч' : 'ночі'} (${check_in} — ${check_out})`,
-          price: totalPrice,
-        }));
-      } catch (wfpError) {
-        console.error('[createBooking] WayForPay error:', wfpError.message);
-        return { ok: false, error: 'Технічна помилка при створенні посилання на оплату.' };
-      }
+    // Guest reservations use Monobank acquiring only.  No direct card/IBAN
+    // transfer and no WayForPay fallback is permitted for this path.
+    let paymentLink; let paymentReference;
+    try {
+      const invoice = await createMonobankInvoice(MONOBANK_ACQUIRING_TOKEN, {
+        amountKopecks: Math.round(Number(totalPrice) * 100), reference: bookingId,
+        destination: `${room.room_type} — ${check_in} — ${check_out}`,
+        webHookUrl: `${API_BASE_URL}/webhook/monobank/acquiring`, redirectUrl: process.env.MONOBANK_PAYMENT_RETURN_URL || `${API_BASE_URL}/payment/result`, validitySeconds: 86400,
+      });
+      paymentLink = invoice.pageUrl; paymentReference = invoice.invoiceId;
+    } catch (monoError) {
+      console.error('[createBooking] Monobank acquiring error:', monoError.message);
+      return { ok: false, error: 'Технічна помилка при створенні рахунку Monobank.' };
     }
 
     const { data: booking, error: insertError } = await supabase
@@ -307,7 +283,7 @@ function createTools(propertyId, channel, chatId) {
         total_price: totalPrice,
         status: 'pending_payment',
         payment_link: paymentLink,
-        payment_method: paymentMethod,
+        payment_method: 'monobank_acquiring',
         payment_reference: paymentReference,
       })
       .select()
@@ -318,7 +294,7 @@ function createTools(propertyId, channel, chatId) {
       return { ok: false, error: 'Технічна помилка при створенні бронювання.' };
     }
 
-    return { ok: true, booking, payment_instructions: paymentInstructions };
+    return { ok: true, booking, payment_instructions: null };
   }
 
   async function escalateToHuman({ reason, urgency }) {

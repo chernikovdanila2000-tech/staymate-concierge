@@ -74,4 +74,37 @@ function findMatchingTransaction(transactions, { totalPrice, reference }) {
   return match || null;
 }
 
-module.exports = { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction };
+// Internet acquiring is deliberately distinct from the personal-account API
+// above.  A dedicated merchant token is required; never reuse a hotel's
+// personal statement token for card acquiring.
+async function createMonobankInvoice(token, { amountKopecks, reference, destination, webHookUrl, redirectUrl, validitySeconds = 86400, fetchImpl = globalThis.fetch } = {}) {
+  if (!token) throw new Error('Monobank acquiring token is not configured.');
+  if (!Number.isSafeInteger(amountKopecks) || amountKopecks <= 0) throw new Error('Invalid invoice amount.');
+  const response = await fetchImpl(`${MONOBANK_API_URL}/api/merchant/invoice/create`, {
+    method: 'POST', headers: { 'X-Token': token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount: amountKopecks, ccy: 980, merchantPaymInfo: { reference, destination, comment: destination, basketOrder: [{ name: destination, qty: 1, sum: amountKopecks, total: amountKopecks, unit: 'послуга', code: reference }] }, redirectUrl, webHookUrl, validity: validitySeconds, paymentType: 'debit' }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.invoiceId || !data.pageUrl) throw new Error(`Monobank acquiring invoice failed (HTTP ${response.status}).`);
+  const page = new URL(data.pageUrl);
+  if (page.protocol !== 'https:' || !['pay.mbnk.biz', 'pay.monobank.ua'].includes(page.hostname)) throw new Error('Monobank returned an untrusted payment URL.');
+  return { invoiceId: String(data.invoiceId), pageUrl: data.pageUrl };
+}
+
+async function getMonobankMerchantPublicKey(token, { fetchImpl = globalThis.fetch } = {}) {
+  const response = await fetchImpl(`${MONOBANK_API_URL}/api/merchant/pubkey`, { headers: { 'X-Token': token } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.key) throw new Error('Monobank merchant public key is unavailable.');
+  const decoded = Buffer.from(data.key, 'base64').toString('utf8');
+  return decoded.includes('BEGIN PUBLIC KEY') ? decoded : data.key;
+}
+
+function verifyMonobankAcquiringSignature(rawBody, xSign, publicKey) {
+  if (!rawBody || !xSign || !publicKey) return false;
+  try {
+    const key = String(publicKey).includes('BEGIN PUBLIC KEY') ? publicKey : { key: Buffer.from(publicKey, 'base64'), format: 'der', type: 'spki' };
+    return require('crypto').verify('sha256', Buffer.from(rawBody), key, Buffer.from(xSign, 'base64'));
+  } catch { return false; }
+}
+
+module.exports = { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, getMonobankMerchantPublicKey, verifyMonobankAcquiringSignature };
