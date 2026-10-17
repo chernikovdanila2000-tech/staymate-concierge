@@ -877,8 +877,19 @@ function elevenToolConfig() {
   };
 }
 
+// ElevenLabs may invoke several tools during one phone conversation.  The
+// number-to-property mapping is stable for the lifetime of a staging process,
+// so avoid adding a Supabase round trip to every tool response.  Explicit
+// configuration still wins, and a short TTL keeps a changed routing from being
+// held indefinitely.
+const elevenLabsPropertyCache = new Map();
+const ELEVENLABS_PROPERTY_CACHE_TTL_MS = 10 * 60 * 1000;
+
 async function resolveElevenLabsPropertyId(config) {
   if (config.propertyId) return config.propertyId;
+  const now = Date.now();
+  const cached = elevenLabsPropertyCache.get(config.phoneNumber);
+  if (cached && cached.expiresAt > now) return cached.propertyId;
   const { data, error } = await supabase
     .from('voice_phone_numbers')
     .select('property_id')
@@ -887,7 +898,12 @@ async function resolveElevenLabsPropertyId(config) {
     .eq('enabled', true)
     .maybeSingle();
   if (error || !data?.property_id) return null;
-  return String(data.property_id);
+  const propertyId = String(data.property_id);
+  elevenLabsPropertyCache.set(config.phoneNumber, {
+    propertyId,
+    expiresAt: now + ELEVENLABS_PROPERTY_CACHE_TTL_MS,
+  });
+  return propertyId;
 }
 
 async function handleElevenLabsTool(req, res, toolName) {
