@@ -20,7 +20,7 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
   assert.equal(config.model, 'gpt-realtime-2.1-mini');
   assert.equal(config.maxDurationSeconds, 600);
   assert.equal(config.vad.interrupt_response, true);
-  assert.equal(config.vad.threshold, 0.60);
+  assert.equal(config.vad.threshold, 0.72);
   assert.equal(config.vad.silence_duration_ms, 400);
   assert.equal(config.voiceSpeed, 1.0);
   assert.equal(config.voice, 'marin');
@@ -35,14 +35,16 @@ test('uses an economical configurable realtime model and ten-minute pilot defaul
 
 test('uses a higher VAD threshold by default while preserving a deliberate tuning override', () => {
   assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: '0.72' }).vad.threshold, 0.72);
-  assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: 'noise' }).vad.threshold, 0.60);
+  assert.equal(voiceConfig({ VOICE_VAD_THRESHOLD: 'noise' }).vad.threshold, 0.72);
 });
 
-test('keeps a server-side language lock and changes it only on an explicit request', () => {
+test('detects a clear supported language both at the start and later in a call', () => {
   assert.equal(detectConversationLanguage('Сколько стоит номер на завтра?'), 'ru');
   assert.equal(detectConversationLanguage('Чи є номер на сьогодні?'), 'uk');
   assert.equal(detectConversationLanguage('Do you have a room tonight?'), 'en');
   assert.equal(detectConversationLanguage('ага', 'ru'), null);
+  assert.equal(detectConversationLanguage('I want to book a room for tomorrow.', 'ru'), 'en');
+  assert.equal(detectConversationLanguage('Я хочу забронировать номер на завтра.', 'uk'), 'ru');
   assert.equal(detectConversationLanguage('давайте українською', 'ru'), 'uk');
   assert.equal(explicitLanguageSwitch('Can we speak English?'), 'en');
 });
