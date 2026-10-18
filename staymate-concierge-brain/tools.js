@@ -26,7 +26,6 @@ const WFP_API_URL = 'https://api.wayforpay.com/api';
 // Публічний домен САМОГО СЕРВЕРА (Railway) — сюди WayForPay надсилає webhook
 // про оплату. Це НЕ маркетинговий сайт (Netlify) — там цього роуту немає.
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
-const MONOBANK_SINGLE_TENANT_PILOT = process.env.MONOBANK_SINGLE_TENANT_PILOT === 'true';
 
 function nightsBetween(checkIn, checkOut) {
   const ms = new Date(checkOut) - new Date(checkIn);
@@ -176,7 +175,7 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
 function createTools(propertyId, channel, chatId, dependencies = {}) {
   const db = dependencies.supabase || supabase;
   const createInvoice = dependencies.createMonobankInvoice || createMonobankInvoice;
-  const resolveMerchant = dependencies.resolveMerchant || ((id) => getMonobankMerchant(db, id, { allowSingleTenantFallback: MONOBANK_SINGLE_TENANT_PILOT }));
+  const resolveMerchant = dependencies.resolveMerchant || ((id) => getMonobankMerchant(db, id));
   async function checkAvailability({ check_in, check_out, guests } = {}) {
     if ((check_in || check_out) && !validStayDates(check_in, check_out)) {
       return { ok: false, code: 'invalid_stay_dates', available_rooms: [] };

@@ -6,24 +6,25 @@ function merchantIdForProperty(propertyId) {
   return `mono:${String(propertyId)}`;
 }
 
-async function getMonobankMerchant(supabase, propertyId, { allowSingleTenantFallback = false } = {}) {
+async function getMonobankMerchant(supabase, propertyId) {
   const { data, error } = await supabase
     .from('payment_merchants')
     .select('merchant_id,property_id,provider,credentials,enabled,credential_version,disabled_at')
     .eq('property_id', propertyId).eq('provider', 'monobank_acquiring').maybeSingle();
   if (error) throw error;
   if (data && data.enabled && !data.disabled_at) {
+    // The query is tenant-filtered, but fail closed if a malformed database
+    // result ever escapes that filter.  Credentials must never be selected by
+    // a caller-supplied or unrelated merchant identifier.
+    if (data.property_id !== propertyId || data.merchant_id !== merchantIdForProperty(propertyId)) return null;
     const credentials = decryptCredentials(data.credentials);
     if (credentials?.token) return { ...data, token: credentials.token, source: 'tenant' };
     return null;
   }
-  // Compatibility is deliberately opt-in and is prohibited for a multi-hotel
-  // deployment. It permits a controlled single-tenant migration only.
-  if (allowSingleTenantFallback && process.env.MONOBANK_ACQUIRING_TOKEN) {
-    return { merchant_id: merchantIdForProperty(propertyId), property_id: propertyId,
-      provider: 'monobank_acquiring', credential_version: 0,
-      token: process.env.MONOBANK_ACQUIRING_TOKEN, source: 'single_tenant_compat' };
-  }
+  // Never fall back to a process-wide acquiring token.  A runtime flag cannot
+  // prove that only one property exists, and using it would let another hotel
+  // receive invoices through the wrong merchant.  Each property must have an
+  // enabled, encrypted row above.
   return null;
 }
 

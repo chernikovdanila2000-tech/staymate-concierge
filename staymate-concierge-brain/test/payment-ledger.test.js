@@ -7,8 +7,15 @@ const event = { invoiceId: 'inv-a', reference: 'BK-A', status: 'success', amount
 
 test('payment event key is stable for a webhook retransmission and differs for a state change', () => {
   assert.equal(eventKey(event), eventKey({ ...event }));
+  assert.equal(eventKey(event), eventKey({ ...event, modifiedDate: '2026-10-18T10:01:00Z' }));
   assert.notEqual(eventKey(event), eventKey({ ...event, status: 'failure' }));
   assert.equal(payloadHash('one'), payloadHash('one'));
+});
+
+test('ledger rejects an event that is not bound to one booking and merchant', async () => {
+  const db = { rpc: async () => ({ data: null, error: null }) };
+  await assert.rejects(() => recordMonobankEvent(db, { property_id: 'hotel-a' }, event, { source: 'webhook', rawBody: '{}' }), /binding_required/);
+  await assert.rejects(() => recordMonobankEvent(db, { property_id: 'hotel-a', booking_id: 'BK-A', payment_merchant_id: 'mono:hotel-a' }, event, { source: 'other', rawBody: '{}' }), /invalid_payment_event_source/);
 });
 
 test('ledger RPC receives the exact tenant, merchant and invoice binding', async () => {

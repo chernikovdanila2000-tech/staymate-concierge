@@ -3,14 +3,20 @@ const { getMonobankInvoiceStatus } = require('./monobank');
 
 function eventKey(event) {
   // Monobank invoices do not expose a universal webhook event id. Include all
-  // settlement-relevant immutable fields so a retransmission is idempotent.
+  // settlement-relevant state fields so a retransmission is idempotent.  Do
+  // not include a provider timestamp: otherwise a retry with a regenerated
+  // timestamp becomes a second logical ledger event.
   const value = [event.invoiceId, event.status, event.reference, event.amount,
-    event.ccy, event.finalAmount ?? '', event.modifiedDate ?? event.createdDate ?? ''].join('|');
+    event.ccy, event.finalAmount ?? ''].join('|');
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 function payloadHash(raw) { return crypto.createHash('sha256').update(String(raw || '')).digest('hex'); }
 
 async function recordMonobankEvent(supabase, booking, event, { source, rawBody }) {
+  if (!booking?.property_id || !booking?.booking_id || !booking?.payment_merchant_id || !event?.invoiceId) {
+    throw new Error('payment_event_binding_required');
+  }
+  if (source !== 'webhook' && source !== 'reconciliation') throw new Error('invalid_payment_event_source');
   const { data, error } = await supabase.rpc('payment_record_monobank_event', {
     p_event_key: eventKey(event), p_source: source, p_property_id: booking.property_id,
     p_booking_id: booking.booking_id, p_merchant_id: booking.payment_merchant_id,
