@@ -190,7 +190,7 @@ test('staging test SMS tool uses Caller ID and never needs an invoice', async ()
   const service = new VoiceCallService({ realtimeClient: {}, repository: {}, config: { ...voiceConfig(), stagingTestSmsEnabled: true }, smsService: { createStagingTestSms: async input => { sent.push(input); return { ok: true, status: 'ACCEPTED' }; }, config: { stagingTestEnabled: true } }, logger: { error() {} } });
   const result = await service.deliverStagingTestSms({ propertyId: 'hotel-a', callerPhone: '+380501234567', callId: 'call-1' }, { consent: true });
   assert.deepEqual(result, { ok: true, status: 'ACCEPTED' });
-  assert.deepEqual(sent[0], { propertyId: 'hotel-a', phone: '+380501234567', callId: 'call-1', consent: true });
+  assert.deepEqual(sent[0], { propertyId: 'hotel-a', phone: '+380501234567', callId: 'call-1', consent: true, phoneSource: 'trusted_sip_caller_id' });
 });
 
 test('does not accept an unmapped or rate-limited call', async () => {

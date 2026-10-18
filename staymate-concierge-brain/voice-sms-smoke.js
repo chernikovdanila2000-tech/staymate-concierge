@@ -32,11 +32,14 @@ const voice = createVoiceCallService({
      'First use the original tools and data; give actual dates and accurate prices.',
      'Speak exclusively in the language of the caller: Russian, Ukrainian or English.',
      'A caller must never need to say the word test or know tool names.',
-     'When guest has discussed a room, offer to send one informational SMS to the verified calling number.',
-     'Ask for their explicit consent. If yes, send_staging_test_sms with consent=true once in this call.',
-     'The SMS does not confirm the booking and does not contain a payment URL.',
+     'After discussing room options, offer one informational SMS to the guest. No booking or payment is needed to send this message.',
+     'If the carrier provided a trusted calling number, NEVER ask the guest to dictate it. After explicit consent call send_staging_test_sms with consent=true and no phone argument.',
+     'If Caller ID was not received, tell the guest you cannot see their number; ask them to dictate their mobile once, repeat it back for confirmation, and after explicit consent call send_staging_test_sms with phone=confirmed number and consent=true.',
+     'When booking cannot be completed because online payment is not set up, explain this accurately AND still offer the informational SMS independently. Do not refuse the SMS merely because payment or booking creation is unavailable.',
+     'Never ask the guest to request a test SMS or mention technical tools. Ask naturally: Would you like me to send a short information message to your phone?',
+     'The SMS is informational only; it does not confirm the booking and does not contain a payment URL.',
+     'If SMS dispatch returns ACCEPTED, say only that the message was accepted for sending, not that it was delivered.',
      'Do not claim a booking is made unless create_booking returned ok=true.',
-     'If real booking cannot be completed due to unavailable payment setup, explain this accurately.',
      'No fake confirmations, no invented availability, no second SMS without permission.'
    ].join('\n');
  }

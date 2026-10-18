@@ -19,10 +19,30 @@ function normalizePhoneNumber(value) {
 function sipHeader(headers, name) {
   const wanted = name.toLowerCase();
   if (Array.isArray(headers)) {
-    const found = headers.find(h => String(h.name || h[0]).toLowerCase() === wanted);
+    const found = headers.find(h => String(h?.name || h?.[0] || '').trim().replace(/:$/, '').toLowerCase() === wanted);
     return found && (found.value || found[1]);
   }
-  return Object.entries(headers || {}).find(([key]) => key.toLowerCase() === wanted)?.[1];
+  return Object.entries(headers || {}).find(([key]) => key.trim().replace(/:$/, '').toLowerCase() === wanted)?.[1];
+}
+// A SIP From header can contain a display name or PBX extension in addition
+// to the actual URI. Extract only the URI user, never concatenate display-name
+// digits with its phone number.
+function phoneFromSipIdentity(value) {
+  if (typeof value !== 'string') return null;
+  const raw = value.trim();
+  // Match the URI user instead of display names such as "Office 101".
+  const uri = raw.match(/(?:sips?:|tel:)([^@;>]+)/i);
+  const phonePart = uri ? uri[1].trim() : raw;
+  if (!/^[+]?[0-9 ()-]+$/.test(phonePart)) return null;
+  return normalizePhoneNumber(phonePart);
+}
+function sipCallerIdentity(headers, toNumber = null) {
+  const candidates = ['from', 'p-asserted-identity', 'remote-party-id', 'p-preferred-identity'];
+  for (const name of candidates) {
+    const phone = phoneFromSipIdentity(sipHeader(headers, name));
+    if (phone && phone !== toNumber) return { phone, source: name };
+  }
+  return { phone: null, source: 'not_available' };
 }
 function hashCaller(value, secret) {
   if (!value) return null;
@@ -202,7 +222,16 @@ class VoiceCallService {
     // that non-phone URI in To.  A fallback is safe only when explicitly bound
     // in deployment configuration; it remains tenant-scoped in the database.
     const to = normalizePhoneNumber(sipHeader(call.sip_headers, 'to')) || this.config.defaultPhoneNumber;
-    const caller = normalizePhoneNumber(sipHeader(call.sip_headers, 'from'));
+    const identity = sipCallerIdentity(call.sip_headers, to);
+    const caller = identity.phone;
+    // Never log a caller's phone, raw SIP header, or call audio. This tells
+    // operators whether Zadarma actually passed an identity to OpenAI.
+    if (!caller) this.logger.warn('[voice] caller ID unavailable', {
+      fromHeader: Boolean(sipHeader(call.sip_headers, 'from')),
+      assertedHeader: Boolean(sipHeader(call.sip_headers, 'p-asserted-identity')),
+      remotePartyHeader: Boolean(sipHeader(call.sip_headers, 'remote-party-id')),
+    });
+    else this.logger.info?.('[voice] caller ID resolved from SIP', identity.source);
     if (!callId || !to) { this.logger.warn('[voice] incoming call has no call id or destination'); return { status: 200, body: { received: true } }; }
     let reservation;
     try {
@@ -228,9 +257,12 @@ class VoiceCallService {
     const trustedCallerRule = callerPhone
       ? 'The secure call context contains a trusted calling number. It is server-bound: do not ask the caller to repeat it, do not read it aloud, and do not accept a replacement number for the current booking.'
       : 'No trusted calling number is available. Ask for a mobile number only when it is necessary to send an SMS, then repeat it once for confirmation.';
-    const instructions = `${phoneInstructions(this.buildPrompt({ propertyName: property.hotel_name, hotelInfo }))}${voiceConversationRules(property.hotel_name)}\n\n${trustedCallerRule} Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
+    const informationalSmsRule = this.config.stagingTestSmsEnabled && this.smsService?.config?.stagingTestEnabled
+      ? 'INFORMATIONAL SMS PILOT: Preserve the complete normal hotel conversation. Offer a single informational SMS after discussing rooms, even if the hotel has no payment merchant and a real booking cannot be created. This SMS never needs a booking or invoice. If Caller ID is supplied use it without asking the guest to repeat it; otherwise request and repeat back the mobile number once for confirmation. After explicit verbal consent, call send_staging_test_sms with consent=true, and with phone only when Caller ID is unavailable. Never tell the guest they must ask for a test. Never invent a booking confirmation or payment link. Do not transfer a routine inquiry merely because a merchant is not configured.'
+      : '';
+    const instructions = `${phoneInstructions(this.buildPrompt({ propertyName: property.hotel_name, hotelInfo }))}${voiceConversationRules(property.hotel_name)}\n\n${trustedCallerRule} Never invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.\n\n${informationalSmsRule}`;
     const tools = [...toRealtimeTools(phoneToolDefinitions(toolDefinitions, { callerPhone: Boolean(callerPhone) })), { type: 'function', name: 'send_payment_sms', description: callerPhone ? 'Queue an SMS with the already-created payment link to the trusted calling number. Call only after create_booking succeeded and the caller explicitly agreed in this call.' : 'Queue an SMS with the already-created payment link. Call only after create_booking succeeded, the caller dictated and confirmed the mobile number, and explicitly agreed in this call.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: callerPhone ? ['booking_id', 'consent'] : ['booking_id', 'phone', 'consent'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
-    if (callerPhone && this.config.stagingTestSmsEnabled && this.smsService?.config?.stagingTestEnabled) tools.push({ type: 'function', name: 'send_staging_test_sms', description: 'Send one informational SMS to the trusted calling number during a normal hotel conversation, only after the guest explicitly agrees in this call. The guest does not need to ask for a test. Do not imply this SMS confirms a booking or contains a payment link. This is independent of booking or invoice creation.', parameters: { type: 'object', properties: { consent: { type: 'boolean', enum: [true] } }, required: ['consent'], additionalProperties: false } });
+    if (this.config.stagingTestSmsEnabled && this.smsService?.config?.stagingTestEnabled) tools.push({ type: 'function', name: 'send_staging_test_sms', description: callerPhone ? 'Send one informational SMS to the carrier-supplied calling number after explicit consent. No invoice, booking, or payment link is needed. Do not ask the guest to repeat the known number.' : 'Send one informational SMS after explicit consent to the mobile number dictated AND repeated back AND confirmed during this call. This works without a booking or a payment link. Do not invent the number. Only call once per conversation.', parameters: { type: 'object', properties: { phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: callerPhone ? ['consent'] : ['phone', 'consent'], additionalProperties: false } });
     if (this.smsService?.config?.bookingTemplates?.uk) tools.push({ type: 'function', name: 'send_booking_sms', description: 'Queue the approved booking-confirmation SMS. Call only after create_booking succeeded, the caller dictated and confirmed the phone number, and explicitly agreed to receive SMS in this call.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: ['booking_id', 'phone', 'consent'], additionalProperties: false } });
     const input = { turn_detection: this.config.vad };
     // This ASR result is processed only in memory to set the conversation
@@ -358,10 +390,17 @@ class VoiceCallService {
     try { return await this.smsService.createBookingSms({ propertyId: state.propertyId, bookingId, phone, callId: state.callId, language, consent: consent === true, phoneSource: 'spoken_confirmed', text }); }
     catch (error) { this.logger.error('[voice] booking SMS preparation failed', error.message); return { ok: false, error: 'booking_sms_unavailable' }; }
   }
-  async deliverStagingTestSms(state, { consent } = {}) {
-    if (!this.smsService || !state.callerPhone || !this.config.stagingTestSmsEnabled) return { ok: false, error: 'staging_test_sms_unavailable' };
-    try { return await this.smsService.createStagingTestSms({ propertyId: state.propertyId, phone: state.callerPhone, callId: state.callId, consent: consent === true }); }
-    catch (error) { this.logger.error('[voice] staging test SMS failed', error.message); return { ok: false, error: 'staging_test_sms_unavailable' }; }
+  async deliverStagingTestSms(state, { consent, phone } = {}) {
+    if (!this.smsService || !this.config.stagingTestSmsEnabled || !state.callId) return { ok: false, error: 'staging_test_sms_unavailable' };
+    // Never allow voice tool arguments to override a trusted carrier number.
+    // If the carrier did not supply a Caller ID, the conversation must obtain
+    // and confirm a guest-provided mobile number before consenting to SMS.
+    const destination = state.callerPhone || phone;
+    const phoneSource = state.callerPhone ? 'trusted_sip_caller_id' : 'spoken_confirmed';
+    if (!destination) return { ok: false, error: 'confirmed_mobile_required' };
+    if (consent !== true) return { ok: false, error: 'guest_consent_required' };
+    try { return await this.smsService.createStagingTestSms({ propertyId: state.propertyId, phone: destination, callId: state.callId, consent: true, phoneSource }); }
+    catch (error) { this.logger.error('[voice] staging SMS failed', error.message); return { ok: false, error: 'staging_test_sms_unavailable' }; }
   }
   async defaultSendPaymentEmail({ to, bookingId, paymentLink, hotelName }) {
     if (!this.config.paymentEmailApiKey) throw new Error('payment email is not configured');
@@ -389,4 +428,4 @@ class VoiceCallService {
 }
 
 function createVoiceCallService({ supabase, env = process.env, ...rest }) { return new VoiceCallService({ supabase, config: voiceConfig(env), ...rest }); }
-module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, normalizeEmail, hashCaller, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConversationRules, detectConversationLanguage, explicitLanguageSwitch, languageLockInstruction };
+module.exports = { VoiceCallService, VoiceCallRepository, createVoiceCallService, voiceConfig, normalizePhoneNumber, phoneFromSipIdentity, sipCallerIdentity, normalizeEmail, hashCaller, safeTransportCode, toRealtimeTools, phoneToolDefinitions, phoneAvailabilityOutput, phoneInstructions, voiceConversationRules, detectConversationLanguage, explicitLanguageSwitch, languageLockInstruction };
