@@ -28,10 +28,17 @@ create table if not exists public.sms_delivery_events (
   provider text not null, event_id text not null, notification_id uuid references public.sms_notifications(id) on delete cascade,
   status text not null, payload jsonb not null, received_at timestamptz not null default now(), primary key(provider,event_id)
 );
+-- A delivery event may arrive before the send acknowledgment is saved.
+-- Store its provider message id so a later sms_finish_outbox can reconcile it.
+alter table public.sms_delivery_events add column if not exists provider_message_id text;
+create index if not exists sms_delivery_events_pending_idx
+on public.sms_delivery_events(provider, provider_message_id)
+where notification_id is null;
 alter table public.payment_link_tokens enable row level security;
 alter table public.notification_consents enable row level security;
 alter table public.sms_notifications enable row level security;
 alter table public.sms_delivery_events enable row level security;
+
 
 create or replace function public.sms_prepare_payment_link(p_property_id text,p_booking_id text,p_phone text,p_call_id text,p_language text,p_phone_source text,p_payment_base_url text,p_allowed_hosts text[])
 returns jsonb language plpgsql security definer set search_path=public as $$
@@ -58,12 +65,20 @@ begin
   return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status);
 end $$;
 
+
 create or replace function public.sms_claim_outbox() returns jsonb language plpgsql security definer set search_path=public as $$
 declare n public.sms_notifications%rowtype;
 begin
- select * into n from sms_notifications where (status='QUEUED' or (status='PROCESSING' and lease_until<now())) and attempts<3 order by created_at for update skip locked limit 1;
+ -- An expired lease may have sent the SMS already. Do not issue the same job
+ -- again, even after a process crash or when a fallback provider is selected.
+ update sms_notifications set status='UNKNOWN', last_error='lease_expired_delivery_unconfirmed',
+   lease_until=null, updated_at=now()
+ where status='PROCESSING' and lease_until<now();
+ select * into n from sms_notifications where status='QUEUED' and attempts=0
+   order by created_at for update skip locked limit 1;
  if not found then return null; end if;
- update sms_notifications set status='PROCESSING',lease_until=now()+interval '5 minutes',attempts=attempts+1,updated_at=now() where id=n.id returning * into n;
+ update sms_notifications set status='PROCESSING',lease_until=now()+interval '5 minutes',attempts=attempts+1,updated_at=now()
+ where id=n.id returning * into n;
  return jsonb_build_object('id',n.id,'phone',n.phone,'text',n.text,'idempotency_key',n.idempotency_key);
 end $$;
 create or replace function public.sms_queue_transactional(p_property_id text,p_booking_id text,p_phone text,p_call_id text,p_language text,p_phone_source text,p_text text)
@@ -78,6 +93,7 @@ begin
   on conflict(property_id,booking_id,notification_type,version) do update set updated_at=now() returning * into n;
   return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status);
 end $$;
+
 
 -- Staging voice test only.  It uses the same outbox and provider path, but a
 -- synthetic, call-scoped booking id means it can never require or affect a
@@ -97,19 +113,78 @@ begin
   values(p_property_id,v_booking_id,'staging_test',p_phone,v_text,encode(digest(p_property_id||':'||v_booking_id||':staging_test:1','sha256'),'hex'),'PROCESSING',1,now()+interval '5 minutes') returning * into n;
   return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status,'job',jsonb_build_object('id',n.id,'phone',n.phone,'text',n.text,'idempotency_key',n.idempotency_key));
 end $$;
-create or replace function public.sms_finish_outbox(p_id uuid,p_status text,p_provider text,p_provider_message_id text,p_error text,p_segments integer,p_cost numeric) returns void language plpgsql security definer set search_path=public as $$
-begin update sms_notifications set status=p_status,provider=coalesce(p_provider,provider),provider_message_id=coalesce(p_provider_message_id,provider_message_id),last_error=p_error,segment_count=nullif(p_segments,0),estimated_cost=nullif(p_cost,0),sent_at=case when p_status in ('ACCEPTED','SENT') then now() else sent_at end,lease_until=null,updated_at=now() where id=p_id and status='PROCESSING'; end $$;
-create or replace function public.sms_record_dlr(p_provider text,p_event_id text,p_provider_message_id text,p_status text,p_payload jsonb) returns boolean language plpgsql security definer set search_path=public as $$
-declare n uuid; begin
- insert into sms_delivery_events(provider,event_id,status,payload) values(p_provider,p_event_id,p_status,p_payload) on conflict do nothing;
+-- Apply a delivery receipt monotonically. SENT cannot downgrade DELIVERED,
+-- and a delayed ACCEPTED or UNKNOWN receipt cannot undo an actual delivery.
+create or replace function public.sms_apply_delivery_status(p_id uuid,p_status text)
+returns void language plpgsql security definer set search_path=public as $$
+begin
+ if p_status not in ('ACCEPTED','SENT','DELIVERED','FAILED') then return; end if;
+ update sms_notifications set
+  status=case
+    when status='DELIVERED' then 'DELIVERED'
+    when p_status='DELIVERED' then 'DELIVERED'
+    when status='FAILED' then 'FAILED'
+    when p_status='FAILED' then 'FAILED'
+    when status='SENT' then 'SENT'
+    when p_status='SENT' then 'SENT'
+    else 'ACCEPTED' end,
+  delivered_at=case when p_status='DELIVERED' then coalesce(delivered_at,now()) else delivered_at end,
+  updated_at=now()
+ where id=p_id;
+end $$;
+
+create or replace function public.sms_finish_outbox(p_id uuid,p_status text,p_provider text,p_provider_message_id text,p_error text,p_segments integer,p_cost numeric)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_status text; v_provider text; v_message_id text; v_receipt text;
+begin
+ update sms_notifications set status=p_status,provider=coalesce(p_provider,provider),
+  provider_message_id=coalesce(p_provider_message_id,provider_message_id),last_error=p_error,
+  segment_count=nullif(p_segments,0),estimated_cost=nullif(p_cost,0),
+  sent_at=case when p_status in ('ACCEPTED','SENT') then now() else sent_at end,
+  lease_until=null,updated_at=now()
+ where id=p_id and status='PROCESSING'
+ returning status,provider,provider_message_id into v_status,v_provider,v_message_id;
+ if not found then raise exception 'sms_finish_requires_processing_row'; end if;
+ if v_provider is not null and v_message_id is not null then
+  update sms_delivery_events set notification_id=p_id
+  where provider=v_provider and provider_message_id=v_message_id and notification_id is null;
+  -- Delivery is more informative than sent or accepted, irrespective of the
+  -- order in which callbacks happened to arrive.
+  select status into v_receipt from sms_delivery_events
+    where provider=v_provider and provider_message_id=v_message_id
+    order by case status when 'DELIVERED' then 1 when 'FAILED' then 2
+      when 'SENT' then 3 when 'ACCEPTED' then 4 else 5 end,received_at desc limit 1;
+  if found then perform sms_apply_delivery_status(p_id,v_receipt); end if;
+ end if;
+end $$;
+create or replace function public.sms_record_dlr(p_provider text,p_event_id text,p_provider_message_id text,p_status text,p_payload jsonb)
+returns boolean language plpgsql security definer set search_path=public as $$
+declare n uuid;
+begin
+ insert into sms_delivery_events(provider,event_id,provider_message_id,status,payload)
+ values(p_provider,p_event_id,p_provider_message_id,p_status,p_payload) on conflict do nothing;
  if not found then return false; end if;
- select id into n from sms_notifications where provider=p_provider and provider_message_id=p_provider_message_id;
- update sms_delivery_events set notification_id=n where provider=p_provider and event_id=p_event_id;
- if n is not null then update sms_notifications set status=p_status,delivered_at=case when p_status='DELIVERED' then now() else delivered_at end,updated_at=now() where id=n and status not in ('DELIVERED','FAILED'); end if;
- return true; end $$;
+ select id into n from sms_notifications
+ where provider=p_provider and provider_message_id=p_provider_message_id;
+ if n is not null then
+  update sms_delivery_events set notification_id=n where provider=p_provider and event_id=p_event_id;
+  perform sms_apply_delivery_status(n,p_status);
+ end if;
+ return true;
+end $$;
 revoke all on function public.sms_prepare_payment_link(text,text,text,text,text,text,text,text[]) from public;
 revoke all on function public.sms_claim_outbox() from public;
 revoke all on function public.sms_queue_transactional(text,text,text,text,text,text,text) from public;
 revoke all on function public.sms_prepare_staging_test(text,text,text,text) from public, anon, authenticated;
 revoke all on function public.sms_finish_outbox(uuid,text,text,text,text,integer,numeric) from public;
 revoke all on function public.sms_record_dlr(text,text,text,text,jsonb) from public;
+
+-- Supabase server-only execution after revoking PUBLIC's default function grants.
+revoke all on function public.sms_apply_delivery_status(uuid,text) from public, anon, authenticated;
+grant execute on function public.sms_prepare_payment_link(text,text,text,text,text,text,text,text[]) to service_role;
+grant execute on function public.sms_claim_outbox() to service_role;
+grant execute on function public.sms_queue_transactional(text,text,text,text,text,text,text) to service_role;
+grant execute on function public.sms_prepare_staging_test(text,text,text,text) to service_role;
+grant execute on function public.sms_finish_outbox(uuid,text,text,text,text,integer,numeric) to service_role;
+grant execute on function public.sms_record_dlr(text,text,text,text,jsonb) to service_role;
+grant execute on function public.sms_apply_delivery_status(uuid,text) to service_role;
