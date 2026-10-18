@@ -1,5 +1,10 @@
 const http = require('http');
 const crypto = require('crypto');
+const { assertStagingIsolation } = require('./environment-isolation');
+
+// When the staging flag is enabled Railway cannot start the service against an
+// unverified or shared project ref. Production is unaffected by this guard.
+assertStagingIsolation(process.env);
 
 const { runConciergeTurn } = require('./claude-client');
 const {

@@ -4,7 +4,8 @@
   "description": "StayMate — ШІ-адміністратор готелю: сервер + Telegram webhook",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "verify:staging-isolation": "node scripts/assert-staging-isolation.js"
   },
   "engines": {
     "node": ">=22"
