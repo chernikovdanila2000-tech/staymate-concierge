@@ -156,6 +156,25 @@ test('starts an audible greeting only after the sideband is connected', async ()
   assert.equal(service.health().diagnostic.stage, 'greeting_requested');
 });
 
+test('uses trusted Caller ID only when explicitly enabled and exposes a separate staging SMS tool', async () => {
+  const socket = new EventEmitter(); socket.OPEN = 1; socket.readyState = 1; socket.send = () => {}; socket.close = () => {};
+  const accepted = [];
+  const client = { unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-sms', sip_headers: [{ name: 'To', value: 'sip:+380441111111@voice' }, { name: 'From', value: 'sip:+380501234567@zadarma' }] } }), acceptCall: async (_, session) => accepted.push(session), openMonitor: () => socket, hangupCall: async () => {} };
+  const service = new VoiceCallService({ repository: { begin: async () => ({ ok: true, property_id: 'hotel-a' }), property: async () => ({ property_id: 'hotel-a', hotel_name: 'Hotel A' }), finish: async () => {} }, realtimeClient: client, config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y', VOICE_TRUST_SIP_CALLER_ID: 'true', VOICE_STAGING_TEST_SMS_ENABLED: 'true' }), enabled: true, apiKey: 'x', webhookSecret: 'y' }, getHotelInfoImpl: async () => ({}), buildPromptImpl: () => 'prompt', smsService: { config: { stagingTestEnabled: true } }, logger: { warn() {}, error() {} } });
+  await service.handleWebhook('{}', {});
+  assert.equal(service.calls.get('call-sms').callerPhone, '+380501234567');
+  assert.deepEqual(accepted[0].tools.find(tool => tool.name === 'send_staging_test_sms').parameters.required, ['consent']);
+  assert.deepEqual(accepted[0].tools.find(tool => tool.name === 'send_payment_sms').parameters.required, ['booking_id', 'consent']);
+});
+
+test('staging test SMS tool uses Caller ID and never needs an invoice', async () => {
+  const sent = [];
+  const service = new VoiceCallService({ realtimeClient: {}, repository: {}, config: { ...voiceConfig(), stagingTestSmsEnabled: true }, smsService: { createStagingTestSms: async input => { sent.push(input); return { ok: true, status: 'ACCEPTED' }; }, config: { stagingTestEnabled: true } }, logger: { error() {} } });
+  const result = await service.deliverStagingTestSms({ propertyId: 'hotel-a', callerPhone: '+380501234567', callId: 'call-1' }, { consent: true });
+  assert.deepEqual(result, { ok: true, status: 'ACCEPTED' });
+  assert.deepEqual(sent[0], { propertyId: 'hotel-a', phone: '+380501234567', callId: 'call-1', consent: true });
+});
+
 test('does not accept an unmapped or rate-limited call', async () => {
   let hungUp = 0; let accepted = 0;
   const service = new VoiceCallService({ repository: { begin: async () => ({ ok: false, code: 'HOTEL_DAILY_LIMIT' }) }, realtimeClient: { unwrapWebhook: async () => ({ type: 'realtime.call.incoming', data: { call_id: 'call-limit', sip_headers: [{ name: 'To', value: '+380441111111' }] } }), hangupCall: async () => { hungUp++; }, acceptCall: async () => { accepted++; } }, config: { ...voiceConfig({ VOICE_ENABLED: 'true', VOICE_OPENAI_API_KEY: 'x', VOICE_OPENAI_WEBHOOK_SECRET: 'y' }), enabled: true, apiKey: 'x', webhookSecret: 'y' }, logger: { warn() {}, error() {} } });

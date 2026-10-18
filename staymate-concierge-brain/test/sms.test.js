@@ -44,3 +44,12 @@ test('a normal booking SMS is queued without a payment URL or Monobank dependenc
   const result = await service.createBookingSms({ propertyId: 'hotel-a', bookingId: 'BK1', phone: '0501234567', consent: true, text: 'StayAI: Ваше бронювання створено.' });
   assert.equal(result.ok, true); assert.equal(call.name, 'sms_queue_transactional'); assert.equal(call.args.p_phone, '+380501234567');
 });
+
+test('staging voice test SMS is accepted without a booking or invoice', async () => {
+  const calls = [];
+  const service = new SmsNotificationService({ supabase: { rpc: async (name, args) => { calls.push({ name, args }); if (name === 'sms_prepare_staging_test') return { data: { ok: true, notification_id: 'n-test', status: 'PROCESSING', job: { id: 'n-test', phone: '+380501234567', text: 'StayAI: Тестове SMS-повідомлення. Сервіс працює.', idempotency_key: 'test-key' } } }; return { data: null }; } }, config: { enabled: true, stagingTestEnabled: true, primary: 'turbosms', fallback: 'mobizon', turboEnabled: true, mobizonEnabled: false, turboToken: 't', estimatedSegmentCost: 0 }, providers: { turbosms: { sendPaymentLink: async () => ({ accepted: true, providerMessageId: 'm-test', status: 'ACCEPTED' }) } } });
+  const result = await service.createStagingTestSms({ propertyId: 'hotel-a', phone: '0501234567', callId: 'call-1', consent: true });
+  assert.deepEqual(result, { ok: true, status: 'ACCEPTED', notification_id: 'n-test' });
+  assert.equal(calls[0].name, 'sms_prepare_staging_test'); assert.equal(calls[0].args.p_phone, '+380501234567');
+  assert.equal(calls.some(call => call.name === 'sms_finish_outbox'), true);
+});

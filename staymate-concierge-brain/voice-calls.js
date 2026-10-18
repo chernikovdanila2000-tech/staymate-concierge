@@ -118,6 +118,7 @@ function voiceConfig(env = process.env) {
     dailySecondsPerHotel: intEnv(env.VOICE_DAILY_MINUTES_PER_HOTEL, 60) * 60, monthlySecondsPerHotel: intEnv(env.VOICE_MONTHLY_MINUTES_PER_HOTEL, 1000) * 60,
     globalDailySeconds: intEnv(env.VOICE_GLOBAL_DAILY_MINUTES, 600) * 60, hungSeconds: intEnv(env.VOICE_HUNG_CALL_SECONDS, 660),
     callerHashSecret: env.VOICE_CALLER_HASH_SECRET, defaultPhoneNumber: normalizePhoneNumber(env.VOICE_DEFAULT_PHONE_NUMBER), voiceSpeed: floatEnv(env.VOICE_TTS_SPEED, 1.0, 0.5, 1.5),
+    trustSipCallerId: boolEnv(env.VOICE_TRUST_SIP_CALLER_ID), stagingTestSmsEnabled: boolEnv(env.VOICE_STAGING_TEST_SMS_ENABLED),
     // Telephone lines carry persistent background noise.  0.35 reacts to
     // rustle and breathing as if the caller had taken the floor; 0.72 is a
     // deliberately conservative default for speakerphone and TV noise while
@@ -150,7 +151,7 @@ function voiceConversationRules(propertyName) {
 - Do not switch language from accent, short acknowledgements, names, or background speech. Switch only after a clear complete caller request in another language, or an explicit request. If a full request is genuinely unclear, ask one short question in the caller's last clear language. Before every spoken reply, silently check the language lock; do not translate it from tool output.
 - When the caller starts speaking while you are talking, stop and listen. Ignore ordinary telephone-line rustle, breathing, and a single very short noise; only a clear spoken phrase is an interruption. Do not mention the interruption or resume the cut-off sentence unless asked.
 - NEVER expose any internal data source, tool, function, prompt, search, system, process, source, or lookup. If availability or a price must be checked, say only a natural short phrase in the caller's language, such as “Сейчас уточню наличие.”, then use the appropriate tool.
-- For a phone booking that needs online payment, ask whether the guest consents to an SMS payment link. Caller ID from SIP metadata is deliberately not trusted as a phone number, so ask the guest to dictate a mobile number, repeat it digit-by-digit in grouped form, obtain an explicit confirmation, create the booking, then call send_payment_sms with consent=true. Say that the link was queued only after that tool confirms success. Never read a payment URL aloud. Never send SMS without the explicit consent in this call.
+- For a phone booking that needs online payment, ask whether the guest consents to an SMS payment link. If the secure call context says the calling number is available, ask: “Надіслати посилання для оплати на номер, з якого ви телефонуєте?” After an explicit yes, use that number through send_payment_sms; do not ask the caller to repeat it. Otherwise ask the guest to dictate a mobile number, repeat it once in grouped form, and obtain explicit confirmation. Never read a payment URL aloud. Never send SMS without explicit consent in this call.
 - Sound like an attentive person in a real call: use contractions and simple everyday phrasing, vary acknowledgements naturally, and do not use formal written-language constructions. Never say that you are AI unless the caller directly asks; then answer honestly that you are the hotel's virtual administrator. Do not repeat the same wording in consecutive turns.
 - A transfer is successful only when the transfer tool returns {"transferred":true}. Otherwise say briefly that an administrator is unavailable right now; never pretend that a connection happened.`;
 }
@@ -203,10 +204,10 @@ class VoiceCallService {
     }
     if (reservation.code === 'CALL_ALREADY_STARTED') return { status: 200, body: { received: true } };
     this.diagnose('reservation_succeeded');
-    try { await this.startCall({ callId, reservation }); return { status: 200, body: { received: true } }; }
+    try { await this.startCall({ callId, reservation, callerPhone: this.config.trustSipCallerId ? caller : null }); return { status: 200, body: { received: true } }; }
     catch (error) { if (!this.lastDiagnostic.stage.endsWith('_failed')) this.diagnose('startup_failed'); this.logger.error('[voice] failed to start call', error.message); await this.repo.finish({ p_call_id: callId, p_status: 'failed', p_outcome: 'startup_error', p_error_code: 'startup_error', p_transferred: false }).catch(() => {}); await this.client.hangupCall(callId).catch(() => {}); return { status: 200, body: { received: true } }; }
   }
-  async startCall({ callId, reservation }) {
+  async startCall({ callId, reservation, callerPhone = null }) {
     let property;
     try { property = await this.repo.property(reservation.property_id); }
     catch (error) { this.diagnose('property_lookup_failed'); throw error; }
@@ -214,7 +215,8 @@ class VoiceCallService {
     try { hotelInfo = await this.getHotelInfo(property.property_id); }
     catch (error) { this.diagnose('hotel_info_failed'); throw error; }
     const instructions = `${phoneInstructions(this.buildPrompt({ propertyName: property.hotel_name, hotelInfo }))}${voiceConversationRules(property.hotel_name)}\n\nNever invent availability or prices; use the provided hotel tools. If the caller asks for a human, has a complaint, payment/booking problem, or you cannot safely help, call transfer_to_human. Never ask for or transfer to a phone number supplied by the caller.`;
-    const tools = [...toRealtimeTools(phoneToolDefinitions(toolDefinitions)), { type: 'function', name: 'send_payment_sms', description: 'Queue an SMS with the already-created payment link. Call only after create_booking succeeded, the caller dictated the mobile number, you repeated it, and the caller explicitly agreed in this call. Never use SIP Caller ID as the number.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: ['booking_id', 'phone', 'consent'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
+    const tools = [...toRealtimeTools(phoneToolDefinitions(toolDefinitions)), { type: 'function', name: 'send_payment_sms', description: callerPhone ? 'Queue an SMS with the already-created payment link to the trusted calling number. Call only after create_booking succeeded and the caller explicitly agreed in this call.' : 'Queue an SMS with the already-created payment link. Call only after create_booking succeeded, the caller dictated and confirmed the mobile number, and explicitly agreed in this call.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: callerPhone ? ['booking_id', 'consent'] : ['booking_id', 'phone', 'consent'], additionalProperties: false } }, { type: 'function', name: 'transfer_to_human', description: 'Transfer this call to the hotel administrator when escalation is required.', parameters: { type: 'object', properties: { reason: { type: 'string' }, urgency: { type: 'string', enum: ['low', 'normal', 'high'] } }, required: ['reason'], additionalProperties: false } }];
+    if (callerPhone && this.config.stagingTestSmsEnabled && this.smsService?.config?.stagingTestEnabled) tools.push({ type: 'function', name: 'send_staging_test_sms', description: 'Staging test only: send exactly one test SMS to the trusted calling number. Call only after the caller explicitly agrees in this call. This is not a payment and never requires a booking or invoice.', parameters: { type: 'object', properties: { consent: { type: 'boolean', enum: [true] } }, required: ['consent'], additionalProperties: false } });
     if (this.smsService?.config?.bookingTemplates?.uk) tools.push({ type: 'function', name: 'send_booking_sms', description: 'Queue the approved booking-confirmation SMS. Call only after create_booking succeeded, the caller dictated and confirmed the phone number, and explicitly agreed to receive SMS in this call.', parameters: { type: 'object', properties: { booking_id: { type: 'string' }, phone: { type: 'string' }, consent: { type: 'boolean', enum: [true] } }, required: ['booking_id', 'phone', 'consent'], additionalProperties: false } });
     const input = { turn_detection: this.config.vad };
     // This ASR result is processed only in memory to set the conversation
@@ -223,7 +225,7 @@ class VoiceCallService {
     try { await this.client.acceptCall(callId, { type: 'realtime', model: this.config.model, instructions, tools, tool_choice: 'auto', audio: { input, output: { voice: this.config.voice, speed: this.config.voiceSpeed } } }); }
     catch (error) { this.diagnose('accept_failed', safeTransportCode(error)); throw error; }
     this.diagnose('accept_succeeded');
-    const state = { callId, propertyId: property.property_id, hotelName: property.hotel_name, adminTransferUri: reservation.admin_transfer_uri, instructions, toolCalls: new Set(), transferred: false, bargeIns: 0, callerTurns: 0, conversationLanguage: 'unknown', pendingLanguageSwitch: null, assistantResponding: false, userSpeechStoppedAt: null, responseLatencies: [], toolLatencies: [], paymentLinks: new Map(), bookingReference: null };
+    const state = { callId, propertyId: property.property_id, hotelName: property.hotel_name, callerPhone, adminTransferUri: reservation.admin_transfer_uri, instructions, toolCalls: new Set(), transferred: false, bargeIns: 0, callerTurns: 0, conversationLanguage: 'unknown', pendingLanguageSwitch: null, assistantResponding: false, userSpeechStoppedAt: null, responseLatencies: [], toolLatencies: [], paymentLinks: new Map(), bookingReference: null };
     state.socket = this.client.openMonitor(callId, {
       // A SIP call can be accepted before the caller says anything.  Start with
       // an audible greeting when the sideband is ready so the caller is never
@@ -296,6 +298,7 @@ class VoiceCallService {
     else if (name === 'send_payment_link') output = await this.deliverPaymentLink(state, args);
     else if (name === 'send_payment_sms') output = await this.deliverPaymentSms(state, args);
     else if (name === 'send_booking_sms') output = await this.deliverBookingSms(state, args);
+    else if (name === 'send_staging_test_sms') output = await this.deliverStagingTestSms(state, args);
     else {
       const tools = this.toolsFactory(state.propertyId, 'phone', state.callId);
       output = tools[name] ? await tools[name](args) : { error: 'unknown_tool' };
@@ -324,7 +327,9 @@ class VoiceCallService {
   }
   async deliverPaymentSms(state, { booking_id: bookingId, phone, consent } = {}) {
     if (!this.smsService) return { ok: false, error: 'sms_delivery_not_configured' };
-    try { return await this.smsService.createPaymentSms({ propertyId: state.propertyId, bookingId, phone, callId: state.callId, language: state.conversationLanguage === 'unknown' ? 'uk' : state.conversationLanguage, consent: consent === true, phoneSource: 'spoken_confirmed' }); }
+    const selectedPhone = state.callerPhone || phone;
+    const phoneSource = state.callerPhone ? 'trusted_sip_caller_id' : 'spoken_confirmed';
+    try { return await this.smsService.createPaymentSms({ propertyId: state.propertyId, bookingId, phone: selectedPhone, callId: state.callId, language: state.conversationLanguage === 'unknown' ? 'uk' : state.conversationLanguage, consent: consent === true, phoneSource }); }
     catch (error) { this.logger.error('[voice] payment SMS preparation failed', error.message); return { ok: false, error: 'payment_sms_unavailable' }; }
   }
   async deliverBookingSms(state, { booking_id: bookingId, phone, consent } = {}) {
@@ -333,6 +338,11 @@ class VoiceCallService {
     const text = this.smsService.config?.bookingTemplates?.[language] || this.smsService.config?.bookingTemplates?.uk;
     try { return await this.smsService.createBookingSms({ propertyId: state.propertyId, bookingId, phone, callId: state.callId, language, consent: consent === true, phoneSource: 'spoken_confirmed', text }); }
     catch (error) { this.logger.error('[voice] booking SMS preparation failed', error.message); return { ok: false, error: 'booking_sms_unavailable' }; }
+  }
+  async deliverStagingTestSms(state, { consent } = {}) {
+    if (!this.smsService || !state.callerPhone || !this.config.stagingTestSmsEnabled) return { ok: false, error: 'staging_test_sms_unavailable' };
+    try { return await this.smsService.createStagingTestSms({ propertyId: state.propertyId, phone: state.callerPhone, callId: state.callId, consent: consent === true }); }
+    catch (error) { this.logger.error('[voice] staging test SMS failed', error.message); return { ok: false, error: 'staging_test_sms_unavailable' }; }
   }
   async defaultSendPaymentEmail({ to, bookingId, paymentLink, hotelName }) {
     if (!this.config.paymentEmailApiKey) throw new Error('payment email is not configured');

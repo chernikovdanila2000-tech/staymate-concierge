@@ -26,7 +26,7 @@ function safeEqual(a, b) { const x = Buffer.from(String(a || '')); const y = Buf
 function statusFromDlr(status) { const v = String(status || '').toUpperCase(); if (['DELIVRD', 'DELIVERED', 'READ'].includes(v)) return 'DELIVERED'; if (['EXPIRED', 'UNDELIV', 'UNDELIVERED', 'REJECTD', 'FAILED'].includes(v)) return 'FAILED'; if (['SENT', 'ACCEPTED', 'QUEUED'].includes(v)) return v === 'SENT' ? 'SENT' : 'ACCEPTED'; return 'UNKNOWN'; }
 
 function smsConfig(env = process.env) {
-  return { enabled: bool(env.SMS_ENABLED), primary: (env.SMS_PRIMARY_PROVIDER || 'turbosms').toLowerCase(), fallback: (env.SMS_FALLBACK_PROVIDER || 'mobizon').toLowerCase(), sender: env.SMS_SENDER || '', turboToken: env.TURBOSMS_API_TOKEN || '', turboWebhookSecret: env.TURBOSMS_WEBHOOK_SECRET || '', turboEnabled: bool(env.TURBOSMS_ENABLED, true), mobizonKey: env.MOBIZON_API_KEY || '', mobizonWebhookSecret: env.MOBIZON_WEBHOOK_SECRET || '', mobizonEnabled: bool(env.MOBIZON_ENABLED, true), bookingTemplates: { uk: env.SMS_BOOKING_TEMPLATE_UK || '', ru: env.SMS_BOOKING_TEMPLATE_RU || '', en: env.SMS_BOOKING_TEMPLATE_EN || '' }, paymentBaseUrl: (env.PAYMENT_LINK_BASE_URL || '').replace(/\/$/, ''), invoiceAllowedHosts: String(env.PAYMENT_INVOICE_ALLOWED_HOSTS || 'pay.mbnk.biz,pay.monobank.ua').split(',').map(x => x.trim()).filter(Boolean), estimatedSegmentCost: Number(env.SMS_ESTIMATED_SEGMENT_COST_UAH || 0) };
+  return { enabled: bool(env.SMS_ENABLED), stagingTestEnabled: bool(env.SMS_STAGING_TEST_ENABLED), primary: (env.SMS_PRIMARY_PROVIDER || 'turbosms').toLowerCase(), fallback: (env.SMS_FALLBACK_PROVIDER || 'mobizon').toLowerCase(), sender: env.SMS_SENDER || '', turboToken: env.TURBOSMS_API_TOKEN || '', turboWebhookSecret: env.TURBOSMS_WEBHOOK_SECRET || '', turboEnabled: bool(env.TURBOSMS_ENABLED, true), mobizonKey: env.MOBIZON_API_KEY || '', mobizonWebhookSecret: env.MOBIZON_WEBHOOK_SECRET || '', mobizonEnabled: bool(env.MOBIZON_ENABLED, true), bookingTemplates: { uk: env.SMS_BOOKING_TEMPLATE_UK || '', ru: env.SMS_BOOKING_TEMPLATE_RU || '', en: env.SMS_BOOKING_TEMPLATE_EN || '' }, paymentBaseUrl: (env.PAYMENT_LINK_BASE_URL || '').replace(/\/$/, ''), invoiceAllowedHosts: String(env.PAYMENT_INVOICE_ALLOWED_HOSTS || 'pay.mbnk.biz,pay.monobank.ua').split(',').map(x => x.trim()).filter(Boolean), estimatedSegmentCost: Number(env.SMS_ESTIMATED_SEGMENT_COST_UAH || 0) };
 }
 
 class TurboSmsProvider {
@@ -52,9 +52,7 @@ class MobizonProvider {
 class SmsNotificationService {
   constructor({ supabase, config = smsConfig(), providers, logger = console }) { this.supabase = supabase; this.config = config; this.logger = logger; this.providers = providers || { turbosms: new TurboSmsProvider(config), mobizon: new MobizonProvider(config) }; }
   enabledProvider(name) { return this.config.enabled && this.config[`${name === 'turbosms' ? 'turbo' : name}Enabled`] && this.providers[name] && (name === 'turbosms' ? this.config.turboToken : this.config.mobizonKey); }
-  async processOne() {
-    if (!this.config.enabled) return { processed: false, reason: 'disabled' };
-    const { data: job, error } = await this.supabase.rpc('sms_claim_outbox'); if (error) throw error; if (!job) return { processed: false, reason: 'empty' };
+  async processClaimed(job) {
     const text = job.text; const primary = this.config.primary; const fallback = this.config.fallback;
     let provider = primary; if (!this.enabledProvider(provider) && this.enabledProvider(fallback)) provider = fallback;
     if (!this.enabledProvider(provider)) { await this.supabase.rpc('sms_finish_outbox', { p_id: job.id, p_status: 'FAILED', p_provider: null, p_provider_message_id: null, p_error: 'no_configured_provider', p_segments: 0, p_cost: 0 }); return { processed: true, status: 'FAILED' }; }
@@ -66,6 +64,11 @@ class SmsNotificationService {
     const segments = smsSegments(text).segments;
     await this.supabase.rpc('sms_finish_outbox', { p_id: job.id, p_status: result.accepted ? 'ACCEPTED' : 'FAILED', p_provider: provider, p_provider_message_id: result.providerMessageId || null, p_error: result.accepted ? null : String(result.status || 'rejected').slice(0, 500), p_segments: segments, p_cost: result.accepted ? segments * this.config.estimatedSegmentCost : 0 });
     return { processed: true, status: result.accepted ? 'ACCEPTED' : 'FAILED' };
+  }
+  async processOne() {
+    if (!this.config.enabled) return { processed: false, reason: 'disabled' };
+    const { data: job, error } = await this.supabase.rpc('sms_claim_outbox'); if (error) throw error; if (!job) return { processed: false, reason: 'empty' };
+    return this.processClaimed(job);
   }
   async createPaymentSms({ propertyId, bookingId, phone, callId, language = 'uk', consent = false, phoneSource = 'spoken_confirmed' }) {
     const normalized = normalizeSmsPhone(phone); if (!consent || !normalized) return { ok: false, error: !consent ? 'guest_consent_required' : 'valid_phone_required' };
@@ -84,6 +87,17 @@ class SmsNotificationService {
     if (!body || body.length > 459) return { ok: false, error: 'approved_sms_template_required' };
     const { data, error } = await this.supabase.rpc('sms_queue_transactional', { p_property_id: propertyId, p_booking_id: bookingId, p_phone: normalized, p_call_id: callId || null, p_language: language, p_phone_source: phoneSource, p_text: body });
     if (error) throw error; return data;
+  }
+  async createStagingTestSms({ propertyId, phone, callId, consent = false, phoneSource = 'trusted_sip_caller_id' }) {
+    const normalized = normalizeSmsPhone(phone);
+    if (!consent || !normalized) return { ok: false, error: !consent ? 'guest_consent_required' : 'valid_phone_required' };
+    if (!this.config.enabled || !this.config.stagingTestEnabled) return { ok: false, error: 'staging_test_sms_disabled' };
+    if (!callId) return { ok: false, error: 'call_context_required' };
+    const { data, error } = await this.supabase.rpc('sms_prepare_staging_test', { p_property_id: propertyId, p_phone: normalized, p_call_id: callId, p_phone_source: phoneSource });
+    if (error) throw error;
+    if (!data?.ok || !data?.job) return { ok: Boolean(data?.ok), status: data?.status || 'UNKNOWN', idempotent: Boolean(data?.idempotent) };
+    const result = await this.processClaimed(data.job);
+    return { ok: result.status === 'ACCEPTED', status: result.status, notification_id: data.notification_id };
   }
 }
 

@@ -78,6 +78,25 @@ begin
   on conflict(property_id,booking_id,notification_type,version) do update set updated_at=now() returning * into n;
   return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status);
 end $$;
+
+-- Staging voice test only.  It uses the same outbox and provider path, but a
+-- synthetic, call-scoped booking id means it can never require or affect a
+-- real booking, invoice, or Monobank payment.  The row is claimed atomically
+-- so the voice tool can truthfully report provider acceptance in this turn.
+create or replace function public.sms_prepare_staging_test(p_property_id text,p_phone text,p_call_id text,p_phone_source text)
+returns jsonb language plpgsql security definer set search_path=public as $$
+declare n public.sms_notifications%rowtype; v_booking_id text; v_text text := 'StayAI: Тестове SMS-повідомлення. Сервіс працює.';
+begin
+  if p_call_id is null or length(trim(p_call_id)) = 0 then raise exception 'call_context_required'; end if;
+  v_booking_id := 'staging-test:' || p_call_id;
+  perform pg_advisory_xact_lock(hashtext(p_property_id || ':' || v_booking_id || ':staging_test'));
+  select * into n from sms_notifications where property_id=p_property_id and booking_id=v_booking_id and notification_type='staging_test' and version=1;
+  if found then return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status,'idempotent',true); end if;
+  insert into notification_consents(property_id,booking_id,call_id,phone,phone_source) values(p_property_id,v_booking_id,p_call_id,p_phone,p_phone_source);
+  insert into sms_notifications(property_id,booking_id,notification_type,phone,text,idempotency_key,status,attempts,lease_until)
+  values(p_property_id,v_booking_id,'staging_test',p_phone,v_text,encode(digest(p_property_id||':'||v_booking_id||':staging_test:1','sha256'),'hex'),'PROCESSING',1,now()+interval '5 minutes') returning * into n;
+  return jsonb_build_object('ok',true,'notification_id',n.id,'status',n.status,'job',jsonb_build_object('id',n.id,'phone',n.phone,'text',n.text,'idempotency_key',n.idempotency_key));
+end $$;
 create or replace function public.sms_finish_outbox(p_id uuid,p_status text,p_provider text,p_provider_message_id text,p_error text,p_segments integer,p_cost numeric) returns void language plpgsql security definer set search_path=public as $$
 begin update sms_notifications set status=p_status,provider=coalesce(p_provider,provider),provider_message_id=coalesce(p_provider_message_id,provider_message_id),last_error=p_error,segment_count=nullif(p_segments,0),estimated_cost=nullif(p_cost,0),sent_at=case when p_status in ('ACCEPTED','SENT') then now() else sent_at end,lease_until=null,updated_at=now() where id=p_id and status='PROCESSING'; end $$;
 create or replace function public.sms_record_dlr(p_provider text,p_event_id text,p_provider_message_id text,p_status text,p_payload jsonb) returns boolean language plpgsql security definer set search_path=public as $$
@@ -91,5 +110,6 @@ declare n uuid; begin
 revoke all on function public.sms_prepare_payment_link(text,text,text,text,text,text,text,text[]) from public;
 revoke all on function public.sms_claim_outbox() from public;
 revoke all on function public.sms_queue_transactional(text,text,text,text,text,text,text) from public;
+revoke all on function public.sms_prepare_staging_test(text,text,text,text) from public;
 revoke all on function public.sms_finish_outbox(uuid,text,text,text,text,integer,numeric) from public;
 revoke all on function public.sms_record_dlr(text,text,text,text,jsonb) from public;
