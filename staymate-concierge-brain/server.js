@@ -77,6 +77,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { createVoiceCallService } = require('./voice-calls');
 const { VoiceTestService, hasVoiceTestAccess, testPageHtml } = require('./voice-test');
 const { SmsNotificationService, verifyTurboWebhook, verifyMobizonWebhook, statusFromDlr } = require('./sms');
+const { hasInternalTestAccess } = require('./internal-test-access');
+const { isExpectedAcquiringSuccess } = require('./payment-validation');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -397,13 +399,6 @@ async function resolveMessengerPropertyId(
     );
   }
 
-  if (
-    fallbackPropertyId &&
-    await getProperty(fallbackPropertyId)
-  ) {
-    return fallbackPropertyId;
-  }
-
   const result =
     await supabase
       .from('properties')
@@ -426,19 +421,10 @@ async function resolveMessengerPropertyId(
     return fallbackPropertyId;
   }
 
-  if (
-    !result.error &&
-    Array.isArray(result.data) &&
-    result.data.length > 0
-  ) {
-    fallbackPropertyId =
-      String(
-        result.data[0].property_id || ''
-      );
-
-    return fallbackPropertyId;
-  }
-
+  // In a multi-tenant deployment an inbound channel with no trusted
+  // page/DID/channel mapping must be rejected, never guessed from the first
+  // property.  The one-property convenience fallback above remains only for
+  // an explicitly unambiguous legacy deployment.
   return '';
 }
 
@@ -1163,7 +1149,18 @@ const server =
           // Only Monobank's signed terminal success event may transition this
           // exact invoice from pending to paid. SMS delivery can never do so.
           if (event.status === 'success') {
-            const { error } = await supabase.from('bookings').update({ status: 'paid' }).eq('booking_id', String(event.reference)).eq('payment_method', 'monobank_acquiring').eq('payment_reference', String(event.invoiceId)).eq('status', 'pending_payment');
+            const { data: booking, error: bookingError } = await supabase
+              .from('bookings')
+              .select('property_id,booking_id,total_price,payment_reference,status')
+              .eq('booking_id', String(event.reference))
+              .eq('payment_method', 'monobank_acquiring')
+              .eq('payment_reference', String(event.invoiceId))
+              .maybeSingle();
+            if (bookingError) throw bookingError;
+            // Unknown, stale, repeated, cross-merchant, partial, or wrong-
+            // currency events are acknowledged but can never affect a row.
+            if (!booking || !isExpectedAcquiringSuccess(event, booking)) return sendJson(res, 200, { received: true, matched: false });
+            const { error } = await supabase.from('bookings').update({ status: 'paid' }).eq('property_id', booking.property_id).eq('booking_id', booking.booking_id).eq('payment_method', 'monobank_acquiring').eq('payment_reference', String(event.invoiceId)).eq('status', 'pending_payment');
             if (error) throw error;
           }
           return sendJson(res, 200, { received: true });
@@ -2056,6 +2053,9 @@ const server =
         req.method === 'POST' &&
         req.url === '/chat'
       ) {
+        if (!hasInternalTestAccess(req.headers)) {
+          return sendJson(res, 404, { error: 'not_found' });
+        }
         readBody(req).then(
           async body => {
             let parsed;
