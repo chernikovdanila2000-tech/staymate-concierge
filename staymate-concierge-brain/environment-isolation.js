@@ -23,16 +23,27 @@ function projectRefFromDatabaseUrl(value) {
     const url = new URL(String(value || ''));
     const host = url.hostname.toLowerCase();
     const direct = host.match(/^db\.([a-z0-9-]+)\.supabase\.co$/);
-    if (direct) return direct[1];
+    // Only accept the documented Supabase pooler host form.  A value in a
+    // URL username or query string is not evidence of its database identity
+    // when the host is arbitrary.
+    const pooler = /^aws-\d+-[a-z0-9-]+\.pooler\.supabase\.com$/.test(host);
+    if (!direct && !pooler) return '';
 
-    // Supabase pooler hosts do not include the project ref, but its required
-    // username and/or the `options=project=<ref>` connection parameter do.
+    // Direct hosts carry the ref in the hostname. Pooler hosts carry it in
+    // their documented `postgres.<project-ref>` username and/or in the
+    // `options=project=<project-ref>` parameter. Every available claim must
+    // agree; this fails closed on a forged or contradictory connection URL.
     const username = decodeURIComponent(url.username || '');
-    const userMatch = username.match(/(?:^|\.)([a-z0-9-]{6,})$/i);
-    if (host.endsWith('.pooler.supabase.com') && userMatch) return userMatch[1].toLowerCase();
+    const userMatch = username.match(/^postgres\.([a-z0-9-]{6,})$/i);
     const options = decodeURIComponent(url.searchParams.get('options') || '');
-    const optionMatch = options.match(/(?:^|\s)project=([a-z0-9-]+)/i);
-    return optionMatch ? optionMatch[1].toLowerCase() : projectRefFromSupabaseUrl(value);
+    const optionMatch = options.match(/(?:^|\s)project=([a-z0-9-]{6,})(?=\s|$)/i);
+    const claims = [
+      direct?.[1],
+      userMatch?.[1],
+      optionMatch?.[1],
+    ].filter(Boolean).map((claim) => claim.toLowerCase());
+    if (!claims.length || new Set(claims).size !== 1) return '';
+    return claims[0];
   } catch { return ''; }
 }
 

@@ -19,6 +19,11 @@ test('extracts only a Supabase project reference from a URL', () => {
   assert.equal(projectRefFromSupabaseUrl('postgres://x'), '');
   assert.equal(projectRefFromDatabaseUrl('postgresql://postgres:pw@db.stage-ref.supabase.co:5432/postgres'), 'stage-ref');
   assert.equal(projectRefFromDatabaseUrl('postgresql://postgres.stage-ref:pw@aws-0-eu-west-1.pooler.supabase.com:6543/postgres'), 'stage-ref');
+  assert.equal(projectRefFromDatabaseUrl('postgresql://postgres:pw@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?options=project%3Dstage-ref'), 'stage-ref');
+  assert.equal(projectRefFromDatabaseUrl('postgresql://postgres:pw@evil.example.com/postgres?options=project%3Dstage-ref'), '');
+  assert.equal(projectRefFromDatabaseUrl('postgresql://postgres.stage-ref:pw@pooler.supabase.com:6543/postgres'), '');
+  assert.equal(projectRefFromDatabaseUrl('postgresql://postgres.stage-ref:pw@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?options=project%3Dprod-ref'), '');
+  assert.equal(projectRefFromDatabaseUrl('postgresql://postgres.prod-ref:pw@db.stage-ref.supabase.co:5432/postgres'), '');
 });
 test('staging isolation fails closed for missing or shared project refs', () => {
   assert.throws(() => assertStagingIsolation({ REQUIRE_STAGING_DB_ISOLATION: 'true', SUPABASE_URL: 'https://same.supabase.co' }), /unconfirmed/);

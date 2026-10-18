@@ -51,11 +51,18 @@ create or replace function public.payment_record_monobank_event(
  p_currency integer, p_final_amount_kopecks bigint, p_occurred_at timestamptz,
  p_payload_hash text
 ) returns jsonb language plpgsql security definer set search_path=public as $$
-declare b public.bookings%rowtype; v_outcome text := 'ignored'; v_expected bigint;
+declare b public.bookings%rowtype; v_outcome text := 'ignored'; v_expected bigint; v_updated integer := 0;
 begin
  if p_source not in ('webhook','reconciliation') or p_event_key is null or p_payload_hash is null then
    raise exception 'invalid_payment_event';
  end if;
+ -- Reserve the ledger key before any booking side effect. A concurrent or
+ -- retried webhook then becomes a harmless duplicate even when it arrives
+ -- while the first worker is still waiting for the booking row lock.
+ insert into public.payment_events(event_key,provider,source,property_id,booking_id,merchant_id,invoice_id,status,amount_kopecks,currency,final_amount_kopecks,occurred_at,payload_hash,outcome)
+ values(p_event_key,'monobank_acquiring',p_source,p_property_id,p_booking_id,p_merchant_id,p_invoice_id,p_status,p_amount_kopecks,p_currency,p_final_amount_kopecks,p_occurred_at,p_payload_hash,'processing')
+ on conflict(event_key) do nothing;
+ if not found then return jsonb_build_object('duplicate',true,'outcome','duplicate'); end if;
  select * into b from public.bookings where property_id=p_property_id and booking_id=p_booking_id
    and payment_method='monobank_acquiring' and payment_merchant_id=p_merchant_id
    and payment_reference=p_invoice_id for update;
@@ -65,21 +72,35 @@ begin
       and (p_final_amount_kopecks is null or p_final_amount_kopecks=v_expected) then
      if b.payment_state='PAID' then v_outcome := 'already_paid';
      elsif b.hold_expires_at is not null and b.hold_expires_at < now() then
-       update public.bookings set payment_state='REQUIRES_REVIEW' where property_id=p_property_id and booking_id=p_booking_id;
+       update public.bookings set payment_state='REQUIRES_REVIEW'
+        where property_id=p_property_id and booking_id=p_booking_id and payment_state <> 'PAID';
+       v_outcome := 'requires_review';
+     elsif b.status <> 'pending_payment' or b.payment_state <> 'PENDING' then
+       -- A success for a released, cancelled, expired or otherwise changed
+       -- hold must never settle the room automatically.
+       update public.bookings set payment_state='REQUIRES_REVIEW'
+        where property_id=p_property_id and booking_id=p_booking_id and payment_state <> 'PAID';
        v_outcome := 'requires_review';
      else
-       update public.bookings set status='paid', payment_state='PAID' where property_id=p_property_id and booking_id=p_booking_id and status='pending_payment';
-       v_outcome := 'paid';
+       update public.bookings set status='paid', payment_state='PAID'
+        where property_id=p_property_id and booking_id=p_booking_id
+          and status='pending_payment' and payment_state='PENDING'
+          and (hold_expires_at is null or hold_expires_at >= now());
+       get diagnostics v_updated = row_count;
+       if v_updated=1 then
+         v_outcome := 'paid';
+       else
+         update public.bookings set payment_state='REQUIRES_REVIEW'
+          where property_id=p_property_id and booking_id=p_booking_id and payment_state <> 'PAID';
+         v_outcome := 'requires_review';
+       end if;
      end if;
    elsif p_status in ('expired','failure','reversed') and b.payment_state='PENDING' then
      update public.bookings set payment_state=upper(p_status) where property_id=p_property_id and booking_id=p_booking_id;
      v_outcome := 'terminal_nonpayment';
    else v_outcome := 'unmatched_or_nonterminal'; end if;
  else v_outcome := 'booking_mismatch'; end if;
- insert into public.payment_events(event_key,provider,source,property_id,booking_id,merchant_id,invoice_id,status,amount_kopecks,currency,final_amount_kopecks,occurred_at,payload_hash,outcome)
- values(p_event_key,'monobank_acquiring',p_source,p_property_id,p_booking_id,p_merchant_id,p_invoice_id,p_status,p_amount_kopecks,p_currency,p_final_amount_kopecks,p_occurred_at,p_payload_hash,v_outcome)
- on conflict(event_key) do nothing;
- if not found then return jsonb_build_object('duplicate',true,'outcome','duplicate'); end if;
+ update public.payment_events set outcome=v_outcome where event_key=p_event_key;
  return jsonb_build_object('duplicate',false,'outcome',v_outcome);
 end $$;
 
@@ -92,7 +113,9 @@ declare n integer;
 begin
  update public.bookings set payment_merchant_id=p_merchant_id, payment_currency=980
   where property_id=p_property_id and booking_id=p_booking_id and status='pending_payment'
-    and payment_method='monobank_acquiring' and payment_reference is null
+    and payment_state='PENDING' and payment_method='monobank_acquiring' and payment_reference is null
+    and (hold_expires_at is null or hold_expires_at >= now())
+    and p_merchant_id=('mono:' || p_property_id)
     and (payment_merchant_id is null or payment_merchant_id=p_merchant_id);
  get diagnostics n = row_count; return n=1;
 end $$;
@@ -106,8 +129,9 @@ begin
  update public.bookings set payment_reference=p_invoice_id,payment_link=p_payment_link,
    invoice_expires_at=hold_expires_at,payment_state='PENDING'
   where property_id=p_property_id and booking_id=p_booking_id and status='pending_payment'
-    and payment_method='monobank_acquiring' and payment_reference is null
-    and payment_merchant_id is not null;
+    and payment_state='PENDING' and payment_method='monobank_acquiring' and payment_reference is null
+    and (hold_expires_at is null or hold_expires_at >= now())
+    and payment_merchant_id=('mono:' || p_property_id);
  get diagnostics v_updated = row_count; return v_updated=1;
 end $$;
 revoke all on public.payment_merchants, public.payment_events from public, anon, authenticated;

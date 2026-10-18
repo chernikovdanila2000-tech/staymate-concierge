@@ -6,9 +6,11 @@ const { eventKey, payloadHash, recordMonobankEvent } = require('../payment-ledge
 const event = { invoiceId: 'inv-a', reference: 'BK-A', status: 'success', amount: 10000, finalAmount: 10000, ccy: 980, modifiedDate: '2026-10-18T10:00:00Z' };
 
 test('payment event key is stable for a webhook retransmission and differs for a state change', () => {
-  assert.equal(eventKey(event), eventKey({ ...event }));
-  assert.equal(eventKey(event), eventKey({ ...event, modifiedDate: '2026-10-18T10:01:00Z' }));
-  assert.notEqual(eventKey(event), eventKey({ ...event, status: 'failure' }));
+  const scoped = { ...event, propertyId: 'hotel-a', merchantId: 'mono:hotel-a' };
+  assert.equal(eventKey(scoped), eventKey({ ...scoped }));
+  assert.equal(eventKey(scoped), eventKey({ ...scoped, modifiedDate: '2026-10-18T10:01:00Z' }));
+  assert.notEqual(eventKey(scoped), eventKey({ ...scoped, status: 'failure' }));
+  assert.notEqual(eventKey(scoped), eventKey({ ...scoped, propertyId: 'hotel-b', merchantId: 'mono:hotel-b' }));
   assert.equal(payloadHash('one'), payloadHash('one'));
 });
 
@@ -29,4 +31,5 @@ test('ledger RPC receives the exact tenant, merchant and invoice binding', async
   assert.equal(call.args.p_merchant_id, 'mono:hotel-a');
   assert.equal(call.args.p_invoice_id, 'inv-a');
   assert.equal(call.args.p_source, 'webhook');
+  assert.equal(call.args.p_event_key, eventKey({ ...event, propertyId: 'hotel-a', merchantId: 'mono:hotel-a' }));
 });
