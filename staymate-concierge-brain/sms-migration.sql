@@ -110,6 +110,6 @@ declare n uuid; begin
 revoke all on function public.sms_prepare_payment_link(text,text,text,text,text,text,text,text[]) from public;
 revoke all on function public.sms_claim_outbox() from public;
 revoke all on function public.sms_queue_transactional(text,text,text,text,text,text,text) from public;
-revoke all on function public.sms_prepare_staging_test(text,text,text,text) from public;
+revoke all on function public.sms_prepare_staging_test(text,text,text,text) from public, anon, authenticated;
 revoke all on function public.sms_finish_outbox(uuid,text,text,text,text,integer,numeric) from public;
 revoke all on function public.sms_record_dlr(text,text,text,text,jsonb) from public;
