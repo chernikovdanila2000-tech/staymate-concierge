@@ -150,9 +150,11 @@ test('starts an audible greeting only after the sideband is connected', async ()
   await service.handleWebhook('{}', {});
   assert.equal(sent.length, 0);
   sidebandOptions.onOpen();
+  sidebandOptions.onOpen();
   assert.equal(sent.length, 1);
   assert.equal(sent[0].type, 'response.create');
   assert.match(sent[0].response.instructions, /Hotel A/);
+  assert.match(sent[0].response.instructions, /Вітаю! Ви зателефонували/);
   assert.equal(service.health().diagnostic.stage, 'greeting_requested');
 });
 

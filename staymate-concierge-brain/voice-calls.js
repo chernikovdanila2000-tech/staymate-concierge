@@ -231,10 +231,11 @@ class VoiceCallService {
       // an audible greeting when the sideband is ready so the caller is never
       // left in silence waiting for the first VAD turn.
       onOpen: () => {
-        if (state.finished || !state.socket || state.socket.readyState !== state.socket.OPEN) return;
+        if (state.finished || state.greetingRequested || !state.socket || state.socket.readyState !== state.socket.OPEN) return;
+        state.greetingRequested = true;
         this.logger.info?.('[voice] sideband connected; starting greeting', callId);
         this.diagnose('sideband_connected');
-        state.socket.send(JSON.stringify({ type: 'response.create', response: { instructions: `Say exactly one short Ukrainian greeting: “Добрий день! Готель ${property.hotel_name}, слухаю вас”. Then wait silently for the caller. Do not call yourself virtual unless the caller asks who is speaking.` } }));
+        state.socket.send(JSON.stringify({ type: 'response.create', response: { instructions: `Say exactly one short Ukrainian greeting: “Вітаю! Ви зателефонували до ${property.hotel_name}. Чим можу допомогти?” Then wait silently for the caller. Do not call yourself virtual unless the caller asks who is speaking.` } }));
         this.diagnose('greeting_requested');
       },
       onEvent: event => this.onEvent(state, event),
