@@ -11,6 +11,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 const { createMonobankInvoice } = require('./monobank');
+const { getMonobankMerchant } = require('./merchant-credentials');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -25,7 +26,7 @@ const WFP_API_URL = 'https://api.wayforpay.com/api';
 // Публічний домен САМОГО СЕРВЕРА (Railway) — сюди WayForPay надсилає webhook
 // про оплату. Це НЕ маркетинговий сайт (Netlify) — там цього роуту немає.
 const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:3000';
-const MONOBANK_ACQUIRING_TOKEN = process.env.MONOBANK_ACQUIRING_TOKEN || '';
+const MONOBANK_SINGLE_TENANT_PILOT = process.env.MONOBANK_SINGLE_TENANT_PILOT === 'true';
 
 function nightsBetween(checkIn, checkOut) {
   const ms = new Date(checkOut) - new Date(checkIn);
@@ -172,7 +173,10 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
  * Схема інструментів (toolDefinitions) однакова для всіх готелів — Claude API
  * не потребує per-tenant версії схеми, тільки реалізація (виконання) різниться.
  */
-function createTools(propertyId, channel, chatId) {
+function createTools(propertyId, channel, chatId, dependencies = {}) {
+  const db = dependencies.supabase || supabase;
+  const createInvoice = dependencies.createMonobankInvoice || createMonobankInvoice;
+  const resolveMerchant = dependencies.resolveMerchant || ((id) => getMonobankMerchant(db, id, { allowSingleTenantFallback: MONOBANK_SINGLE_TENANT_PILOT }));
   async function checkAvailability({ check_in, check_out, guests } = {}) {
     if ((check_in || check_out) && !validStayDates(check_in, check_out)) {
       return { ok: false, code: 'invalid_stay_dates', available_rooms: [] };
@@ -181,7 +185,7 @@ function createTools(propertyId, channel, chatId) {
     if (guestCount != null && (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 20)) {
       return { ok: false, code: 'invalid_guest_count', available_rooms: [] };
     }
-    let query = supabase
+    let query = db
       .from('rooms')
       .select('room_type, price_per_night, capacity, description, quantity')
       .eq('property_id', propertyId)
@@ -214,7 +218,7 @@ function createTools(propertyId, channel, chatId) {
 
     // Dates are present: these independent reads run concurrently to remove
     // one network wait from the phone path.
-    const bookingsQuery = supabase
+    const bookingsQuery = db
       .from('bookings')
       .select('room_type,status,hold_expires_at')
       .eq('property_id', propertyId)
@@ -266,12 +270,17 @@ function createTools(propertyId, channel, chatId) {
     if (!validStayDates(check_in, check_out) || !room_type || !String(guest_name || '').trim() || !String(guest_contact || '').trim()) {
       return { ok: false, code: 'booking_details_required' };
     }
-    // Avoid creating a hold that cannot be paid.  A missing merchant token is
-    // configuration state, not a reason to create an orphan reservation.
-    if (!MONOBANK_ACQUIRING_TOKEN) return { ok: false, code: 'payment_unavailable' };
+    // A merchant is selected server-side by property. Never accept a merchant
+    // ID/token from a voice tool or reuse an unrelated hotel's token.
+    let merchant;
+    try { merchant = await resolveMerchant(propertyId); } catch (error) {
+      console.error('[createBooking] merchant lookup failed:', error.message);
+      return { ok: false, code: 'payment_unavailable' };
+    }
+    if (!merchant) return { ok: false, code: 'payment_unavailable' };
     const requestKey = bookingRequestKey({ propertyId, channel, chatId, roomType: room_type, checkIn: check_in, checkOut: check_out, guestName: guest_name, guestContact: guest_contact });
     const bookingId = `BK${requestKey.slice(0, 10).toUpperCase()}`;
-    const { data: hold, error: holdError } = await supabase.rpc('booking_prepare_monobank_hold', {
+    const { data: hold, error: holdError } = await db.rpc('booking_prepare_monobank_hold', {
       p_property_id: propertyId, p_booking_id: bookingId, p_request_key: requestKey, p_room_type: room_type,
       p_check_in: check_in, p_check_out: check_out, p_guest_name: guest_name, p_guest_contact: guest_contact, p_hold_minutes: 15,
     });
@@ -287,14 +296,22 @@ function createTools(propertyId, channel, chatId) {
       return { ok: false, code: 'payment_invoice_pending' };
     }
 
+    const { data: bound, error: bindError } = await db.rpc('booking_bind_monobank_merchant', {
+      p_property_id: propertyId, p_booking_id: bookingId, p_merchant_id: merchant.merchant_id,
+    });
+    if (bindError || !bound) {
+      console.error('[createBooking] merchant binding failed:', bindError?.message || 'not_bound');
+      return { ok: false, code: 'payment_unavailable' };
+    }
+
     // Guest reservations use Monobank acquiring only. No direct card/IBAN
     // transfer and no WayForPay fallback is permitted for this path.
     let paymentLink; let paymentReference;
     try {
-      const invoice = await createMonobankInvoice(MONOBANK_ACQUIRING_TOKEN, {
+      const invoice = await createInvoice(merchant.token, {
         amountKopecks: Math.round(Number(hold.booking.total_price) * 100), reference: bookingId,
         destination: `${hold.booking.room_type} — ${check_in} — ${check_out}`,
-        webHookUrl: `${API_BASE_URL}/webhook/monobank/acquiring`, redirectUrl: process.env.MONOBANK_PAYMENT_RETURN_URL || `${API_BASE_URL}/payment/result`, validitySeconds: 86400,
+        webHookUrl: `${API_BASE_URL}/webhook/monobank/acquiring`, redirectUrl: process.env.MONOBANK_PAYMENT_RETURN_URL || `${API_BASE_URL}/payment/result`, validitySeconds: 15 * 60,
       });
       paymentLink = invoice.pageUrl; paymentReference = invoice.invoiceId;
     } catch (monoError) {
@@ -303,7 +320,7 @@ function createTools(propertyId, channel, chatId) {
       // have been created despite a network timeout. The hold expires shortly.
       return { ok: false, code: 'payment_invoice_unavailable' };
     }
-    const { data: attached, error: attachError } = await supabase.rpc('booking_attach_monobank_invoice', {
+    const { data: attached, error: attachError } = await db.rpc('booking_attach_monobank_invoice', {
       p_property_id: propertyId, p_booking_id: bookingId, p_invoice_id: paymentReference, p_payment_link: paymentLink,
     });
     if (attachError || !attached) {
@@ -316,7 +333,7 @@ function createTools(propertyId, channel, chatId) {
   async function escalateToHuman({ reason, urgency }) {
     console.log(`[ESCALATION ${propertyId}${urgency ? ' - ' + urgency : ''}] ${reason}`);
 
-    const { error } = await supabase
+    const { error } = await db
       .from('escalations')
       .insert({
         property_id: propertyId,

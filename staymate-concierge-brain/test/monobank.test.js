@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, verifyMonobankAcquiringSignature } = require('../monobank');
+const { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, getMonobankInvoiceStatus, verifyMonobankAcquiringSignature } = require('../monobank');
 const crypto = require('crypto');
 
 function fakeFetch(responses) {
@@ -107,6 +107,17 @@ test('createMonobankInvoice uses the acquiring endpoint and only accepts Mono pa
   assert.equal(request.url, 'https://api.monobank.ua/api/merchant/invoice/create');
   assert.equal(request.options.headers['X-Token'], 'merchant-token');
   assert.equal(JSON.parse(request.options.body).amount, 12345);
+  assert.equal(JSON.parse(request.options.body).validity, 86400);
+});
+
+test('getMonobankInvoiceStatus uses the official merchant invoice status endpoint', async () => {
+  let requested;
+  const status = await getMonobankInvoiceStatus('merchant-token', 'inv / 1', { fetchImpl: async (url, options) => {
+    requested = { url, options }; return { ok: true, status: 200, json: async () => ({ invoiceId: 'inv / 1', status: 'success' }) };
+  } });
+  assert.equal(status.status, 'success');
+  assert.match(requested.url, /invoiceId=inv%20%2F%201/);
+  assert.equal(requested.options.headers['X-Token'], 'merchant-token');
 });
 
 test('verifies acquiring webhook body with ECDSA X-Sign', () => {

@@ -51,6 +51,8 @@ const {
   getMonobankMerchantPublicKey,
   verifyMonobankAcquiringSignature,
 } = require('./monobank');
+const { getMonobankMerchant } = require('./merchant-credentials');
+const { recordMonobankEvent, reconcileMonobankInvoices } = require('./payment-ledger');
 const {
   createSubscriptionInvoice,
   cancelRegularPayment,
@@ -168,9 +170,8 @@ const META_WHATSAPP_PROPERTY_ID =
   process.env.META_WHATSAPP_PROPERTY_ID || '';
 
 const PORT = process.env.PORT || 3000;
-const MONOBANK_ACQUIRING_TOKEN = process.env.MONOBANK_ACQUIRING_TOKEN || '';
-let monobankMerchantPublicKey = null;
-let monobankMerchantPublicKeyAt = 0;
+const MONOBANK_SINGLE_TENANT_PILOT = process.env.MONOBANK_SINGLE_TENANT_PILOT === 'true';
+const monobankMerchantPublicKeys = new Map();
 
 const propertyCache = new Map();
 const PROPERTY_CACHE_TTL_MS = 60 * 1000;
@@ -1139,31 +1140,28 @@ const server =
 
       if (req.method === 'POST' && requestUrl.pathname === '/webhook/monobank/acquiring') {
         readBody(req).then(async rawBody => {
-          if (!MONOBANK_ACQUIRING_TOKEN) return sendJson(res, 503, { error: 'monobank_acquiring_not_configured' });
-          if (!monobankMerchantPublicKey || Date.now() - monobankMerchantPublicKeyAt > 6 * 60 * 60 * 1000) {
-            monobankMerchantPublicKey = await getMonobankMerchantPublicKey(MONOBANK_ACQUIRING_TOKEN); monobankMerchantPublicKeyAt = Date.now();
-          }
-          if (!verifyMonobankAcquiringSignature(rawBody, req.headers['x-sign'], monobankMerchantPublicKey)) return sendJson(res, 403, { error: 'invalid_monobank_signature' });
           const event = JSON.parse(rawBody);
           if (!event.invoiceId || !event.reference) return sendJson(res, 400, { error: 'invalid_monobank_event' });
-          // Only Monobank's signed terminal success event may transition this
-          // exact invoice from pending to paid. SMS delivery can never do so.
-          if (event.status === 'success') {
-            const { data: booking, error: bookingError } = await supabase
-              .from('bookings')
-              .select('property_id,booking_id,total_price,payment_reference,status')
-              .eq('booking_id', String(event.reference))
-              .eq('payment_method', 'monobank_acquiring')
-              .eq('payment_reference', String(event.invoiceId))
-              .maybeSingle();
-            if (bookingError) throw bookingError;
-            // Unknown, stale, repeated, cross-merchant, partial, or wrong-
-            // currency events are acknowledged but can never affect a row.
-            if (!booking || !isExpectedAcquiringSuccess(event, booking)) return sendJson(res, 200, { received: true, matched: false });
-            const { error } = await supabase.from('bookings').update({ status: 'paid' }).eq('property_id', booking.property_id).eq('booking_id', booking.booking_id).eq('payment_method', 'monobank_acquiring').eq('payment_reference', String(event.invoiceId)).eq('status', 'pending_payment');
-            if (error) throw error;
-          }
-          return sendJson(res, 200, { received: true });
+          // Parsing is only used to locate the already-bound merchant. It has
+          // no side effect until that merchant's signature validates.
+          const { data: booking, error: bookingError } = await supabase
+            .from('bookings').select('property_id,booking_id,total_price,payment_reference,status,payment_merchant_id')
+            .eq('booking_id', String(event.reference)).eq('payment_method', 'monobank_acquiring')
+            .eq('payment_reference', String(event.invoiceId)).maybeSingle();
+          if (bookingError) throw bookingError;
+          if (!booking?.payment_merchant_id) return sendJson(res, 200, { received: true, matched: false });
+          const merchant = await getMonobankMerchant(supabase, booking.property_id, { allowSingleTenantFallback: MONOBANK_SINGLE_TENANT_PILOT });
+          if (!merchant || merchant.merchant_id !== booking.payment_merchant_id) return sendJson(res, 200, { received: true, matched: false });
+          const cached = monobankMerchantPublicKeys.get(merchant.merchant_id);
+          const key = cached && Date.now() - cached.at < 6 * 60 * 60 * 1000
+            ? cached.key : await getMonobankMerchantPublicKey(merchant.token);
+          if (!cached || key !== cached.key) monobankMerchantPublicKeys.set(merchant.merchant_id, { key, at: Date.now() });
+          if (!verifyMonobankAcquiringSignature(rawBody, req.headers['x-sign'], key)) return sendJson(res, 403, { error: 'invalid_monobank_signature' });
+          // Fast validation stays explicit; durable idempotency and transitions
+          // are delegated to the ledger transaction.
+          if (!isExpectedAcquiringSuccess(event, booking) && event.status === 'success') return sendJson(res, 200, { received: true, matched: false });
+          const result = await recordMonobankEvent(supabase, booking, event, { source: 'webhook', rawBody });
+          return sendJson(res, 200, { received: true, outcome: result?.outcome || 'recorded' });
         }).catch(error => { console.error('[monobank acquiring] webhook failed:', error.message); sendJson(res, 500, { error: 'monobank_webhook_failed' }); });
         return;
       }
@@ -4085,6 +4083,8 @@ const server =
 // бронь через WayForPay підтверджується своїм вебхуком, цього циклу не
 // стосується.
 const MONOBANK_CHECK_INTERVAL_MS = 2 * 60 * 1000; // безпечний запас понад ліміт Monobank — 1 запит/60с на токен
+const MONOBANK_ACQUIRING_RECONCILIATION_ENABLED = process.env.MONOBANK_ACQUIRING_RECONCILIATION_ENABLED === 'true';
+const MONOBANK_ACQUIRING_RECONCILIATION_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.MONOBANK_ACQUIRING_RECONCILIATION_INTERVAL_MS) || 5 * 60 * 1000);
 
 async function checkMonobankPaymentsForProperty(propertyId, token) {
   const { data: pending, error } = await supabase
@@ -4152,6 +4152,16 @@ async function runMonobankPaymentChecks() {
   }
 }
 
+async function runMonobankAcquiringReconciliation() {
+  if (!MONOBANK_ACQUIRING_RECONCILIATION_ENABLED) return { disabled: true };
+  return reconcileMonobankInvoices({
+    supabase,
+    resolveMerchant: (propertyId) => getMonobankMerchant(supabase, propertyId, { allowSingleTenantFallback: MONOBANK_SINGLE_TENANT_PILOT }),
+    limit: Math.max(1, Math.min(100, Number(process.env.MONOBANK_ACQUIRING_RECONCILIATION_BATCH_SIZE) || 20)),
+    logger: console,
+  });
+}
+
 server.listen(
   PORT,
   () => {
@@ -4164,6 +4174,15 @@ server.listen(
         console.error('[monobank] payment check cycle failed:', error.message);
       });
     }, MONOBANK_CHECK_INTERVAL_MS);
+
+    if (MONOBANK_ACQUIRING_RECONCILIATION_ENABLED) {
+      setInterval(() => {
+        runMonobankAcquiringReconciliation().catch((error) => {
+          console.error('[monobank acquiring] reconciliation cycle failed:', error.message);
+        });
+      }, MONOBANK_ACQUIRING_RECONCILIATION_INTERVAL_MS);
+      runMonobankAcquiringReconciliation().catch((error) => console.error('[monobank acquiring] initial reconciliation failed:', error.message));
+    }
 
     // A lease in Postgres makes this safe with multiple Railway instances and
     // recovers abandoned work after a restart.  The worker never retries an

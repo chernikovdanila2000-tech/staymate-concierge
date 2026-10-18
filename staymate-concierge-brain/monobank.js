@@ -99,6 +99,15 @@ async function getMonobankMerchantPublicKey(token, { fetchImpl = globalThis.fetc
   return decoded.includes('BEGIN PUBLIC KEY') ? decoded : data.key;
 }
 
+async function getMonobankInvoiceStatus(token, invoiceId, { fetchImpl = globalThis.fetch } = {}) {
+  if (!token || !invoiceId) throw new Error('Merchant token and invoice ID are required.');
+  const url = `${MONOBANK_API_URL}/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoiceId)}`;
+  const response = await fetchImpl(url, { headers: { 'X-Token': token } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.invoiceId) throw new Error(`Monobank invoice status failed (HTTP ${response.status}).`);
+  return data;
+}
+
 function verifyMonobankAcquiringSignature(rawBody, xSign, publicKey) {
   if (!rawBody || !xSign || !publicKey) return false;
   try {
@@ -107,4 +116,4 @@ function verifyMonobankAcquiringSignature(rawBody, xSign, publicKey) {
   } catch { return false; }
 }
 
-module.exports = { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, getMonobankMerchantPublicKey, verifyMonobankAcquiringSignature };
+module.exports = { verifyMonobankToken, fetchMonobankStatement, findMatchingTransaction, createMonobankInvoice, getMonobankMerchantPublicKey, getMonobankInvoiceStatus, verifyMonobankAcquiringSignature };
