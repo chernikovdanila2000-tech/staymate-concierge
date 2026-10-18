@@ -14,5 +14,15 @@ Each tenant needs a separate merchant configuration and signing-key lookup. A we
 
 ## Cost model status
 
-No numerical 10/100-hotel cost forecast is included because account plans, per-minute Realtime pricing/limits, Zadarma tariff/line allowance, Railway plan, Supabase plan, TurboSMS rate and Monobank contract fees have not been verified from the relevant accounts. The existing observed TurboSMS test was 1.29 UAH for one segment; it is not a general commercial tariff or forecast. Collect current provider quotes before pricing the SaaS.
+Verified public inputs as of the audit date:
+
+- The deployed `gpt-realtime-2.1-mini` list price is USD 10 / 1M audio input tokens and USD 20 / 1M audio output tokens; actual billable usage must be taken from the OpenAI account, because a reliable audio-token-per-minute assumption was not available in this audit. [Official pricing](https://developers.openai.com/api/docs/pricing?wvideo=akzb57a5z3)
+- Zadarma publishes plan/line options, but the actual number allowance and tariff of the test number must be read from its account. Public documentation for external lines describes 1 inbound channel on Standard, 2 on Office and 4 on Corporation, with optional 3/3 and 10/10 channel add-ons; this does **not** prove the test DID's entitlement. [Zadarma guidance](https://zadarma.com/ua/support/faq/virtual-numbers/can-i-use-my-old-number/)
+- TurboSMS tariffs can change; the provider directs customers to its current price list and contract terms. The historical observed staging SMS cost was 1.29 UAH/segment, not a pricing assumption. [TurboSMS terms](https://turbosms.ua/en/guide.html)
+
+Use this forecast spreadsheet formula after collecting the missing account facts:
+
+`monthly_cost = fixed_platform + hotels × (DID + merchant/PMS overhead) + calls × (OpenAI_audio_in_tokens/1e6×10 USD + OpenAI_audio_out_tokens/1e6×20 USD + Zadarma_minutes) + SMS_segments × current_TurboSMS_rate + acquiring_fees`
+
+For 1, 10 and 100 hotels, substitute each cohort's observed `calls`, mean call audio tokens, SMS segments and subscribed carrier lines. Do not use a numerical forecast until those values and Monobank contract fees are confirmed; doing so would manufacture a margin figure.
 
