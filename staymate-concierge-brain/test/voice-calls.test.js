@@ -76,6 +76,13 @@ test('removes catalogue terminology from phone prompts, tool descriptions, and a
   });
 });
 
+test('trusted callers need not repeat a contact number to create a booking', () => {
+  const tools = phoneToolDefinitions([{ name: 'create_booking', description: 'book', input_schema: { type: 'object', required: ['room_type', 'check_in', 'check_out', 'guest_name', 'guest_contact'] } }], { callerPhone: true });
+  assert.deepEqual(tools[0].input_schema.required, ['room_type', 'check_in', 'check_out', 'guest_name']);
+  assert.match(tools[0].description, /server/i);
+  assert.match(voiceConversationRules('Hotel A'), /fast, linear telephone flow/i);
+});
+
 test('classifies a failed OpenAI request without publishing its message', () => {
   assert.equal(safeTransportCode({ cause: { code: 'ENOTFOUND' } }), 'dns_failed');
   assert.equal(safeTransportCode({ status: 401 }), 'http_401');
@@ -156,6 +163,15 @@ test('starts an audible greeting only after the sideband is connected', async ()
   assert.match(sent[0].response.instructions, /Hotel A/);
   assert.match(sent[0].response.instructions, /Вітаю! Ви зателефонували/);
   assert.equal(service.health().diagnostic.stage, 'greeting_requested');
+});
+
+test('records a cancelled Realtime response without producing another greeting', () => {
+  const service = new VoiceCallService({ realtimeClient: {}, repository: {}, config: voiceConfig(), logger: { error() {} } });
+  const state = { assistantResponding: true, cancelledResponses: 0, toolCalls: new Set() };
+  service.onEvent(state, { type: 'response.cancelled', response: { status_details: { reason: 'turn_detected' } } });
+  assert.equal(state.assistantResponding, false);
+  assert.equal(state.cancelledResponses, 1);
+  assert.equal(service.health().diagnostic.stage, 'response_cancelled');
 });
 
 test('uses trusted Caller ID only when explicitly enabled and exposes a separate staging SMS tool', async () => {

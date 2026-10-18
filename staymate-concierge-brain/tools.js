@@ -33,6 +33,17 @@ function nightsBetween(checkIn, checkOut) {
   return nights > 0 ? nights : 1;
 }
 
+function validStayDates(checkIn, checkOut) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(checkIn || ''))
+    && /^\d{4}-\d{2}-\d{2}$/.test(String(checkOut || ''))
+    && new Date(`${checkOut}T00:00:00Z`) > new Date(`${checkIn}T00:00:00Z`);
+}
+
+function bookingRequestKey({ propertyId, channel, chatId, roomType, checkIn, checkOut, guestName, guestContact }) {
+  const stable = [propertyId, channel || '', chatId || '', roomType, checkIn, checkOut, String(guestName || '').trim(), String(guestContact || '').trim()].join('\u001f');
+  return crypto.createHash('sha256').update(stable).digest('hex');
+}
+
 function wfpSignature(fields) {
   const str = fields.join(';');
   return crypto.createHmac('md5', WFP_MERCHANT_SECRET).update(str).digest('hex');
@@ -163,24 +174,29 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
  */
 function createTools(propertyId, channel, chatId) {
   async function checkAvailability({ check_in, check_out, guests } = {}) {
+    if ((check_in || check_out) && !validStayDates(check_in, check_out)) {
+      return { ok: false, code: 'invalid_stay_dates', available_rooms: [] };
+    }
+    const guestCount = guests == null ? null : Number(guests);
+    if (guestCount != null && (!Number.isInteger(guestCount) || guestCount < 1 || guestCount > 20)) {
+      return { ok: false, code: 'invalid_guest_count', available_rooms: [] };
+    }
     let query = supabase
       .from('rooms')
       .select('room_type, price_per_night, capacity, description, quantity')
       .eq('property_id', propertyId)
       .order('price_per_night', { ascending: true });
 
-    if (guests) query = query.gte('capacity', guests);
-
-    const { data: roomTypes, error } = await query;
-
-    if (error) {
-      console.error('[checkAvailability] Supabase error:', error);
-      return { check_in: check_in || null, check_out: check_out || null, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
-    }
+    if (guestCount) query = query.gte('capacity', guestCount);
 
     // Гість ще не назвав дати — показуємо каталог типів номерів і цін
     // без перевірки зайнятості (Фаза 1.2 плану).
     if (!check_in || !check_out) {
+      const { data: roomTypes, error } = await query;
+      if (error) {
+        console.error('[checkAvailability] Supabase error:', error);
+        return { check_in: null, check_out: null, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
+      }
       return {
         check_in: null,
         check_out: null,
@@ -196,16 +212,22 @@ function createTools(propertyId, channel, chatId) {
       };
     }
 
-    // Дати вказано — рахуємо, скільки номерів кожного типу вже зайнято
-    // бронями, що перетинаються з цим періодом, і порівнюємо з кількістю
-    // фізичних номерів цього типу (Фаза 1.1 плану).
-    const { data: overlapping, error: bookingsError } = await supabase
+    // Dates are present: these independent reads run concurrently to remove
+    // one network wait from the phone path.
+    const bookingsQuery = supabase
       .from('bookings')
-      .select('room_type')
+      .select('room_type,status,hold_expires_at')
       .eq('property_id', propertyId)
       .in('status', ['pending_payment', 'paid'])
       .lt('check_in', check_out)
       .gt('check_out', check_in);
+
+    const [{ data: roomTypes, error }, { data: overlapping, error: bookingsError }] = await Promise.all([query, bookingsQuery]);
+
+    if (error) {
+      console.error('[checkAvailability] Supabase error:', error);
+      return { check_in, check_out, available_rooms: [], note: 'Технічна помилка при перевірці наявності. Спробуйте ще раз трохи пізніше.' };
+    }
 
     if (bookingsError) {
       console.error('[checkAvailability] Supabase error (bookings):', bookingsError);
@@ -214,14 +236,20 @@ function createTools(propertyId, channel, chatId) {
 
     const bookedCounts = {};
     for (const b of overlapping) {
+      // An uncompleted acquiring hold stops consuming inventory as soon as its
+      // explicit expiry passes. Legacy rows with no expiry remain occupied.
+      if (b.status === 'pending_payment' && b.hold_expires_at && new Date(b.hold_expires_at) <= new Date()) continue;
       bookedCounts[b.room_type] = (bookedCounts[b.room_type] || 0) + 1;
     }
 
+    const nights = nightsBetween(check_in, check_out);
     const available = roomTypes
       .filter(r => (bookedCounts[r.room_type] || 0) < (r.quantity ?? 1))
       .map(r => ({
         room_type: r.room_type,
         price_per_night: r.price_per_night,
+        total_price: Number(r.price_per_night) * nights,
+        nights,
         capacity: r.capacity,
         description: r.description,
       }));
@@ -235,66 +263,54 @@ function createTools(propertyId, channel, chatId) {
   }
 
   async function createBooking({ room_type, check_in, check_out, guest_name, guest_contact }) {
-    const { data: room, error: roomError } = await supabase
-      .from('rooms')
-      .select('room_type, price_per_night')
-      .eq('property_id', propertyId)
-      .eq('room_type', room_type)
-      .maybeSingle();
-
-    if (roomError) {
-      console.error('[createBooking] Supabase error (room lookup):', roomError);
-      return { ok: false, error: 'Технічна помилка при пошуку номера.' };
+    if (!validStayDates(check_in, check_out) || !room_type || !String(guest_name || '').trim() || !String(guest_contact || '').trim()) {
+      return { ok: false, code: 'booking_details_required' };
     }
-    if (!room) {
-      return { ok: false, error: `Тип номера "${room_type}" не знайдено серед доступних варіантів.` };
+    // Avoid creating a hold that cannot be paid.  A missing merchant token is
+    // configuration state, not a reason to create an orphan reservation.
+    if (!MONOBANK_ACQUIRING_TOKEN) return { ok: false, code: 'payment_unavailable' };
+    const requestKey = bookingRequestKey({ propertyId, channel, chatId, roomType: room_type, checkIn: check_in, checkOut: check_out, guestName: guest_name, guestContact: guest_contact });
+    const bookingId = `BK${requestKey.slice(0, 10).toUpperCase()}`;
+    const { data: hold, error: holdError } = await supabase.rpc('booking_prepare_monobank_hold', {
+      p_property_id: propertyId, p_booking_id: bookingId, p_request_key: requestKey, p_room_type: room_type,
+      p_check_in: check_in, p_check_out: check_out, p_guest_name: guest_name, p_guest_contact: guest_contact, p_hold_minutes: 15,
+    });
+    if (holdError || !hold?.ok) {
+      if (holdError) console.error('[createBooking] hold failed:', holdError.message);
+      return { ok: false, code: hold?.code || 'booking_hold_unavailable' };
+    }
+    if (hold.idempotent) {
+      if (hold.booking?.payment_link) return { ok: true, booking: hold.booking, payment_instructions: null, idempotent: true };
+      // We may have timed out after Monobank received an earlier request.
+      // Do not create a second invoice against the same hold; let it expire
+      // safely and ask the caller to retry later.
+      return { ok: false, code: 'payment_invoice_pending' };
     }
 
-    const bookingId = 'BK' + Math.random().toString(36).slice(2, 8).toUpperCase();
-    const nights = nightsBetween(check_in, check_out);
-    const totalPrice = room.price_per_night * nights;
-
-    // Guest reservations use Monobank acquiring only.  No direct card/IBAN
+    // Guest reservations use Monobank acquiring only. No direct card/IBAN
     // transfer and no WayForPay fallback is permitted for this path.
     let paymentLink; let paymentReference;
     try {
       const invoice = await createMonobankInvoice(MONOBANK_ACQUIRING_TOKEN, {
-        amountKopecks: Math.round(Number(totalPrice) * 100), reference: bookingId,
-        destination: `${room.room_type} — ${check_in} — ${check_out}`,
+        amountKopecks: Math.round(Number(hold.booking.total_price) * 100), reference: bookingId,
+        destination: `${hold.booking.room_type} — ${check_in} — ${check_out}`,
         webHookUrl: `${API_BASE_URL}/webhook/monobank/acquiring`, redirectUrl: process.env.MONOBANK_PAYMENT_RETURN_URL || `${API_BASE_URL}/payment/result`, validitySeconds: 86400,
       });
       paymentLink = invoice.pageUrl; paymentReference = invoice.invoiceId;
     } catch (monoError) {
       console.error('[createBooking] Monobank acquiring error:', monoError.message);
-      return { ok: false, error: 'Технічна помилка при створенні рахунку Monobank.' };
+      // Do not release after an ambiguous provider failure: an invoice might
+      // have been created despite a network timeout. The hold expires shortly.
+      return { ok: false, code: 'payment_invoice_unavailable' };
     }
-
-    const { data: booking, error: insertError } = await supabase
-      .from('bookings')
-      .insert({
-        booking_id: bookingId,
-        property_id: propertyId,
-        room_type,
-        check_in,
-        check_out,
-        guest_name,
-        guest_contact,
-        price_per_night: room.price_per_night,
-        total_price: totalPrice,
-        status: 'pending_payment',
-        payment_link: paymentLink,
-        payment_method: 'monobank_acquiring',
-        payment_reference: paymentReference,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('[createBooking] Supabase error (insert):', insertError);
-      return { ok: false, error: 'Технічна помилка при створенні бронювання.' };
+    const { data: attached, error: attachError } = await supabase.rpc('booking_attach_monobank_invoice', {
+      p_property_id: propertyId, p_booking_id: bookingId, p_invoice_id: paymentReference, p_payment_link: paymentLink,
+    });
+    if (attachError || !attached) {
+      console.error('[createBooking] invoice attachment failed:', attachError?.message || 'not_attached');
+      return { ok: false, code: 'booking_finalize_unavailable' };
     }
-
-    return { ok: true, booking, payment_instructions: null };
+    return { ok: true, booking: { ...hold.booking, payment_link: paymentLink, payment_reference: paymentReference }, payment_instructions: null };
   }
 
   async function escalateToHuman({ reason, urgency }) {
@@ -369,4 +385,4 @@ const toolDefinitions = [
   },
 ];
 
-module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS };
+module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS, validStayDates, bookingRequestKey, nightsBetween };
