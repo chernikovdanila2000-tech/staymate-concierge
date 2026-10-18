@@ -16,11 +16,11 @@
 
 This covers unit-level invoice-status, event-key/idempotency argument binding, merchant-independent matching and inventory adapter isolation. It does not prove a real Monobank invoice, webhook, reconciliation or external PMS transaction because no staging merchant token/PMS access is configured.
 
-## Deployment safety blocker
+## Deployment safety blocker — verified by active connections
 
-The Supabase dashboard identifies project `nyknlyufbwjodbpyehtv` as `main PRODUCTION`, and its branch selector currently lists only `main`. Therefore it cannot be treated as staging. No further migration, database concurrency test, merchant credential setup, or deployment may be run until Railway staging is connected to a separately identified non-production Supabase project (or a separately labelled Supabase branch).
+The `main / PRODUCTION` label alone is not evidence about an application's traffic. The actual Railway service configuration was compared instead: both `voice-realtime-test` and `production` use the same Supabase API project ref, `nyknlyufbwjodbpyehtv`. This is a shared database, so it is not safe for isolated staging migrations or synthetic concurrency data.
 
-An earlier SQL operation was mistakenly submitted there before this mismatch was visible. It added the new empty payment tables, nullable payment metadata columns and server-only RPCs; it did not delete existing data or send money/SMS. No rollback was run, because that would be an additional production mutation. This must be reviewed under a dedicated production change procedure.
+The earlier payment-ledger SQL operation therefore landed in this shared database. It added the new empty payment tables, nullable payment metadata columns and server-only RPCs; it did not delete existing data or send money/SMS. No rollback was run, because that would be another change to the shared database. Review it under a production change procedure.
 
 ## Remaining P0
 

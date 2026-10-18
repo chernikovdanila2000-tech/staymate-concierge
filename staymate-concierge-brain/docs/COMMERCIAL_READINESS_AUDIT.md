@@ -14,7 +14,7 @@ Audit date: 2026-10-18. Scope: `codex/voice-phone-agent`, staging only. This is 
 
 - Git baseline: `99bbda4` before this audit.
 - Staging Railway environment: `voice-realtime-test`; health endpoint returned `ok=true`, Zadarma/Reatime configured.
-- **Correction, 2026-10-18:** the Supabase dashboard identifies project `nyknlyufbwjodbpyehtv` as `main PRODUCTION` and exposes no staging branch. It must not be used for staging work. See `P0_IMPLEMENTATION_STATUS.md` for the resulting deployment blocker and the limited accidental schema change that requires production change review.
+- **Correction, 2026-10-18:** the active Railway `voice-realtime-test` and `production` configurations both resolve `SUPABASE_URL` to project ref `nyknlyufbwjodbpyehtv`. This connection fact—not the dashboard branch label—is why it cannot safely host isolated staging tests. See `P0_IMPLEMENTATION_STATUS.md`.
 - Live staging database inspection: RLS is enabled on `properties`, `rooms`, `bookings`, `channels`, `conversations`, `voice_phone_numbers`, `voice_calls`, SMS tables and payment-link token table. The operational tables intentionally have no browser policies, so anon/authenticated roles cannot access them; server service role is the only application path.
 - Automated suite after audit changes: 96 passed, 0 failed.
 - Synthetic in-process test: 100 simultaneous signed-call equivalents created 100 independent call states, tenant prompts and Caller IDs, then released all states. It used no carrier, OpenAI, database, SMS or payment traffic, so it proves code-level isolation only.
