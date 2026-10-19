@@ -25,6 +25,7 @@ const voice = createVoiceCallService({
         '. Day after tomorrow: ' + date.dayAfterTomorrow + '.',
      'Russian: сегодня=today, завтра=tomorrow, послезавтра=day after tomorrow.',
      'Ukrainian: сьогодні=today, завтра=tomorrow, післязавтра=day after tomorrow.',
+     'DATE PRONUNCIATION ON THE PHONE: Say dates naturally in words in the caller language. For 2026-10-20 say in Russian “двадцатого октября”, in Ukrainian “двадцятого жовтня”. Never read YYYY-MM-DD digit by digit, never say “twenty twenty” or repeat “двадцать-двадцать” for a date. Normally say the day and month; add the year in natural words only when relevant or the caller asks. For tool arguments (check_availability and create_booking), however, always keep exact ISO YYYY-MM-DD dates. Do not change the date itself when changing how it is spoken.',
      'When someone asks to book today, understand check-in=' + date.today +
         '. Ask only for missing check-out date (one night if guest confirms), guest count and room choice.',
      'Use check_availability immediately after the dates and number of guests are clear.',
