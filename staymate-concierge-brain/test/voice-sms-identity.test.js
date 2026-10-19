@@ -10,6 +10,9 @@ test('SIP caller parser accepts phone URI and does not mix display-name extensio
  assert.equal(phoneFromSipIdentity('sip:+380501234567@zadarma'), '+380501234567');
  assert.equal(phoneFromSipIdentity('"Office 101" <sip:+380501234567@carrier.example>;tag=x'), '+380501234567');
  assert.equal(phoneFromSipIdentity('<tel:+380501234567>'), '+380501234567');
+ assert.equal(phoneFromSipIdentity('"380501234567" <sip:anonymous@pbx.example>'), '+380501234567');
+ assert.equal(phoneFromSipIdentity('"380501234567" sip:<@pbx.example>'), '+380501234567');
+ assert.equal(phoneFromSipIdentity('"Office 101" <sip:anonymous@pbx.example>'), null);
  assert.equal(phoneFromSipIdentity('sip:1001@pbx.example'), null);
  assert.equal(phoneFromSipIdentity('sip:proj_AJV3lMNB4yT4ITo42ScEZMmC@sip.api.openai.com'), null);
  assert.equal(phoneFromSipIdentity('anonymous'), null);

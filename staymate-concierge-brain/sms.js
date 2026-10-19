@@ -29,7 +29,13 @@ function smsSegments(text) {
 }
 function shortKey(value) { return crypto.createHash('sha256').update(String(value)).digest('hex').slice(0, 40); }
 function safeEqual(a, b) { const x = Buffer.from(String(a || '')); const y = Buffer.from(String(b || '')); return x.length === y.length && crypto.timingSafeEqual(x, y); }
-function statusFromDlr(status) { const v = String(status || '').toUpperCase(); if (['DELIVRD', 'DELIVERED', 'READ'].includes(v)) return 'DELIVERED'; if (['EXPIRED', 'UNDELIV', 'UNDELIVERED', 'REJECTD', 'FAILED'].includes(v)) return 'FAILED'; if (['SENT', 'ACCEPTED', 'QUEUED'].includes(v)) return v === 'SENT' ? 'SENT' : 'ACCEPTED'; return 'UNKNOWN'; }
+function statusFromDlr(status) {
+  const v = String(status || '').trim().toUpperCase();
+  if (['DELIVRD', 'DELIVERED', 'READ'].includes(v)) return 'DELIVERED';
+  if (['EXPIRED', 'UNDELIV', 'UNDELIVERED', 'REJECTD', 'REJECTED', 'FAILED', 'CANCELLED'].includes(v)) return 'FAILED';
+  if (['SENT', 'ACCEPTED', 'QUEUED'].includes(v)) return v === 'SENT' ? 'SENT' : 'ACCEPTED';
+  return 'UNKNOWN';
+}
 
 
 function smsConfig(env = process.env) {
@@ -44,6 +50,21 @@ class TurboSmsProvider {
     const data = await response.json(); const item = data?.response_result?.[0];
     if (!response.ok || !item?.message_id || ![0, 800, 801, 802, 803, 507].includes(Number(data?.response_code))) return { accepted: false, status: data?.response_status || `HTTP_${response.status}`, definitive: true };
     return { accepted: true, providerMessageId: String(item.message_id), status: item.response_status || data.response_status || 'ACCEPTED', definitive: true };
+  }
+  // Read-only lookup of previously submitted messages; never sends SMS.
+  async statuses(messageIds) {
+    if (!Array.isArray(messageIds) || !messageIds.length) return [];
+    const response = await this.fetch('https://api.turbosms.ua/message/status.json', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${this.config.turboToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: messageIds }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!response.ok) throw new Error(`turbosms_status_http_${response.status}`);
+    const data = await response.json();
+    if (Number(data?.response_code) !== 0 || !Array.isArray(data?.response_result))
+      throw new Error('turbosms_status_api_unavailable');
+    return data.response_result;
   }
 }
 class MobizonProvider {
@@ -111,6 +132,38 @@ class SmsNotificationService {
       p_segments: segments,
       p_cost: result.accepted ? segments * this.config.estimatedSegmentCost : 0,
     }, result.accepted ? 'ACCEPTED' : 'FAILED');
+  }
+  async reconcileTurboStatuses() {
+    if (this.reconciling || !this.config.stagingTestEnabled ||
+        !this.enabledProvider('turbosms')) return { checked: 0 };
+    this.reconciling = true;
+    try {
+      const { data, error } = await this.supabase.from('sms_notifications')
+        .select('id,phone,provider_message_id')
+        .eq('provider', 'turbosms').eq('notification_type', 'staging_test')
+        .in('status', ['ACCEPTED', 'SENT'])
+        .order('created_at', { ascending: false }).limit(10);
+      if (error) throw error;
+      const rows = (data || []).filter(x => x.provider_message_id);
+      if (!rows.length) return { checked: 0 };
+      const reports = await this.providers.turbosms.statuses(rows.map(x => x.provider_message_id));
+      let updated = 0;
+      for (const job of rows) {
+        const report = reports.find(r => String(r.message_id) === String(job.provider_message_id));
+        if (!report || Number(report.response_code) !== 0) continue;
+        if (report.recipient && normalizeSmsPhone(report.recipient) !== normalizeSmsPhone(job.phone)) {
+          this.logger.error('[sms] delivery destination mismatch'); continue;
+        }
+        const status = statusFromDlr(report.status);
+        this.logger.info?.('[sms] carrier lookup status', status);
+        if (status === 'UNKNOWN' || status === 'ACCEPTED') continue;
+        const { error: updateError } = await this.supabase.rpc('sms_apply_delivery_status', { p_id: job.id, p_status: status });
+        if (updateError) throw updateError;
+        updated += 1;
+        this.logger.info?.('[sms] carrier delivery state', status);
+      }
+      return { checked: rows.length, updated };
+    } finally { this.reconciling = false; }
   }
   async processOne() {
     if (!this.config.enabled) return { processed: false, reason: 'disabled' };

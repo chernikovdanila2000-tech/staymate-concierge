@@ -139,10 +139,16 @@ test('updates the Realtime session when a full caller transcription establishes 
   assert.equal(sent[0].type, 'session.update');
   assert.match(sent[0].session.instructions, /Russian \(ru\)/);
   await service.updateConversationLanguage(state, 'Чи є номер?');
-  assert.equal(sent.length, 1);
-  await service.updateConversationLanguage(state, 'давайте українською');
   assert.equal(state.conversationLanguage, 'uk');
   assert.equal(sent.length, 2);
+  await service.updateConversationLanguage(state, 'Сколько стоит?');
+  assert.equal(state.conversationLanguage, 'ru');
+  assert.equal(sent.length, 3);
+  await service.updateConversationLanguage(state, 'ага');
+  assert.equal(sent.length, 3);
+  await service.updateConversationLanguage(state, 'давайте українською');
+  assert.equal(state.conversationLanguage, 'uk');
+  assert.equal(sent.length, 4);
 });
 
 test('starts an audible greeting only after the sideband is connected', async () => {

@@ -32,6 +32,7 @@ const voice = createVoiceCallService({
      'First use the original tools and data; give actual dates and accurate prices.',
      'Speak exclusively in the language of the caller: Russian, Ukrainian or English.',
      'A caller must never need to say the word test or know tool names.',
+     'The informational SMS text is predefined. NEVER ask the caller to choose or dictate message contents.',
      'After discussing room options, offer one informational SMS to the guest. No booking or payment is needed to send this message.',
      'If the carrier provided a trusted calling number, NEVER ask the guest to dictate it. After explicit consent call send_staging_test_sms with consent=true and no phone argument.',
      'If Caller ID was not received, tell the guest you cannot see their number; ask them to dictate their mobile once, repeat it back for confirmation, and after explicit consent call send_staging_test_sms with phone=confirmed number and consent=true.',
@@ -40,12 +41,22 @@ const voice = createVoiceCallService({
      'The SMS is informational only; it does not confirm the booking and does not contain a payment URL.',
      'If SMS dispatch returns ACCEPTED, say only that the message was accepted for sending, not that it was delivered.',
      'Do not claim a booking is made unless create_booking returned ok=true.',
+     'If the caller ends the conversation or says goodbye, call end_call promptly. Give one short goodbye and hang up; do not wait for another question.',
      'No fake confirmations, no invented availability, no second SMS without permission.'
    ].join('\n');
  }
 });
 const ready = Boolean(voice.isReady() && sms.enabledProvider('turbosms') &&
   voice.config.trustSipCallerId && voice.config.stagingTestSmsEnabled);
+// Reconcile receipts for already-sent pilot SMS; this never submits a new SMS.
+if (ready) {
+ const poll = () => sms.reconcileTurboStatuses()
+   .then(result => { if (result.checked) console.log('[sms] polled provider delivery', result); })
+   .catch(err => console.warn('[sms] delivery poll unavailable', err?.message?.slice(0, 80)));
+ setTimeout(poll, 1000);
+ const pollTimer = setInterval(poll, 60000);
+ pollTimer.unref?.();
+}
 function respond(res,code,obj) {
  res.writeHead(code, {'content-type':'application/json; charset=utf-8',
   'cache-control':'no-store'});
