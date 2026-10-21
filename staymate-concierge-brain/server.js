@@ -1829,6 +1829,7 @@ const server =
         req.method === 'OPTIONS' &&
         [
           '/api/create-subscription-invoice',
+          '/api/create-subscription-invoice-crypto',
           '/api/connect-channel',
           '/api/notify-signin',
           '/api/create-trial-invoice',
