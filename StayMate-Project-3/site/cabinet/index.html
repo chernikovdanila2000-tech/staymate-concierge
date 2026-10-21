@@ -397,7 +397,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         <span class="msg" id="gateMsg"></span>
       </div>
       <p class="hint" id="gateDisclosure" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
-      <p class="hint" id="gateCryptoHint" data-i18n="pay.cryptoFeeHint" style="margin:6px 0 0;">До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.</p>
+      <p class="hint" id="gateCryptoHint" data-i18n="pay.cryptoFeeHint" style="margin:6px 0 0;">До суми в криптовалюті додається комісія 1% — вона покриває мережевий переказ.</p>
     </div>
     <div class="actions">
       <button class="btn-secondary hidden" id="gateUseTrialBtn" data-i18n="gate.useTrialBtn">Скористатися пробним періодом замість цього</button>
@@ -438,7 +438,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <button class="btn-secondary" id="subPayCryptoBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v9M9.3 9.8h4a1.9 1.9 0 0 1 0 3.8h-2.6a1.9 1.9 0 0 0 0 3.8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="btn-label" data-i18n="sub.payCryptoBtn">Криптою</span></button>
           <span class="msg" id="subMsg"></span>
         </div>
-        <p class="hint" data-i18n="pay.cryptoFeeHint" style="margin:10px 0 0;">До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.</p>
+        <p class="hint" data-i18n="pay.cryptoFeeHint" style="margin:10px 0 0;">До суми в криптовалюті додається комісія 1% — вона покриває мережевий переказ.</p>
       </div>
     </div>
 
@@ -847,7 +847,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.",
       "gate.payBtn":"Карткою","gate.payCryptoBtn":"Криптою",
       "gate.disclosure.default":"Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).",
-      "pay.cryptoFeeHint":"До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.",
+      "pay.cryptoFeeHint":"До суми в криптовалюті додається комісія 1% — вона покриває мережевий переказ.",
       "gate.useTrialBtn":"Скористатися пробним періодом замість цього","gate.signOutBtn":"Вийти з акаунту",
       "gate.trialCard.title":"Підключіть картку — і почніть безкоштовно",
       "gate.trialCard.lede":"3 дні повного доступу безкоштовно. Оберіть тариф, який діятиме після пробного періоду, і підключіть картку — списання не відбудеться прямо зараз.",
@@ -1038,7 +1038,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in Ukrainian hryvnia (UAH).",
       "gate.payBtn":"By card","gate.payCryptoBtn":"By crypto",
       "gate.disclosure.default":"Payment is handled by WayForPay. Once payment is confirmed, access to the cabinet is restored automatically (usually within a minute).",
-      "pay.cryptoFeeHint":"A small fee (~1–1.5%) is added to the crypto amount — it covers the network transfer, so we receive the plan's full price.",
+      "pay.cryptoFeeHint":"A 1% fee is added to the crypto amount — it covers the network transfer.",
       "gate.useTrialBtn":"Use the trial period instead","gate.signOutBtn":"Log out",
       "gate.trialCard.title":"Link a card — and start for free",
       "gate.trialCard.lede":"3 days of full access, free. Choose the plan that will apply after the trial period and link a card — you won't be charged right now.",
