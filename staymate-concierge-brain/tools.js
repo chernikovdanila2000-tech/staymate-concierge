@@ -10,6 +10,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
+const { createInvoice: createNowPaymentsInvoice } = require('./nowpayments');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -149,6 +150,29 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
     // старті пробного періоду: перше фактичне списання станеться саме
     // тоді (закінчення тріалу), а не зараз.
     regular: autoRenewDateBegin ? { mode: 'monthly', dateBegin: autoRenewDateBegin } : undefined,
+  });
+  return { invoiceUrl, priceUah: planInfo.priceUah };
+}
+
+/**
+ * Той самий тариф, але оплата криптовалютою через NOWPayments замість
+ * картки через WayForPay. На відміну від WayForPay тут немає збереженого
+ * платіжного засобу для автопродовження — кожен період власник оплачує
+ * окремим рахунком.
+ */
+async function createCryptoSubscriptionInvoice({ orderId, plan, propertyName }) {
+  const planInfo = SUBSCRIPTION_PLANS[plan];
+  if (!planInfo) {
+    throw new Error(`Невідомий тариф: ${plan}`);
+  }
+
+  const { invoiceUrl } = await createNowPaymentsInvoice({
+    apiKey: process.env.NOWPAYMENTS_API_KEY,
+    priceAmount: planInfo.priceUah,
+    priceCurrency: 'uah',
+    orderId,
+    orderDescription: `StayAI — тариф «${planInfo.label}» ${propertyName || ''}`.trim(),
+    ipnCallbackUrl: `${API_BASE_URL}/webhook/nowpayments-subscription`,
   });
   return { invoiceUrl, priceUah: planInfo.priceUah };
 }
@@ -392,4 +416,4 @@ const toolDefinitions = [
   },
 ];
 
-module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS };
+module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, createCryptoSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS };

@@ -47,8 +47,10 @@ const {
   fetchMonobankStatement,
   findMatchingTransaction,
 } = require('./monobank');
+const { verifyIpnSignature: verifyNowPaymentsIpn } = require('./nowpayments');
 const {
   createSubscriptionInvoice,
+  createCryptoSubscriptionInvoice,
   cancelRegularPayment,
 } = require('./tools');
 const {
@@ -2771,6 +2773,75 @@ const server =
       }
 
       // =========================
+      // NOWPAYMENTS SUBSCRIPTION (crypto)
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url === '/webhook/nowpayments-subscription'
+      ) {
+        readBody(req).then(async rawBody => {
+          const signature = req.headers['x-nowpayments-sig'];
+          const validSignature = verifyNowPaymentsIpn({
+            rawBody,
+            signatureHeader: signature,
+            ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET,
+          });
+
+          if (!validSignature) {
+            res.writeHead(401);
+            return res.end();
+          }
+
+          let payload;
+          try {
+            payload = JSON.parse(rawBody);
+          } catch {
+            res.writeHead(400);
+            return res.end();
+          }
+
+          const { order_id: orderId, payment_status: paymentStatus } = payload;
+
+          if (orderId && (paymentStatus === 'finished' || paymentStatus === 'confirmed')) {
+            const { data: order, error } = await supabase
+              .from('subscription_orders')
+              .select('property_id, plan, status')
+              .eq('order_id', orderId)
+              .maybeSingle();
+
+            // status check avoids double-crediting if NOWPayments resends
+            // the same finished/confirmed callback (both statuses can fire
+            // for one payment as it settles).
+            if (!error && order && order.status !== 'paid') {
+              await supabase
+                .from('subscription_orders')
+                .update({ status: 'paid' })
+                .eq('order_id', orderId);
+
+              await supabase
+                .from('properties')
+                .update({
+                  subscription_status: 'active',
+                  subscription_plan: order.plan,
+                  subscription_active_until: new Date(
+                    Date.now() + 31 * 24 * 60 * 60 * 1000
+                  ).toISOString(),
+                })
+                .eq('property_id', order.property_id);
+
+              propertyCache.delete(order.property_id);
+            }
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+        });
+
+        return;
+      }
+
+      // =========================
       // CREATE SUBSCRIPTION
       // =========================
 
@@ -2921,6 +2992,65 @@ const server =
             }
           }
         );
+
+        return;
+      }
+
+      // =========================
+      // CREATE SUBSCRIPTION (crypto via NOWPayments)
+      // =========================
+
+      if (
+        req.method === 'POST' &&
+        req.url === '/api/create-subscription-invoice-crypto'
+      ) {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async body => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, plan } = parsed;
+          if (!propertyId || !plan) {
+            return sendJson(res, 400, { error: 'Потрібні propertyId і plan.' }, corsHeaders);
+          }
+
+          const property = await getProperty(propertyId);
+          if (!property) {
+            return sendJson(res, 404, { error: 'Готель не знайдено.' }, corsHeaders);
+          }
+
+          const orderId = 'SUBC' + Math.random().toString(36).slice(2, 8).toUpperCase();
+
+          try {
+            const { invoiceUrl, priceUah } = await createCryptoSubscriptionInvoice({
+              orderId,
+              plan,
+              propertyName: property.hotel_name,
+            });
+
+            const { error } = await supabase.from('subscription_orders').insert({
+              order_id: orderId,
+              property_id: propertyId,
+              plan,
+              status: 'pending',
+              amount_uah: priceUah,
+              payment_provider: 'nowpayments',
+            });
+
+            if (error) {
+              return sendJson(res, 500, { error: 'Не вдалося створити замовлення.' }, corsHeaders);
+            }
+
+            return sendJson(res, 200, { invoiceUrl, orderId, priceUah }, corsHeaders);
+          } catch (error) {
+            return sendJson(res, 500, { error: error.message }, corsHeaders);
+          }
+        });
 
         return;
       }

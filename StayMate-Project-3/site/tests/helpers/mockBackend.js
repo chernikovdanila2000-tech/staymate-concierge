@@ -344,6 +344,9 @@ async function installBackendMock(page, initialState = {}) {
   await page.route('**/api/create-subscription-invoice', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-invoice', orderId: 'SUBMOCK', priceUah: 4999 }) })
   );
+  await page.route('**/api/create-subscription-invoice-crypto', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://nowpayments.io/mock-invoice', orderId: 'SUBCMOCK', priceUah: 4999 }) })
+  );
   await page.route('**/api/create-trial-invoice', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-trial-invoice', orderId: 'TRLMOCK', priceUah: 4999 }) })
   );

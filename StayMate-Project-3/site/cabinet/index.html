@@ -392,10 +392,12 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">14999 ₴ / міс</span></div>
       </div>
       <div class="actions">
-        <button class="btn-primary" id="gatePayBtn" data-i18n="gate.payBtn">Оплатити обраний тариф</button>
+        <button class="btn-primary" id="gatePayBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/></svg><span class="btn-label" data-i18n="gate.payBtn">Карткою</span></button>
+        <button class="btn-secondary" id="gatePayCryptoBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v9M9.3 9.8h4a1.9 1.9 0 0 1 0 3.8h-2.6a1.9 1.9 0 0 0 0 3.8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="btn-label" data-i18n="gate.payCryptoBtn">Криптою</span></button>
         <span class="msg" id="gateMsg"></span>
       </div>
       <p class="hint" id="gateDisclosure" style="margin:16px 0 0;">Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).</p>
+      <p class="hint" id="gateCryptoHint" data-i18n="pay.cryptoFeeHint" style="margin:6px 0 0;">До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.</p>
     </div>
     <div class="actions">
       <button class="btn-secondary hidden" id="gateUseTrialBtn" data-i18n="gate.useTrialBtn">Скористатися пробним періодом замість цього</button>
@@ -432,9 +434,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <div class="plan-opt" data-plan="network"><b data-i18n="planCard.network.name">Мережа</b><span data-i18n="planCard.network.price">14999 ₴ / міс</span></div>
         </div>
         <div class="actions">
-          <button class="btn-primary" id="subPayBtn" data-i18n="sub.payBtn">Оплатити обраний тариф</button>
+          <button class="btn-primary" id="subPayBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/></svg><span class="btn-label" data-i18n="sub.payBtn">Карткою</span></button>
+          <button class="btn-secondary" id="subPayCryptoBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5v9M9.3 9.8h4a1.9 1.9 0 0 1 0 3.8h-2.6a1.9 1.9 0 0 0 0 3.8h4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="btn-label" data-i18n="sub.payCryptoBtn">Криптою</span></button>
           <span class="msg" id="subMsg"></span>
         </div>
+        <p class="hint" data-i18n="pay.cryptoFeeHint" style="margin:10px 0 0;">До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.</p>
       </div>
     </div>
 
@@ -841,8 +845,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
       "gate.chooseTariff":"Оберіть тариф",
       "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.",
-      "gate.payBtn":"Оплатити обраний тариф",
+      "gate.payBtn":"Карткою","gate.payCryptoBtn":"Криптою",
       "gate.disclosure.default":"Оплата — через WayForPay. Після підтвердження оплати доступ до кабінету відновиться автоматично (зазвичай протягом хвилини).",
+      "pay.cryptoFeeHint":"До суми в криптовалюті додається невелика комісія (~1–1.5%) — вона покриває мережевий переказ, щоб ми отримали повну суму тарифу.",
       "gate.useTrialBtn":"Скористатися пробним періодом замість цього","gate.signOutBtn":"Вийти з акаунту",
       "gate.trialCard.title":"Підключіть картку — і почніть безкоштовно",
       "gate.trialCard.lede":"3 дні повного доступу безкоштовно. Оберіть тариф, який діятиме після пробного періоду, і підключіть картку — списання не відбудеться прямо зараз.",
@@ -875,7 +880,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.test.name":"Тестовий чат",
 
       "sub.title":"Тариф і підписка","sub.manageBtn":"Змінити тариф / оплатити",
-      "sub.cancelAutoRenewBtn":"Скасувати автопродовження","sub.payBtn":"Оплатити обраний тариф",
+      "sub.cancelAutoRenewBtn":"Скасувати автопродовження","sub.payBtn":"Карткою","sub.payCryptoBtn":"Криптою",
       "sub.notActive":"Підписка не активна.",
       "sub.activeHint":"Активна підписка: {plan}. Залишилось {countdown} (до {date}).",
       "sub.trialHint":"Пробний період — залишилось {countdown}. Оберіть тариф заздалегідь, щоб доступ не перервався.",
@@ -1031,8 +1036,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
       "gate.chooseTariff":"Choose a plan",
       "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in Ukrainian hryvnia (UAH).",
-      "gate.payBtn":"Pay for selected plan",
+      "gate.payBtn":"By card","gate.payCryptoBtn":"By crypto",
       "gate.disclosure.default":"Payment is handled by WayForPay. Once payment is confirmed, access to the cabinet is restored automatically (usually within a minute).",
+      "pay.cryptoFeeHint":"A small fee (~1–1.5%) is added to the crypto amount — it covers the network transfer, so we receive the plan's full price.",
       "gate.useTrialBtn":"Use the trial period instead","gate.signOutBtn":"Log out",
       "gate.trialCard.title":"Link a card — and start for free",
       "gate.trialCard.lede":"3 days of full access, free. Choose the plan that will apply after the trial period and link a card — you won't be charged right now.",
@@ -1065,7 +1071,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.test.name":"Test chat",
 
       "sub.title":"Plan & subscription","sub.manageBtn":"Change plan / pay",
-      "sub.cancelAutoRenewBtn":"Cancel auto-renewal","sub.payBtn":"Pay for selected plan",
+      "sub.cancelAutoRenewBtn":"Cancel auto-renewal","sub.payBtn":"By card","sub.payCryptoBtn":"By crypto",
       "sub.notActive":"Subscription is not active.",
       "sub.activeHint":"Active subscription: {plan}. {countdown} left (until {date}).",
       "sub.trialHint":"Trial period — {countdown} left. Choose a plan ahead of time so access doesn't get interrupted.",
@@ -1740,15 +1746,21 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     currentGateReason = reason;
     const lang = getLang();
     const payBtn = document.getElementById('gatePayBtn');
+    const payCryptoBtn = document.getElementById('gatePayCryptoBtn');
+    const cryptoHint = document.getElementById('gateCryptoHint');
     const disclosure = document.getElementById('gateDisclosure');
+    // Crypto has no saved-card equivalent, so it can't do the "link now,
+    // charge at trial end" flow — only offer it for an immediate payment.
+    payCryptoBtn.classList.toggle('hidden', reason === 'trial_card');
+    cryptoHint.classList.toggle('hidden', reason === 'trial_card');
     if (reason === 'trial_card') {
       document.getElementById('gateTitle').textContent = t('gate.trialCard.title', lang);
       document.getElementById('gateLede').textContent = t('gate.trialCard.lede', lang);
-      payBtn.textContent = t('gate.trialCard.payBtn', lang);
+      payBtn.querySelector('.btn-label').textContent = t('gate.trialCard.payBtn', lang);
       const trialEndDate = currentProperty && currentProperty.trial_ends_at ? formatDate(currentProperty.trial_ends_at) : t('gate.trialCard.inDays', lang);
       disclosure.textContent = t('gate.trialCard.disclosure', lang, { date: trialEndDate });
     } else {
-      payBtn.textContent = t('gate.payBtn', lang);
+      payBtn.querySelector('.btn-label').textContent = t('gate.payBtn', lang);
       disclosure.textContent = t('gate.disclosure.default', lang);
       document.getElementById('gateTitle').textContent = reason === 'choose_plan' ? t('gate.title.choosePlan', lang) : t('gate.title.suspended', lang);
       document.getElementById('gateLede').textContent = reason === 'active_expired'
@@ -1792,7 +1804,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  async function createInvoiceAndRedirect(plan, msgEl, isTrial) {
+  async function createInvoiceAndRedirect(plan, msgEl, isTrial, method) {
     if (!plan) {
       msgEl.className = 'msg error';
       msgEl.textContent = t('sub.noPlanSelected', getLang());
@@ -1801,7 +1813,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     msgEl.className = 'msg';
     msgEl.textContent = isTrial ? t('sub.creatingTrialLink', getLang()) : t('sub.creatingInvoice', getLang());
     try {
-      const endpoint = isTrial ? '/api/create-trial-invoice' : '/api/create-subscription-invoice';
+      const endpoint = method === 'crypto'
+        ? '/api/create-subscription-invoice-crypto'
+        : isTrial ? '/api/create-trial-invoice' : '/api/create-subscription-invoice';
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1821,8 +1835,14 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   onClickGuarded(document.getElementById('gatePayBtn'), () => {
     return createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), currentGateReason === 'trial_card');
   });
+  onClickGuarded(document.getElementById('gatePayCryptoBtn'), () => {
+    return createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), false, 'crypto');
+  });
   onClickGuarded(document.getElementById('subPayBtn'), () => {
     return createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'));
+  });
+  onClickGuarded(document.getElementById('subPayCryptoBtn'), () => {
+    return createInvoiceAndRedirect(selectedSubPlan, document.getElementById('subMsg'), false, 'crypto');
   });
   document.getElementById('manageSubBtn').addEventListener('click', () => {
     const picker = document.getElementById('subPlanPicker');
