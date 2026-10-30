@@ -70,6 +70,15 @@ const {
   verifyInstagramCredentials,
   verifyMessengerCredentials,
 } = require('./meta-verify');
+const {
+  exchangeCodeForToken: exchangeMetaCodeForToken,
+  exchangeForLongLivedToken: exchangeMetaLongLivedToken,
+  listPages: listMetaPages,
+  getPageInstagramAccount,
+  subscribePageWebhooks,
+  registerWhatsAppNumber,
+  subscribeWabaWebhooks,
+} = require('./meta-oauth');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -124,6 +133,29 @@ const META_MESSENGER_PAGE_TO_PROPERTY_MAP =
 
 const META_GRAPH_VERSION =
   process.env.META_GRAPH_VERSION || 'v24.0';
+
+// Meta OAuth ("Увійти через Facebook") для самостійного підключення
+// Messenger/Instagram/WhatsApp власником — App Secret той самий один на
+// весь застосунок, що й для перевірки підписів вебхуків, тому свідомо не
+// заводимо окрему змінну під нього.
+const META_APP_ID = process.env.META_APP_ID || '';
+const META_APP_SECRET = META_MESSENGER_APP_SECRET;
+const META_LOGIN_CONFIG_ID_PAGES = process.env.META_LOGIN_CONFIG_ID_PAGES || '';
+const META_LOGIN_CONFIG_ID_WHATSAPP = process.env.META_LOGIN_CONFIG_ID_WHATSAPP || '';
+
+// Короткоживучий кеш незавершених OAuth-підключень Pages/Instagram: крок 1
+// (обмін коду, список сторінок) і крок 2 (власник обирає сторінку) — два
+// окремі запити з паузою на вибір користувача, тому проміжний стан
+// зберігається тут, а не передається токеном через браузер.
+const pendingMetaConnections = new Map();
+const META_PENDING_CONNECTION_TTL_MS = 10 * 60 * 1000;
+
+function storePendingMetaConnection(propertyId, pages) {
+  const pendingId = crypto.randomBytes(16).toString('hex');
+  pendingMetaConnections.set(pendingId, { propertyId, pages, createdAt: Date.now() });
+  setTimeout(() => pendingMetaConnections.delete(pendingId), META_PENDING_CONNECTION_TTL_MS).unref?.();
+  return pendingId;
+}
 
 const PROPERTY_ID =
   process.env.PROPERTY_ID || '';
@@ -1805,6 +1837,9 @@ const server =
           '/api/create-subscription-invoice',
           '/api/create-subscription-invoice-crypto',
           '/api/connect-channel',
+          '/api/connect-meta-pages',
+          '/api/connect-meta-finalize',
+          '/api/connect-whatsapp-embedded',
           '/api/notify-signin',
           '/api/create-trial-invoice',
           '/api/cancel-auto-renew',
@@ -3806,6 +3841,280 @@ const server =
             return sendJson(res, 400, { error: `Невідомий тип каналу: ${channelType}.` }, corsHeaders);
           }
         );
+
+        return;
+      }
+
+      // Публічна конфігурація для FB.init()/FB.login() у кабінеті — App ID
+      // і config_id не секретні (вони видимі в будь-якому разі в мережевих
+      // запитах браузера під час логіну), це просто щоб не хардкодити їх
+      // окремо у фронтенд-файлі.
+      if (req.method === 'GET' && req.url === '/api/meta-config') {
+        return sendJson(
+          res,
+          200,
+          {
+            appId: META_APP_ID,
+            graphVersion: META_GRAPH_VERSION,
+            pagesConfigId: META_LOGIN_CONFIG_ID_PAGES,
+            whatsappConfigId: META_LOGIN_CONFIG_ID_WHATSAPP,
+          },
+          { 'Access-Control-Allow-Origin': '*' }
+        );
+      }
+
+      // =========================
+      // CONNECT VIA META OAUTH (Messenger + Instagram)
+      // =========================
+
+      // Крок 1: власник пройшов FB.login() у браузері, передає нам code.
+      // Міняємо його на User Access Token, дивимось, якими сторінками він
+      // керує, і повертаємо список для вибору — без жодного токена в
+      // браузер, вони лишаються лише в pendingMetaConnections на сервері.
+      if (req.method === 'POST' && req.url === '/api/connect-meta-pages') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, code } = parsed;
+          if (!propertyId || !code) {
+            return sendJson(res, 400, { error: 'Потрібні propertyId, code.' }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          if (!META_APP_ID || !META_APP_SECRET) {
+            return sendJson(res, 500, { error: 'Meta OAuth не налаштовано на сервері (META_APP_ID).' }, corsHeaders);
+          }
+
+          try {
+            const { accessToken: shortLived } = await exchangeMetaCodeForToken({
+              code,
+              appId: META_APP_ID,
+              appSecret: META_APP_SECRET,
+              graphVersion: META_GRAPH_VERSION,
+            });
+            const { accessToken: userToken } = await exchangeMetaLongLivedToken({
+              shortLivedToken: shortLived,
+              appId: META_APP_ID,
+              appSecret: META_APP_SECRET,
+              graphVersion: META_GRAPH_VERSION,
+            });
+
+            const pages = await listMetaPages({ userToken, graphVersion: META_GRAPH_VERSION });
+            if (!pages.length) {
+              return sendJson(res, 400, { error: 'Не знайдено жодної сторінки Facebook, до якої надано доступ.' }, corsHeaders);
+            }
+
+            const pagesWithInstagram = await Promise.all(
+              pages.map(async (page) => {
+                const instagram = await getPageInstagramAccount({
+                  pageId: page.id,
+                  pageToken: page.access_token,
+                  graphVersion: META_GRAPH_VERSION,
+                }).catch(() => null);
+                return { ...page, instagram };
+              })
+            );
+
+            const pendingId = storePendingMetaConnection(propertyId, pagesWithInstagram);
+            return sendJson(
+              res,
+              200,
+              {
+                pendingId,
+                pages: pagesWithInstagram.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  hasInstagram: !!p.instagram,
+                  instagramUsername: p.instagram ? p.instagram.username : null,
+                })),
+              },
+              corsHeaders
+            );
+          } catch (error) {
+            return sendJson(res, 400, { error: error.message }, corsHeaders);
+          }
+        });
+
+        return;
+      }
+
+      // Крок 2: власник обрав конкретну сторінку зі списку — підписуємо її
+      // на вебхуки застосунку і зберігаємо як messenger (+ instagram, якщо
+      // до неї прив'язаний IG-акаунт) у тому ж форматі, що й ручне введення.
+      if (req.method === 'POST' && req.url === '/api/connect-meta-finalize') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, pendingId, pageId } = parsed;
+          if (!propertyId || !pendingId || !pageId) {
+            return sendJson(res, 400, { error: 'Потрібні propertyId, pendingId, pageId.' }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          const pending = pendingMetaConnections.get(pendingId);
+          if (!pending || pending.propertyId !== propertyId) {
+            return sendJson(res, 400, { error: 'Сесію підключення не знайдено або вона застаріла — спробуйте ще раз.' }, corsHeaders);
+          }
+          const page = pending.pages.find((p) => p.id === pageId);
+          if (!page) {
+            return sendJson(res, 400, { error: 'Цю сторінку не знайдено в поточній сесії підключення.' }, corsHeaders);
+          }
+
+          try {
+            await subscribePageWebhooks({ pageId: page.id, pageToken: page.access_token, graphVersion: META_GRAPH_VERSION });
+
+            const storedMessenger = encryptCredentialsPartial(
+              { page_id: page.id, page_name: page.name, access_token: page.access_token },
+              'access_token'
+            );
+            const { error: msgError } = await supabase
+              .from('channels')
+              .upsert(
+                {
+                  property_id: propertyId,
+                  channel_type: 'messenger',
+                  credentials: storedMessenger,
+                  connected: true,
+                  status: 'connected',
+                  status_detail: null,
+                  connected_at: new Date().toISOString(),
+                },
+                { onConflict: 'property_id,channel_type' }
+              );
+            if (msgError) throw new Error('Не вдалося зберегти Messenger.');
+            invalidateChannel(propertyId, 'messenger');
+
+            let instagramConnected = false;
+            if (page.instagram) {
+              const storedInstagram = encryptCredentialsPartial(
+                { instagram_account_id: page.instagram.id, access_token: page.access_token },
+                'access_token'
+              );
+              const { error: igError } = await supabase
+                .from('channels')
+                .upsert(
+                  {
+                    property_id: propertyId,
+                    channel_type: 'instagram',
+                    credentials: storedInstagram,
+                    connected: true,
+                    status: 'connected',
+                    status_detail: null,
+                    connected_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'property_id,channel_type' }
+                );
+              if (!igError) {
+                invalidateChannel(propertyId, 'instagram');
+                instagramConnected = true;
+              }
+            }
+
+            pendingMetaConnections.delete(pendingId);
+            return sendJson(res, 200, { ok: true, messenger: true, instagram: instagramConnected }, corsHeaders);
+          } catch (error) {
+            return sendJson(res, 500, { error: error.message }, corsHeaders);
+          }
+        });
+
+        return;
+      }
+
+      // =========================
+      // CONNECT WHATSAPP (Embedded Signup)
+      // =========================
+
+      if (req.method === 'POST' && req.url === '/api/connect-whatsapp-embedded') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, code, wabaId, phoneNumberId } = parsed;
+          if (!propertyId || !code || !wabaId || !phoneNumberId) {
+            return sendJson(res, 400, { error: 'Потрібні propertyId, code, wabaId, phoneNumberId.' }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          if (!META_APP_ID || !META_APP_SECRET) {
+            return sendJson(res, 500, { error: 'Meta OAuth не налаштовано на сервері (META_APP_ID).' }, corsHeaders);
+          }
+
+          try {
+            const { accessToken: shortLived } = await exchangeMetaCodeForToken({
+              code,
+              appId: META_APP_ID,
+              appSecret: META_APP_SECRET,
+              graphVersion: META_GRAPH_VERSION,
+            });
+            const { accessToken } = await exchangeMetaLongLivedToken({
+              shortLivedToken: shortLived,
+              appId: META_APP_ID,
+              appSecret: META_APP_SECRET,
+              graphVersion: META_GRAPH_VERSION,
+            });
+
+            const pin = String(Math.floor(100000 + Math.random() * 900000));
+            await registerWhatsAppNumber({ phoneNumberId, accessToken, pin, graphVersion: META_GRAPH_VERSION });
+            await subscribeWabaWebhooks({ wabaId, accessToken, graphVersion: META_GRAPH_VERSION });
+
+            const stored = encryptCredentialsPartial({ phone_number_id: phoneNumberId, access_token: accessToken }, 'access_token');
+            const { error } = await supabase
+              .from('channels')
+              .upsert(
+                {
+                  property_id: propertyId,
+                  channel_type: 'whatsapp',
+                  credentials: stored,
+                  connected: true,
+                  status: 'connected',
+                  status_detail: null,
+                  connected_at: new Date().toISOString(),
+                },
+                { onConflict: 'property_id,channel_type' }
+              );
+            if (error) throw new Error('Не вдалося зберегти WhatsApp.');
+            invalidateChannel(propertyId, 'whatsapp');
+
+            return sendJson(res, 200, { ok: true }, corsHeaders);
+          } catch (error) {
+            return sendJson(res, 500, { error: error.message }, corsHeaders);
+          }
+        });
 
         return;
       }

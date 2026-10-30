@@ -632,6 +632,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="status-pill off" id="pill-whatsapp">Не підключено</span>
         </div>
         <p class="hint" id="hintWhatsapp" data-i18n="ch.whatsapp.hint">Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.</p>
+        <div class="actions">
+          <button class="btn-primary" id="connectWhatsappOAuth" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="ch.whatsapp.oauthBtn">Підключити через Meta</span></button>
+          <span class="msg" id="msgWhatsappOAuth"></span>
+        </div>
+        <p class="hint" data-i18n="ch.meta.manualDivider">— або введіть дані вручну нижче —</p>
         <label for="waPhoneId" data-i18n="ch.whatsapp.phoneLabel">Phone Number ID</label>
         <input id="waPhoneId" type="text" placeholder="1029384756...">
         <label for="waToken" data-i18n="ch.whatsapp.tokenLabel">Access Token</label>
@@ -649,6 +654,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="status-pill off" id="pill-instagram">Не підключено</span>
         </div>
         <p class="hint" id="hintInstagram" data-i18n="ch.instagram.hint">Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.</p>
+        <div class="actions">
+          <button class="btn-primary" id="connectMetaPagesIg" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="ch.meta.oauthBtn">Підключити через Facebook</span></button>
+          <span class="msg" id="msgMetaPagesIg"></span>
+        </div>
+        <p class="hint" data-i18n="ch.meta.manualDivider">— або введіть дані вручну нижче —</p>
         <label for="igAccountId" data-i18n="ch.instagram.idLabel">Instagram Business Account ID</label>
         <input id="igAccountId" type="text" placeholder="1789...">
         <label for="igToken" data-i18n="ch.instagram.tokenLabel">Access Token</label>
@@ -666,6 +676,11 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
           <span class="status-pill off" id="pill-messenger">Не підключено</span>
         </div>
         <p class="hint" id="hintMessenger" data-i18n="ch.messenger.hint">Вставте Page Access Token сторінки вашого готелю з Meta for Developers — ID сторінки визначиться автоматично.</p>
+        <div class="actions">
+          <button class="btn-primary" id="connectMetaPagesFb" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="ch.meta.oauthBtn">Підключити через Facebook</span></button>
+          <span class="msg" id="msgMetaPagesFb"></span>
+        </div>
+        <p class="hint" data-i18n="ch.meta.manualDivider">— або введіть дані вручну нижче —</p>
         <label for="fbToken" data-i18n="ch.messenger.tokenLabel">Page Access Token</label>
         <input id="fbToken" type="password" placeholder="EAAG...">
         <div class="actions">
@@ -980,6 +995,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.name":"WhatsApp",
       "ch.whatsapp.hint":"Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.",
       "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
+      "ch.whatsapp.oauthBtn":"Підключити через Meta",
+      "ch.meta.oauthBtn":"Підключити через Facebook","ch.meta.manualDivider":"— або введіть дані вручну нижче —",
+      "ch.meta.notConfigured":"Вхід через Meta ще не налаштовано на сервері.","ch.meta.cancelled":"Вхід через Meta скасовано.",
+      "ch.meta.choosePage":"Оберіть сторінку:","ch.meta.noWabaInfo":"Не вдалося отримати дані WhatsApp-акаунта з вікна підключення. Спробуйте ще раз.",
       "ch.instagram.name":"Instagram",
       "ch.instagram.hint":"Директ Instagram підключається через той самий Meta-додаток, що й WhatsApp/Messenger. Вставте Instagram Business Account ID і Access Token.",
       "ch.instagram.idLabel":"Instagram Business Account ID","ch.instagram.tokenLabel":"Access Token",
@@ -1171,6 +1190,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.name":"WhatsApp",
       "ch.whatsapp.hint":"Connect via WhatsApp Cloud API (Meta). Paste the Phone Number ID and Access Token from your Meta for Developers app — we'll verify them with a real request to Meta right away.",
       "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
+      "ch.whatsapp.oauthBtn":"Connect via Meta",
+      "ch.meta.oauthBtn":"Connect via Facebook","ch.meta.manualDivider":"— or enter the details manually below —",
+      "ch.meta.notConfigured":"Meta login isn't configured on the server yet.","ch.meta.cancelled":"Meta login was cancelled.",
+      "ch.meta.choosePage":"Choose a page:","ch.meta.noWabaInfo":"Couldn't get the WhatsApp account details from the connect window. Please try again.",
       "ch.instagram.name":"Instagram",
       "ch.instagram.hint":"Instagram Direct connects through the same Meta app as WhatsApp/Messenger. Paste the Instagram Business Account ID and Access Token.",
       "ch.instagram.idLabel":"Instagram Business Account ID","ch.instagram.tokenLabel":"Access Token",
@@ -2361,6 +2384,163 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       msg.textContent = e.message;
     }
   }
+
+  /* ---------- Meta OAuth ("Увійти через Facebook") ---------- */
+  let metaSdkReadyPromise = null;
+  function loadMetaSdk() {
+    if (metaSdkReadyPromise) return metaSdkReadyPromise;
+    metaSdkReadyPromise = (async () => {
+      const res = await fetch(`${API_BASE_URL}/api/meta-config`);
+      const config = await res.json();
+      if (!config.appId) throw new Error(t('ch.meta.notConfigured', getLang()));
+      if (!window.FB) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://connect.facebook.net/en_US/sdk.js';
+          script.async = true;
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Facebook SDK не завантажився.'));
+          document.body.appendChild(script);
+        });
+        window.FB.init({ appId: config.appId, xfbml: false, version: config.graphVersion || 'v24.0' });
+      }
+      return config;
+    })();
+    return metaSdkReadyPromise;
+  }
+
+  function fbLoginWithConfig(configId) {
+    return new Promise((resolve, reject) => {
+      window.FB.login((response) => {
+        const code = response.authResponse && response.authResponse.code;
+        if (!code) { reject(new Error(t('ch.meta.cancelled', getLang()))); return; }
+        resolve(code);
+      }, { config_id: configId, response_type: 'code', override_default_response_type: true, extras: {} });
+    });
+  }
+
+  // Якщо до акаунта надано доступ до кількох сторінок — показуємо простий
+  // список кнопок під повідомленням, щоб власник обрав потрібну, замість
+  // автоматичного вгадування.
+  function renderMetaPagePicker(containerEl, pendingId, pages, onPick) {
+    const old = containerEl.querySelector('.meta-page-picker');
+    if (old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'meta-page-picker';
+    wrap.style.cssText = 'display:flex; flex-direction:column; gap:8px; margin-top:10px;';
+    pages.forEach((page) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-secondary';
+      btn.style.justifyContent = 'flex-start';
+      btn.textContent = page.hasInstagram ? `${page.name} (+ Instagram @${page.instagramUsername})` : page.name;
+      btn.addEventListener('click', () => { wrap.remove(); onPick(page.id); });
+      wrap.appendChild(btn);
+    });
+    containerEl.appendChild(wrap);
+  }
+
+  async function connectMetaPages(msgId) {
+    const msg = document.getElementById(msgId);
+    const container = msg.parentElement;
+    msg.className = 'msg';
+    msg.textContent = t('ch.connecting', getLang());
+    try {
+      const config = await loadMetaSdk();
+      if (!config.pagesConfigId) throw new Error(t('ch.meta.notConfigured', getLang()));
+      const code = await fbLoginWithConfig(config.pagesConfigId);
+
+      const res = await fetch(`${API_BASE_URL}/api/connect-meta-pages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({ propertyId: currentProperty.property_id, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const finalize = async (pageId) => {
+        msg.className = 'msg';
+        msg.textContent = t('ch.connecting', getLang());
+        const fRes = await fetch(`${API_BASE_URL}/api/connect-meta-finalize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+          body: JSON.stringify({ propertyId: currentProperty.property_id, pendingId: data.pendingId, pageId }),
+        });
+        const fData = await fRes.json();
+        if (!fRes.ok) { msg.className = 'msg error'; msg.textContent = fData.error; return; }
+        msg.className = 'msg ok';
+        msg.textContent = t('ch.connectedMsg', getLang());
+        await fetchChannels();
+      };
+
+      if (data.pages.length === 1) {
+        await finalize(data.pages[0].id);
+      } else {
+        msg.className = 'msg';
+        msg.textContent = t('ch.meta.choosePage', getLang());
+        renderMetaPagePicker(container, data.pendingId, data.pages, finalize);
+      }
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
+  }
+
+  async function connectWhatsAppEmbedded() {
+    const msg = document.getElementById('msgWhatsappOAuth');
+    msg.className = 'msg';
+    msg.textContent = t('ch.connecting', getLang());
+    try {
+      const config = await loadMetaSdk();
+      if (!config.whatsappConfigId) throw new Error(t('ch.meta.notConfigured', getLang()));
+
+      let sessionInfo = null;
+      const onMessage = (event) => {
+        if (!String(event.origin).endsWith('facebook.com')) return;
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'WA_EMBEDDED_SIGNUP' && data.data && data.data.waba_id) {
+            sessionInfo = data.data;
+          }
+        } catch {}
+      };
+      window.addEventListener('message', onMessage);
+
+      let code;
+      try {
+        code = await fbLoginWithConfig(config.whatsappConfigId);
+      } finally {
+        window.removeEventListener('message', onMessage);
+      }
+
+      if (!sessionInfo || !sessionInfo.waba_id || !sessionInfo.phone_number_id) {
+        throw new Error(t('ch.meta.noWabaInfo', getLang()));
+      }
+
+      const res = await fetch(`${API_BASE_URL}/api/connect-whatsapp-embedded`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+        body: JSON.stringify({
+          propertyId: currentProperty.property_id,
+          code,
+          wabaId: sessionInfo.waba_id,
+          phoneNumberId: sessionInfo.phone_number_id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      msg.className = 'msg ok';
+      msg.textContent = t('ch.connectedMsg', getLang());
+      await fetchChannels();
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
+  }
+
+  onClickGuarded(document.getElementById('connectMetaPagesFb'), () => connectMetaPages('msgMetaPagesFb'));
+  onClickGuarded(document.getElementById('connectMetaPagesIg'), () => connectMetaPages('msgMetaPagesIg'));
+  onClickGuarded(document.getElementById('connectWhatsappOAuth'), () => connectWhatsAppEmbedded());
 
   onClickGuarded(document.getElementById('connectTelegram'), () =>
     connectChannel('telegram', { bot_token: document.getElementById('tokenTelegram').value.trim() }, 'msgTelegram', ['bot_token']));
