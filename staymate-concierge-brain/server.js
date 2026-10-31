@@ -4101,14 +4101,11 @@ const server =
           }
 
           try {
-            const { accessToken: shortLived } = await exchangeMetaCodeForToken({
+            // WhatsApp Embedded Signup returns a Business Integration System User
+            // access token directly. fb_exchange_token is only for user tokens
+            // and can invalidate the WhatsApp onboarding flow.
+            const { accessToken } = await exchangeMetaCodeForToken({
               code,
-              appId: META_APP_ID,
-              appSecret: META_APP_SECRET,
-              graphVersion: META_GRAPH_VERSION,
-            });
-            const { accessToken } = await exchangeMetaLongLivedToken({
-              shortLivedToken: shortLived,
               appId: META_APP_ID,
               appSecret: META_APP_SECRET,
               graphVersion: META_GRAPH_VERSION,
