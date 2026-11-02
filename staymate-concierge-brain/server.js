@@ -73,6 +73,7 @@ const {
   verifyMessengerCredentials,
 } = require('./meta-verify');
 const {
+  isValidMetaSdkRedirectUri,
   exchangeCodeForToken: exchangeMetaCodeForToken,
   exchangeForLongLivedToken: exchangeMetaLongLivedToken,
   listPages: listMetaPages,
@@ -3914,7 +3915,7 @@ const server =
             return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
           }
 
-          const { propertyId, code } = parsed;
+          const { propertyId, code, redirectUri } = parsed;
           if (!propertyId || !code) {
             return sendJson(res, 400, { error: 'Потрібні propertyId, code.' }, corsHeaders);
           }
@@ -3929,11 +3930,16 @@ const server =
             return sendJson(res, 500, { error: 'Meta OAuth не налаштовано на сервері (META_APP_ID).' }, corsHeaders);
           }
 
+          if (!isValidMetaSdkRedirectUri(redirectUri)) {
+            return sendJson(res, 400, { error: 'Meta OAuth redirect_uri missing or invalid. Restart the Meta connection.' }, corsHeaders);
+          }
+
           try {
             const { accessToken: shortLived } = await exchangeMetaCodeForToken({
               code,
               appId: META_APP_ID,
               appSecret: META_APP_SECRET,
+              redirectUri,
               graphVersion: META_GRAPH_VERSION,
             });
             const { accessToken: userToken } = await exchangeMetaLongLivedToken({
@@ -4091,7 +4097,7 @@ const server =
             return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
           }
 
-          const { propertyId, code, wabaId, phoneNumberId } = parsed;
+          const { propertyId, code, redirectUri, wabaId, phoneNumberId } = parsed;
           if (!propertyId || !code || !wabaId || !phoneNumberId) {
             return sendJson(res, 400, { error: 'Потрібні propertyId, code, wabaId, phoneNumberId.' }, corsHeaders);
           }
@@ -4106,6 +4112,10 @@ const server =
             return sendJson(res, 500, { error: 'Meta OAuth не налаштовано на сервері (META_APP_ID).' }, corsHeaders);
           }
 
+          if (!isValidMetaSdkRedirectUri(redirectUri)) {
+            return sendJson(res, 400, { error: 'Meta OAuth redirect_uri missing or invalid. Restart the Meta connection.' }, corsHeaders);
+          }
+
           try {
             // WhatsApp Embedded Signup returns a Business Integration System User
             // access token directly. fb_exchange_token is only for user tokens
@@ -4114,6 +4124,7 @@ const server =
               code,
               appId: META_APP_ID,
               appSecret: META_APP_SECRET,
+              redirectUri,
               graphVersion: META_GRAPH_VERSION,
             });
 

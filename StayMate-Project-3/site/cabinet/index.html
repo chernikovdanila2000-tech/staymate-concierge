@@ -2440,11 +2440,39 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   function fbLoginWithConfig(configId) {
     return new Promise((resolve, reject) => {
-      window.FB.login((response) => {
-        const code = response.authResponse && response.authResponse.code;
-        if (!code) { reject(new Error(t('ch.meta.cancelled', getLang()))); return; }
-        resolve(code);
-      }, { config_id: configId, response_type: 'code', override_default_response_type: true, extras: {} });
+      // FB.login uses an SDK-generated, per-attempt redirect URI. The actual
+      // value must be sent with the authorization code; redirect_uri='' fails.
+      const nativeOpen = window.open;
+      let oauthRedirectUri = '';
+      const captureMetaPopup = function(url, ...args) {
+        try {
+          const popupUrl = new URL(String(url), window.location.href);
+          if (['www.facebook.com', 'm.facebook.com', 'web.facebook.com'].includes(popupUrl.hostname)
+              && /\/dialog\/oauth$/.test(popupUrl.pathname)) {
+            oauthRedirectUri = popupUrl.searchParams.get('redirect_uri') || '';
+          }
+        } catch {}
+        return nativeOpen.call(this, url, ...args);
+      };
+      const restoreOpen = () => {
+        if (window.open === captureMetaPopup) window.open = nativeOpen;
+      };
+      window.open = captureMetaPopup;
+      try {
+        window.FB.login((response) => {
+          restoreOpen();
+          const code = response.authResponse && response.authResponse.code;
+          if (!code) { reject(new Error(t('ch.meta.cancelled', getLang()))); return; }
+          if (!oauthRedirectUri) {
+            reject(new Error('Meta не повернула адресу авторизації. Спробуйте ще раз у браузері Safari або Chrome.'));
+            return;
+          }
+          resolve({ code, redirectUri: oauthRedirectUri });
+        }, { config_id: configId, response_type: 'code', override_default_response_type: true, extras: {} });
+      } catch (e) {
+        restoreOpen();
+        reject(e);
+      }
     });
   }
 
@@ -2477,12 +2505,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     try {
       const config = requireReadyMetaSdk();
       if (!config.pagesConfigId) throw new Error(t('ch.meta.notConfigured', getLang()));
-      const code = await fbLoginWithConfig(config.pagesConfigId);
+      const { code, redirectUri } = await fbLoginWithConfig(config.pagesConfigId);
 
       const res = await fetch(`${API_BASE_URL}/api/connect-meta-pages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
-        body: JSON.stringify({ propertyId: currentProperty.property_id, code }),
+        body: JSON.stringify({ propertyId: currentProperty.property_id, code, redirectUri }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -2536,8 +2564,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       window.addEventListener('message', onMessage);
 
       let code;
+      let redirectUri;
       try {
-        code = await fbLoginWithConfig(config.whatsappConfigId);
+        ({ code, redirectUri } = await fbLoginWithConfig(config.whatsappConfigId));
       } finally {
         window.removeEventListener('message', onMessage);
       }
@@ -2552,6 +2581,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         body: JSON.stringify({
           propertyId: currentProperty.property_id,
           code,
+          redirectUri,
           wabaId: sessionInfo.waba_id,
           phoneNumberId: sessionInfo.phone_number_id,
         }),

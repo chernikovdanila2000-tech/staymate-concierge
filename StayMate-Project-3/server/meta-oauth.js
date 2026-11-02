@@ -120,7 +120,24 @@ async function subscribeWabaWebhooks({ wabaId, accessToken, graphVersion, fetchI
   });
 }
 
+function isValidMetaSdkRedirectUri(value) {
+  if (typeof value !== 'string' || value.length > 2048 || !value) return false;
+  try {
+    const uri = new URL(value);
+    if (uri.protocol !== 'https:' || uri.hostname !== 'staticxx.facebook.com'
+        || uri.port || uri.username || uri.password
+        || uri.pathname !== '/x/connect/xd_arbiter/') return false;
+    const hashParams = new URLSearchParams(uri.hash.slice(1));
+    if (hashParams.get('domain') !== 'stayai.online') return false;
+    const origin = new URL(hashParams.get('origin') || '');
+    return origin.origin === 'https://stayai.online';
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
+  isValidMetaSdkRedirectUri,
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   listPages,
