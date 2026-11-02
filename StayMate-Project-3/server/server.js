@@ -2517,6 +2517,12 @@ const server =
                 corsHeaders
               );
             } catch (error) {
+              console.error(
+                '[website]',
+                propertyId,
+                error.message,
+                error.stack
+              );
               return sendJson(
                 res,
                 500,
