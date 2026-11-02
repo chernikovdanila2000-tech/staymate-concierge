@@ -2387,6 +2387,15 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   /* ---------- Meta OAuth ("Увійти через Facebook") ---------- */
   let metaSdkReadyPromise = null;
+  let metaSdkConfig = null;
+  function requireReadyMetaSdk() {
+    // FB.login must run in the original click event, before any await.
+    if (!metaSdkConfig || !window.FB) {
+      void loadMetaSdk().catch(() => {});
+      throw new Error('Meta ще завантажується. Спробуйте ще раз.');
+    }
+    return metaSdkConfig;
+  }
   function loadMetaSdk() {
     if (metaSdkReadyPromise) return metaSdkReadyPromise;
     metaSdkReadyPromise = (async () => {
@@ -2404,10 +2413,30 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         });
         window.FB.init({ appId: config.appId, xfbml: false, version: config.graphVersion || 'v24.0' });
       }
+      metaSdkConfig = config;
       return config;
-    })();
+    })().catch((error) => {
+      metaSdkReadyPromise = null;
+      metaSdkConfig = null;
+      throw error;
+    });
     return metaSdkReadyPromise;
   }
+
+  // Prepare Meta while the user reads the cabinet, not after clicking Connect.
+  const metaOAuthButtons = ['connectMetaPagesFb', 'connectMetaPagesIg', 'connectWhatsappOAuth']
+    .map((id) => document.getElementById(id));
+  metaOAuthButtons.forEach((btn) => { btn.disabled = true; });
+  void loadMetaSdk().then(() => {
+    metaOAuthButtons.forEach((btn) => { btn.disabled = false; });
+  }).catch((error) => {
+    metaOAuthButtons.forEach((btn) => { btn.disabled = false; });
+    ['msgMetaPagesFb', 'msgMetaPagesIg', 'msgWhatsappOAuth'].forEach((id) => {
+      const message = document.getElementById(id);
+      message.className = 'msg error';
+      message.textContent = error.message;
+    });
+  });
 
   function fbLoginWithConfig(configId) {
     return new Promise((resolve, reject) => {
@@ -2446,7 +2475,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     msg.className = 'msg';
     msg.textContent = t('ch.connecting', getLang());
     try {
-      const config = await loadMetaSdk();
+      const config = requireReadyMetaSdk();
       if (!config.pagesConfigId) throw new Error(t('ch.meta.notConfigured', getLang()));
       const code = await fbLoginWithConfig(config.pagesConfigId);
 
@@ -2491,7 +2520,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     msg.className = 'msg';
     msg.textContent = t('ch.connecting', getLang());
     try {
-      const config = await loadMetaSdk();
+      const config = requireReadyMetaSdk();
       if (!config.whatsappConfigId) throw new Error(t('ch.meta.notConfigured', getLang()));
 
       let sessionInfo = null;
