@@ -283,6 +283,23 @@ async function isTakenOverConversation(propertyId, channel, chatId) {
   }
 }
 
+// While a conversation is taken over, every new guest message is recorded
+// but the AI never gets a turn to reply — so consecutive messages would
+// otherwise stack up as back-to-back "user" entries. The Anthropic API
+// requires strictly alternating user/assistant turns, so once the
+// escalation is resolved and the AI resumes, that broken history would
+// make every single next call fail (or badly confuse the model). Folding
+// them into one turn keeps the history valid no matter how many messages
+// piled up while nobody was answering.
+function appendGuestMessage(history, text) {
+  const last = history[history.length - 1];
+  if (last && last.role === 'user' && typeof last.content === 'string') {
+    last.content += '\n' + text;
+  } else {
+    history.push({ role: 'user', content: text });
+  }
+}
+
 /**
  * Перевіряє, що запит несе дійсний Supabase-токен власника готелю
  * propertyId (заголовок Authorization: Bearer <jwt>), а не просто довіряє
@@ -1217,10 +1234,7 @@ const server =
                         event.senderId
                       );
 
-                    history.push({
-                      role: 'user',
-                      content: incomingText,
-                    });
+                    appendGuestMessage(history, incomingText);
 
                     if (await isTakenOverConversation(connection.propertyId, 'messenger', event.senderId)) {
                       await saveHistory(connection.propertyId, 'messenger', event.senderId, history);
@@ -1536,10 +1550,7 @@ const server =
                         }
                       );
 
-                      history.push({
-                        role: 'user',
-                        content: incomingText,
-                      });
+                      appendGuestMessage(history, incomingText);
 
                       if (await isTakenOverConversation(connection.propertyId, 'instagram', event.senderId)) {
                         await saveHistory(connection.propertyId, 'instagram', event.senderId, history);
@@ -1790,7 +1801,7 @@ const server =
                   'whatsapp',
                   event.senderId
                 );
-                history.push({ role: 'user', content: incomingText });
+                appendGuestMessage(history, incomingText);
 
                 if (await isTakenOverConversation(connection.propertyId, 'whatsapp', event.senderId)) {
                   await saveHistory(connection.propertyId, 'whatsapp', event.senderId, history);
@@ -1979,10 +1990,7 @@ const server =
                 userId
               );
 
-            history.push({
-              role: 'user',
-              content: message,
-            });
+            appendGuestMessage(history, message);
 
             if (await isTakenOverConversation(propertyId, 'test', userId)) {
               await saveHistory(propertyId, 'test', userId, history);
@@ -2157,10 +2165,7 @@ const server =
                 chatId
               );
 
-            history.push({
-              role: 'user',
-              content: text,
-            });
+            appendGuestMessage(history, text);
 
             if (await isTakenOverConversation(propertyId, 'telegram', chatId)) {
               await saveHistory(propertyId, 'telegram', chatId, history);
@@ -2318,10 +2323,7 @@ const server =
                 chatId
               );
 
-            history.push({
-              role: 'user',
-              content: text,
-            });
+            appendGuestMessage(history, text);
 
             if (await isTakenOverConversation(propertyId, 'viber', chatId)) {
               await saveHistory(propertyId, 'viber', chatId, history);
@@ -2488,11 +2490,7 @@ const server =
                 sessionId
               );
 
-            history.push({
-              role: 'user',
-              content:
-                String(message),
-            });
+            appendGuestMessage(history, String(message));
 
             if (await isTakenOverConversation(propertyId, 'website', sessionId)) {
               await saveHistory(propertyId, 'website', sessionId, history);

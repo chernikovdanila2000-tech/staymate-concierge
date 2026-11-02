@@ -347,6 +347,37 @@ function createTools(propertyId, channel, chatId) {
   async function escalateToHuman({ reason, urgency }) {
     console.log(`[ESCALATION ${propertyId}${urgency ? ' - ' + urgency : ''}] ${reason}`);
 
+    // The AI re-evaluates whether to escalate on every turn, so the same
+    // still-open ticket could otherwise get a brand new row (and the owner
+    // a brand new, easy-to-miss card in the cabinet) for every guest
+    // message that arrives while nobody has resolved it yet. Refresh the
+    // existing open escalation for this conversation instead of stacking
+    // duplicates; a conversation resolved earlier still gets a fresh one.
+    if (channel && chatId != null) {
+      const { data: existing, error: lookupError } = await supabase
+        .from('escalations')
+        .select('id')
+        .eq('property_id', propertyId)
+        .eq('channel', channel)
+        .eq('chat_id', String(chatId))
+        .neq('status', 'resolved')
+        .limit(1)
+        .maybeSingle();
+
+      if (!lookupError && existing) {
+        const { error: updateError } = await supabase
+          .from('escalations')
+          .update({ reason, urgency: urgency || 'normal' })
+          .eq('id', existing.id);
+
+        if (updateError) {
+          console.error('[escalateToHuman] Supabase error (update):', updateError);
+        }
+
+        return { ok: true, message: 'Звернення передано адміністрації закладу.' };
+      }
+    }
+
     const { error } = await supabase
       .from('escalations')
       .insert({
