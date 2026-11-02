@@ -148,6 +148,8 @@
           sendBtn.disabled = false;
           if (data && data.reply) {
             addMessage('ai', data.reply);
+          } else if (data && data.takenOver) {
+            addMessage('ai', 'Ваше повідомлення передано менеджеру готелю — він відповість тут найближчим часом.');
           } else {
             addMessage('ai', 'Вибачте, сталася технічна помилка. Спробуйте, будь ласка, ще раз.');
           }
