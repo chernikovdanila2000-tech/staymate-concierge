@@ -890,7 +890,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "esc.noHistory":"Історія переписки порожня.",
       "esc.modal.title":"Ескалація","esc.markResolved":"Позначити вирішеною","esc.reopen":"Відкрити знову",
       "esc.reply.label":"Відповісти гостю","esc.reply.ph":"Напишіть відповідь — вона піде гостю тим самим каналом","esc.reply.send":"Надіслати",
-      "esc.reply.empty":"Напишіть текст відповіді.","esc.reply.sent":"Надіслано.","esc.reply.error":"Не вдалося надіслати відповідь.",
+      "esc.reply.empty":"Напишіть текст відповіді.","esc.reply.sent":"Надіслано. Ескалацію позначено вирішеною.","esc.reply.error":"Не вдалося надіслати відповідь.",
       "esc.delete":"Видалити","esc.deleteConfirm":"Видалити цю ескалацію разом з історією переписки? Дію не можна скасувати.","esc.deleteError":"Не вдалося видалити.",
       "ch.test.name":"Тестовий чат",
 
@@ -1085,7 +1085,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "esc.noHistory":"No conversation history.",
       "esc.modal.title":"Escalation","esc.markResolved":"Mark resolved","esc.reopen":"Reopen",
       "esc.reply.label":"Reply to guest","esc.reply.ph":"Write a reply — it'll go to the guest through the same channel","esc.reply.send":"Send",
-      "esc.reply.empty":"Write a reply first.","esc.reply.sent":"Sent.","esc.reply.error":"Couldn't send the reply.",
+      "esc.reply.empty":"Write a reply first.","esc.reply.sent":"Sent. Marked as resolved.","esc.reply.error":"Couldn't send the reply.",
       "esc.delete":"Delete","esc.deleteConfirm":"Delete this escalation along with its conversation history? This can't be undone.","esc.deleteError":"Couldn't delete.",
       "ch.test.name":"Test chat",
 
@@ -2223,6 +2223,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('escReplyText').value = '';
     msg.className = 'msg ok';
     msg.textContent = t('esc.reply.sent', getLang());
+    // Відповідь власника автоматично закриває ескалацію на бекенді —
+    // віддзеркалюємо це в локальному стані, щоб модалка й список карток
+    // одразу показали актуальний статус без повторного завантаження.
+    esc.status = 'resolved';
+    updateEscStatusButton('resolved');
+    renderEscalationsList();
     const { data } = await supabase
       .from('conversations')
       .select('messages')

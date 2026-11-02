@@ -3611,6 +3611,15 @@ const server =
           history.push({ role: 'assistant', content: text, from_owner: true });
           await saveHistory(propertyId, escalation.channel, escalation.chat_id, history);
 
+          // Власник відповів гостю — для нього це й означає "питання
+          // вирішено". Без цього AI лишався б мовчати на всі наступні
+          // повідомлення цього гостя, поки хтось окремо не натисне
+          // "Позначити вирішеним" у кабінеті.
+          await supabase
+            .from('escalations')
+            .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+            .eq('id', escalationId);
+
           return sendJson(res, 200, { ok: true }, corsHeaders);
         });
 
