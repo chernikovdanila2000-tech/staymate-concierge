@@ -82,6 +82,7 @@ const {
   listWabaPhoneNumbers,
   getPhoneMode,
 } = require('./meta-oauth');
+const { parseCoexistenceEvents, requestBusinessAppSync } = require('./whatsapp-coexistence');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -631,10 +632,7 @@ async function resolveWhatsAppConnection(phoneNumberId) {
 
   if (data && data.credentials && data.credentials.access_token) {
     let propertyId = String(data.property_id || '').trim();
-    if (!propertyId || !(await getProperty(propertyId))) {
-      propertyId = await resolveMessengerPropertyId('');
-    }
-    if (!propertyId) return null;
+    if (!propertyId || !(await getProperty(propertyId))) return null;
     return {
       propertyId,
       accessToken: String(data.credentials.access_token),
@@ -1699,12 +1697,52 @@ const server =
             return sendJson(res, 400, { error: 'Invalid JSON.' });
           }
 
-          const events = parseWhatsAppEvents(payload);
-          console.log('[whatsapp] Webhook received:', { messageEvents: events.length });
-          sendJson(res, 200, { ok: true });
-          if (events.length === 0) return;
+           const events = parseWhatsAppEvents(payload);
+           const mirrorEvents = parseCoexistenceEvents(payload);
+           console.log('[whatsapp] Webhook received:', {
+             messageEvents: events.length, mirrorEvents: mirrorEvents.length,
+           });
+           sendJson(res, 200, { ok: true });
+           if (events.length === 0 && mirrorEvents.length === 0) return;
 
-          setImmediate(async () => {
+           setImmediate(async () => {
+             for (const item of mirrorEvents) {
+               try {
+                 const connection = await resolveWhatsAppConnection(item.phoneNumberId);
+                 if (!connection) continue;
+                 if (item.kind === 'message') {
+                   const { error } = await supabase
+                     .from('whatsapp_coexistence_messages')
+                     .upsert({
+                       property_id: connection.propertyId, phone_number_id: item.phoneNumberId,
+                       message_id: item.messageId, chat_id: item.chatId,
+                       direction: item.direction, message_type: item.messageType,
+                       body: item.text, source: item.source, sent_at: item.sentAt,
+                     }, {onConflict:'property_id,phone_number_id,message_id', ignoreDuplicates:true});
+                   if (error) throw error;
+                 } else if (item.kind === 'contact') {
+                   const { error } = await supabase
+                     .from('whatsapp_coexistence_contacts')
+                     .upsert({
+                       property_id: connection.propertyId, phone_number_id: item.phoneNumberId,
+                       contact_id: item.contactId, contact_name: item.contactName,
+                       action: item.action, updated_at:new Date().toISOString(),
+                     }, {onConflict:'property_id,phone_number_id,contact_id'});
+                   if (error) throw error;
+                 } else if (item.kind === 'history_status') {
+                   const { error } = await supabase.from('whatsapp_coexistence_sync')
+                     .upsert({
+                       property_id: connection.propertyId, phone_number_id: item.phoneNumberId,
+                       sync_type:'history', status:item.status,
+                       updated_at:new Date().toISOString(),
+                     }, {onConflict:'property_id,phone_number_id,sync_type'});
+                   if (error) throw error;
+                 }
+               } catch(error) {
+                 console.error('[whatsapp] Coexistence sync event error:', error.message);
+               }
+             }
+
             for (const event of events) {
               try {
                 const connection = await resolveWhatsAppConnection(event.phoneNumberId);
@@ -4140,8 +4178,17 @@ const server =
             }
             await subscribeWabaWebhooks({ wabaId, accessToken, graphVersion: META_GRAPH_VERSION });
 
-            const stored = encryptCredentialsPartial({
-              phone_number_id: String(chosen.id),
+             const { data: previousConnection, error: lookupError } = await supabase
+               .from('channels').select('credentials')
+               .eq('property_id', propertyId).eq('channel_type', 'whatsapp')
+               .maybeSingle();
+             if (lookupError) throw lookupError;
+             const alreadyOnboarded = onboardingMode === 'coexistence'
+               && previousConnection?.credentials?.phone_number_id === String(chosen.id)
+               && previousConnection?.credentials?.onboarding_mode === 'coexistence';
+
+             const stored = encryptCredentialsPartial({
+               phone_number_id: String(chosen.id),
               waba_id: String(wabaId), onboarding_mode: onboardingMode, access_token: accessToken,
             }, 'access_token');
             const { error } = await supabase
@@ -4159,9 +4206,50 @@ const server =
                 { onConflict: 'property_id,channel_type' }
               );
             if (error) throw new Error('Не вдалося зберегти WhatsApp.');
-            invalidateChannel(propertyId, 'whatsapp');
+             invalidateChannel(propertyId, 'whatsapp');
 
-            return sendJson(res, 200, { ok: true }, corsHeaders);
+             const syncErrors = [];
+             if (onboardingMode === 'coexistence' && !alreadyOnboarded) {
+               // Meta allows each Business App data-sync request only once after
+               // onboarding. Record the request before sending and never silently
+               // repeat it on a reconnect. Sync events arrive asynchronously.
+               for (const syncType of ['smb_app_state_sync', 'history']) {
+                 const id = {property_id:propertyId, phone_number_id:String(chosen.id), sync_type:syncType};
+                 const {data:priorSync, error:priorError} = await supabase
+                   .from('whatsapp_coexistence_sync').select('status')
+                   .match(id).maybeSingle();
+                 if (priorError) { syncErrors.push(syncType); continue; }
+                 if (priorSync && ['starting','requested','completed','not_shared'].includes(priorSync.status)) continue;
+                 const {error:beforeError} = await supabase
+                   .from('whatsapp_coexistence_sync')
+                   .upsert({...id, status:'starting', updated_at:new Date().toISOString()},
+                     {onConflict:'property_id,phone_number_id,sync_type'});
+                 if (beforeError) { syncErrors.push(syncType); continue; }
+                 try {
+                   const result = await requestBusinessAppSync({
+                     phoneNumberId: String(chosen.id), accessToken,
+                     syncType, graphVersion:META_GRAPH_VERSION,
+                   });
+                   const {error:saveError} = await supabase
+                     .from('whatsapp_coexistence_sync')
+                     .upsert({...id,status:'requested',request_id:result.request_id || null,
+                       updated_at:new Date().toISOString()},
+                       {onConflict:'property_id,phone_number_id,sync_type'});
+                   if (saveError) throw saveError;
+                 } catch(err) {
+                   console.error('[whatsapp] Initial coexistence sync failed:', syncType, err.message);
+                   syncErrors.push(syncType);
+                   await supabase.from('whatsapp_coexistence_sync').upsert({
+                     ...id,status:'failed',updated_at:new Date().toISOString(),
+                   }, {onConflict:'property_id,phone_number_id,sync_type'});
+                 }
+               }
+             }
+             return sendJson(res, 200, {
+               ok:true, coexistence:onboardingMode==='coexistence',
+               syncStarted:syncErrors.length===0,
+               ...(syncErrors.length ? {syncWarnings:syncErrors} : {}),
+             }, corsHeaders);
           } catch (error) {
             return sendJson(res, 500, { error: error.message }, corsHeaders);
           }
