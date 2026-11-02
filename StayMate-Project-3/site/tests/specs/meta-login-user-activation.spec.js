@@ -42,13 +42,17 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
           window.__metaCalls.push({
             configId: options.config_id,
             duringClick: window.__insideNativeClickEvent,
+            featureType: options.extras?.featureType || null,
           });
           if (options.config_id === 'whatsapp-test-config') {
             window.dispatchEvent(new MessageEvent('message', {
               origin: 'https://www.facebook.com',
               data: JSON.stringify({
                 type: 'WA_EMBEDDED_SIGNUP',
-                data: { waba_id: 'demo-waba', phone_number_id: 'demo-phone' },
+                event: options.extras?.featureType ? 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' : 'FINISH',
+                data: options.extras?.featureType
+                  ? { waba_id: 'demo-waba' }
+                  : { waba_id: 'demo-waba', phone_number_id: 'demo-phone' },
               }),
             }));
           }
@@ -78,7 +82,7 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
   await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/);
   await page.locator('.dash-tab[data-tab="channels"]').click();
 
-  for (const button of ['connectMetaPagesIg', 'connectMetaPagesFb', 'connectWhatsappOAuth']) {
+  for (const button of ['connectMetaPagesIg', 'connectMetaPagesFb', 'connectWhatsappOAuth', 'connectWhatsappBusinessOAuth']) {
     await expect(page.locator('#' + button)).toBeEnabled();
     await page.locator('#' + button).click();
     await expect(page.locator('#' + button)).toBeEnabled();
@@ -86,11 +90,18 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
 
   const calls = await page.evaluate(() => window.__metaCalls);
   expect(calls).toEqual([
-    { configId: 'pages-test-config', duringClick: true },
-    { configId: 'pages-test-config', duringClick: true },
-    { configId: 'whatsapp-test-config', duringClick: true },
+    { configId: 'pages-test-config', duringClick: true, featureType: null },
+    { configId: 'pages-test-config', duringClick: true, featureType: null },
+    { configId: 'whatsapp-test-config', duringClick: true, featureType: null },
+    { configId: 'whatsapp-test-config', duringClick: true, featureType: 'whatsapp_business_app_onboarding' },
   ]);
-  expect(oauthRequests).toHaveLength(3);
+  expect(oauthRequests).toHaveLength(4);
+  expect(oauthRequests[2]).toMatchObject({
+    onboardingMode: 'standard', coexistenceEvent: false, phoneNumberId: 'demo-phone',
+  });
+  expect(oauthRequests[3]).toMatchObject({
+    onboardingMode: 'coexistence', coexistenceEvent: true, phoneNumberId: null, wabaId: 'demo-waba',
+  });
   for (const item of oauthRequests) {
     expect(item.code).toBe('demo-oauth-code');
     expect(item.redirectUri).toBe('https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=demo&domain=stayai.online&origin=https%3A%2F%2Fstayai.online%2Ftest&relation=opener');

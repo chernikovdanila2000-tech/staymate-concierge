@@ -81,6 +81,8 @@ const {
   subscribePageWebhooks,
   registerWhatsAppNumber,
   subscribeWabaWebhooks,
+  listWabaPhoneNumbers,
+  getPhoneMode,
 } = require('./meta-oauth');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -4095,9 +4097,13 @@ const server =
             return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
           }
 
-          const { propertyId, code, redirectUri, wabaId, phoneNumberId } = parsed;
-          if (!propertyId || !code || !wabaId || !phoneNumberId) {
-            return sendJson(res, 400, { error: 'Потрібні propertyId, code, wabaId, phoneNumberId.' }, corsHeaders);
+          const { propertyId, code, redirectUri, wabaId, phoneNumberId, onboardingMode, coexistenceEvent } = parsed;
+          if (!propertyId || !code || !/^[0-9]{5,30}$/.test(String(wabaId || ''))
+              || !['standard', 'coexistence'].includes(onboardingMode)) {
+            return sendJson(res, 400, { error: 'Invalid WhatsApp Embedded Signup details.' }, corsHeaders);
+          }
+          if (onboardingMode === 'coexistence' && coexistenceEvent !== true) {
+            return sendJson(res, 400, { error: 'Meta did not confirm WhatsApp Business app coexistence.' }, corsHeaders);
           }
 
           try {
@@ -4126,11 +4132,36 @@ const server =
               graphVersion: META_GRAPH_VERSION,
             });
 
-            const pin = String(Math.floor(100000 + Math.random() * 900000));
-            await registerWhatsAppNumber({ phoneNumberId, accessToken, pin, graphVersion: META_GRAPH_VERSION });
+            // The coexistence session may return only WABA ID. Resolve the
+            // phone from that WABA rather than guessing or re-registering it.
+            const numbers = await listWabaPhoneNumbers({
+              wabaId, accessToken, graphVersion: META_GRAPH_VERSION,
+            });
+            const chosen = phoneNumberId
+              ? numbers.find((item) => String(item.id) === String(phoneNumberId))
+              : numbers.length === 1 ? numbers[0] : null;
+            if (!chosen) {
+              throw new Error('Could not uniquely identify the WhatsApp phone number in the business account.');
+            }
+            if (onboardingMode === 'coexistence') {
+              const status = await getPhoneMode({
+                phoneNumberId: chosen.id, accessToken, graphVersion: META_GRAPH_VERSION,
+              });
+              if (status.is_on_biz_app !== true || status.platform_type !== 'CLOUD_API') {
+                throw new Error('Meta has not confirmed WhatsApp Business app coexistence for this number.');
+              }
+            } else {
+              const pin = String(Math.floor(100000 + Math.random() * 900000));
+              await registerWhatsAppNumber({
+                phoneNumberId: chosen.id, accessToken, pin, graphVersion: META_GRAPH_VERSION,
+              });
+            }
             await subscribeWabaWebhooks({ wabaId, accessToken, graphVersion: META_GRAPH_VERSION });
 
-            const stored = encryptCredentialsPartial({ phone_number_id: phoneNumberId, access_token: accessToken }, 'access_token');
+            const stored = encryptCredentialsPartial({
+              phone_number_id: String(chosen.id),
+              waba_id: String(wabaId), onboarding_mode: onboardingMode, access_token: accessToken,
+            }, 'access_token');
             const { error } = await supabase
               .from('channels')
               .upsert(

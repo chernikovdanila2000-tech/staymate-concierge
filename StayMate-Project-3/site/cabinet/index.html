@@ -633,7 +633,9 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
         </div>
         <p class="hint" id="hintWhatsapp" data-i18n="ch.whatsapp.hint">Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.</p>
         <div class="actions">
-          <button class="btn-primary" id="connectWhatsappOAuth" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="ch.whatsapp.oauthBtn">Підключити через Meta</span></button>
+          <button class="btn-secondary" id="connectWhatsappOAuth" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M7 9h10M7 13h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="ch.whatsapp.oauthBtn">Підключити новий номер через Meta</span></button>
+          <button class="btn-primary" id="connectWhatsappBusinessOAuth" type="button"><span data-i18n="ch.whatsapp.businessBtn">Підключити чинний WhatsApp Business</span></button>
+          <p class="hint" data-i18n="ch.whatsapp.businessHint">Чинний номер можна підключити без видалення застосунку лише з WhatsApp Business. Звичайний WhatsApp не підтримується.</p>
           <span class="msg" id="msgWhatsappOAuth"></span>
         </div>
         <p class="hint" data-i18n="ch.meta.manualDivider">— або введіть дані вручну нижче —</p>
@@ -995,7 +997,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.name":"WhatsApp",
       "ch.whatsapp.hint":"Підключення через WhatsApp Cloud API (Meta). Вставте Phone Number ID і Access Token із вашого додатка в Meta for Developers — ми одразу перевіримо їх реальним запитом до Meta.",
       "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
-      "ch.whatsapp.oauthBtn":"Підключити через Meta",
+      "ch.whatsapp.oauthBtn":"Підключити новий номер через Meta",
+      "ch.whatsapp.businessBtn":"Підключити чинний WhatsApp Business",
+      "ch.whatsapp.businessHint":"Чинний номер можна підключити без видалення застосунку лише з WhatsApp Business. Звичайний WhatsApp не підтримується.",
       "ch.meta.oauthBtn":"Підключити через Facebook","ch.meta.manualDivider":"— або введіть дані вручну нижче —",
       "ch.meta.notConfigured":"Вхід через Meta ще не налаштовано на сервері.","ch.meta.cancelled":"Вхід через Meta скасовано.",
       "ch.meta.choosePage":"Оберіть сторінку:","ch.meta.noWabaInfo":"Не вдалося отримати дані WhatsApp-акаунта з вікна підключення. Спробуйте ще раз.",
@@ -1190,7 +1194,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.name":"WhatsApp",
       "ch.whatsapp.hint":"Connect via WhatsApp Cloud API (Meta). Paste the Phone Number ID and Access Token from your Meta for Developers app — we'll verify them with a real request to Meta right away.",
       "ch.whatsapp.phoneLabel":"Phone Number ID","ch.whatsapp.tokenLabel":"Access Token",
-      "ch.whatsapp.oauthBtn":"Connect via Meta",
+      "ch.whatsapp.oauthBtn":"Connect a new number via Meta",
+      "ch.whatsapp.businessBtn":"Connect existing WhatsApp Business",
+      "ch.whatsapp.businessHint":"Connect your existing number without removing the WhatsApp Business app. Personal WhatsApp is not supported.",
       "ch.meta.oauthBtn":"Connect via Facebook","ch.meta.manualDivider":"— or enter the details manually below —",
       "ch.meta.notConfigured":"Meta login isn't configured on the server yet.","ch.meta.cancelled":"Meta login was cancelled.",
       "ch.meta.choosePage":"Choose a page:","ch.meta.noWabaInfo":"Couldn't get the WhatsApp account details from the connect window. Please try again.",
@@ -2424,7 +2430,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   }
 
   // Prepare Meta while the user reads the cabinet, not after clicking Connect.
-  const metaOAuthButtons = ['connectMetaPagesFb', 'connectMetaPagesIg', 'connectWhatsappOAuth']
+  const metaOAuthButtons = ['connectMetaPagesFb', 'connectMetaPagesIg', 'connectWhatsappOAuth', 'connectWhatsappBusinessOAuth']
     .map((id) => document.getElementById(id));
   metaOAuthButtons.forEach((btn) => { btn.disabled = true; });
   void loadMetaSdk().then(() => {
@@ -2438,7 +2444,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     });
   });
 
-  function fbLoginWithConfig(configId) {
+  function fbLoginWithConfig(configId, extras = {}) {
     return new Promise((resolve, reject) => {
       // FB.login uses an SDK-generated, per-attempt redirect URI. The actual
       // value must be sent with the authorization code; redirect_uri='' fails.
@@ -2468,7 +2474,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
             return;
           }
           resolve({ code, redirectUri: oauthRedirectUri });
-        }, { config_id: configId, response_type: 'code', override_default_response_type: true, extras: {} });
+        }, { config_id: configId, response_type: 'code', override_default_response_type: true, extras });
       } catch (e) {
         restoreOpen();
         reject(e);
@@ -2543,7 +2549,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  async function connectWhatsAppEmbedded() {
+  async function connectWhatsAppEmbedded(mode = 'coexistence') {
     const msg = document.getElementById('msgWhatsappOAuth');
     msg.className = 'msg';
     msg.textContent = t('ch.connecting', getLang());
@@ -2553,11 +2559,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
       let sessionInfo = null;
       const onMessage = (event) => {
-        if (!String(event.origin).endsWith('facebook.com')) return;
+        if (!['https://www.facebook.com', 'https://m.facebook.com', 'https://web.facebook.com'].includes(event.origin)) return;
         try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'WA_EMBEDDED_SIGNUP' && data.data && data.data.waba_id) {
-            sessionInfo = data.data;
+          const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          if (data && data.type === 'WA_EMBEDDED_SIGNUP' && data.data && data.data.waba_id) {
+            sessionInfo = { ...data.data, event: data.event };
           }
         } catch {}
       };
@@ -2566,12 +2572,15 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       let code;
       let redirectUri;
       try {
-        ({ code, redirectUri } = await fbLoginWithConfig(config.whatsappConfigId));
+        const extras = mode === 'coexistence'
+          ? { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' }
+          : { setup: {}, sessionInfoVersion: '3' };
+        ({ code, redirectUri } = await fbLoginWithConfig(config.whatsappConfigId, extras));
       } finally {
         window.removeEventListener('message', onMessage);
       }
 
-      if (!sessionInfo || !sessionInfo.waba_id || !sessionInfo.phone_number_id) {
+      if (!sessionInfo || !sessionInfo.waba_id) {
         throw new Error(t('ch.meta.noWabaInfo', getLang()));
       }
 
@@ -2583,7 +2592,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
           code,
           redirectUri,
           wabaId: sessionInfo.waba_id,
-          phoneNumberId: sessionInfo.phone_number_id,
+          phoneNumberId: sessionInfo.phone_number_id || null,
+          onboardingMode: mode,
+          coexistenceEvent: sessionInfo.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
         }),
       });
       const data = await res.json();
@@ -2599,7 +2610,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 
   onClickGuarded(document.getElementById('connectMetaPagesFb'), () => connectMetaPages('msgMetaPagesFb'));
   onClickGuarded(document.getElementById('connectMetaPagesIg'), () => connectMetaPages('msgMetaPagesIg'));
-  onClickGuarded(document.getElementById('connectWhatsappOAuth'), () => connectWhatsAppEmbedded());
+  onClickGuarded(document.getElementById('connectWhatsappOAuth'), () => connectWhatsAppEmbedded('standard'));
+  onClickGuarded(document.getElementById('connectWhatsappBusinessOAuth'), () => connectWhatsAppEmbedded('coexistence'));
 
   onClickGuarded(document.getElementById('connectTelegram'), () =>
     connectChannel('telegram', { bot_token: document.getElementById('tokenTelegram').value.trim() }, 'msgTelegram', ['bot_token']));
