@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  isValidMetaSdkRedirectUri,
   exchangeCodeForToken,
   exchangeForLongLivedToken,
   listPages,
@@ -117,4 +118,22 @@ test('fetchImpl must be a function', async () => {
     () => listPages({ userToken: 'x', fetchImpl: null }),
     /fetch недоступний/
   );
+});
+
+test('validates exact Facebook SDK OAuth redirect URL, rejecting malicious callback domains', () => {
+  const good = 'https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=sample&domain=stayai.online&origin=https%3A%2F%2Fstayai.online%2Fsession&relation=opener';
+  assert.equal(isValidMetaSdkRedirectUri(good), true);
+  assert.equal(isValidMetaSdkRedirectUri(''), false);
+  assert.equal(isValidMetaSdkRedirectUri('https://attacker.example/x/connect/xd_arbiter/'), false);
+  assert.equal(isValidMetaSdkRedirectUri(good.replace('domain=stayai.online', 'domain=evil.example')), false);
+  assert.equal(isValidMetaSdkRedirectUri(good.replace('origin=https%3A%2F%2Fstayai.online', 'origin=https%3A%2F%2Fevil.example')), false);
+  assert.equal(isValidMetaSdkRedirectUri(good.replace('staticxx.facebook.com', 'staticxx.facebook.com.evil.example')), false);
+});
+
+test('code exchange forwards the identical redirect_uri supplied by the JS SDK', async () => {
+  const redirectUri = 'https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=session&domain=stayai.online&origin=https%3A%2F%2Fstayai.online%2Fx';
+  const fetchImpl = fakeFetch([{ body: { access_token: 'token', expires_in: 3600 } }]);
+  const result = await exchangeCodeForToken({ code:'abc', appId:'app1', appSecret:'secret1', redirectUri, fetchImpl });
+  assert.equal(result.accessToken, 'token');
+  assert.equal(new URL(fakeFetch.calls[0].url).searchParams.get('redirect_uri'), redirectUri);
 });

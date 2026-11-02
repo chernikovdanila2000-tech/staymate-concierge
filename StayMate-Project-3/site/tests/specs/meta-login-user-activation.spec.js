@@ -13,6 +13,9 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
   });
   await page.addInitScript(() => {
     window.__metaCalls = [];
+    // A fake native window.open lets tests observe the Meta SDK popup URL
+    // without opening a real Facebook window.
+    window.open = function() { return { close(){}, focus(){}, closed: false }; };
     window.__insideNativeClickEvent = false;
     document.addEventListener('click', () => { window.__insideNativeClickEvent = true; }, true);
     document.addEventListener('click', () => { window.__insideNativeClickEvent = false; });
@@ -34,6 +37,8 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
       window.FB = {
         init() {},
         login(callback, options) {
+          const redirect = 'https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=demo&domain=stayai.online&origin=https%3A%2F%2Fstayai.online%2Ftest&relation=opener';
+          window.open('https://www.facebook.com/v24.0/dialog/oauth?redirect_uri=' + encodeURIComponent(redirect), 'fb_login');
           window.__metaCalls.push({
             configId: options.config_id,
             duringClick: window.__insideNativeClickEvent,
@@ -52,17 +57,22 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
       };
     `,
   }));
-  await page.route('**/api/connect-meta-pages', (route) => route.fulfill({
+  const oauthRequests = [];
+  await page.route('**/api/connect-meta-pages', (route) => {
+    oauthRequests.push(JSON.parse(route.request().postData() || '{}'));
+    return route.fulfill({
     status: 200,
     contentType: 'application/json',
     body: JSON.stringify({ pendingId: 'pending-demo', pages: [{ id: 'page-demo', name: 'Demo Page' }] }),
-  }));
+    });
+  });
   await page.route('**/api/connect-meta-finalize', (route) => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }),
   }));
-  await page.route('**/api/connect-whatsapp-embedded', (route) => route.fulfill({
-    status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }),
-  }));
+  await page.route('**/api/connect-whatsapp-embedded', (route) => {
+    oauthRequests.push(JSON.parse(route.request().postData() || '{}'));
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+  });
 
   await page.goto('/cabinet/');
   await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/);
@@ -80,4 +90,9 @@ test('Instagram, Messenger, WhatsApp launch Meta login within the original click
     { configId: 'pages-test-config', duringClick: true },
     { configId: 'whatsapp-test-config', duringClick: true },
   ]);
+  expect(oauthRequests).toHaveLength(3);
+  for (const item of oauthRequests) {
+    expect(item.code).toBe('demo-oauth-code');
+    expect(item.redirectUri).toBe('https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=demo&domain=stayai.online&origin=https%3A%2F%2Fstayai.online%2Ftest&relation=opener');
+  }
 });
