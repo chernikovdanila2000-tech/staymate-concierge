@@ -120,6 +120,21 @@ async function subscribeWabaWebhooks({ wabaId, accessToken, graphVersion, fetchI
   });
 }
 
+async function listWabaPhoneNumbers({ wabaId, accessToken, graphVersion, fetchImpl }) {
+  const data = await graphCall('GET', String(wabaId) + '/phone_numbers', {
+    params: { fields: 'id,display_phone_number', limit: '100' },
+    accessToken, graphVersion, fetchImpl,
+  });
+  return Array.isArray(data.data) ? data.data : [];
+}
+
+async function getPhoneMode({ phoneNumberId, accessToken, graphVersion, fetchImpl }) {
+  return graphCall('GET', phoneNumberId, {
+    params: { fields: 'is_on_biz_app,platform_type' },
+    accessToken, graphVersion, fetchImpl,
+  });
+}
+
 function isValidMetaSdkRedirectUri(value) {
   if (typeof value !== 'string' || value.length > 2048 || !value) return false;
   try {
@@ -145,4 +160,6 @@ module.exports = {
   subscribePageWebhooks,
   registerWhatsAppNumber,
   subscribeWabaWebhooks,
+  listWabaPhoneNumbers,
+  getPhoneMode,
 };

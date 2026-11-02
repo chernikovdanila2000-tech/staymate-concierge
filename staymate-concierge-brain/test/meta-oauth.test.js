@@ -9,6 +9,8 @@ const {
   subscribePageWebhooks,
   registerWhatsAppNumber,
   subscribeWabaWebhooks,
+  listWabaPhoneNumbers,
+  getPhoneMode,
 } = require('../meta-oauth');
 
 function fakeFetch(responses) {
@@ -136,4 +138,23 @@ test('code exchange forwards the identical redirect_uri supplied by the JS SDK',
   const result = await exchangeCodeForToken({ code:'abc', appId:'app1', appSecret:'secret1', redirectUri, fetchImpl });
   assert.equal(result.accessToken, 'token');
   assert.equal(new URL(fakeFetch.calls[0].url).searchParams.get('redirect_uri'), redirectUri);
+});
+
+test('fetches authorized WABA numbers to resolve a coexistence callback without phone ID', async () => {
+  const fetchImpl = fakeFetch([{ body: { data: [{ id: '123', display_phone_number: '+380000000000' }] } }]);
+  const result = await listWabaPhoneNumbers({ wabaId:'987', accessToken:'token', fetchImpl });
+  assert.deepEqual(result, [{ id: '123', display_phone_number: '+380000000000' }]);
+  const url = new URL(fakeFetch.calls[0].url);
+  assert.equal(url.pathname, '/v24.0/987/phone_numbers');
+  assert.equal(url.searchParams.get('fields'), 'id,display_phone_number');
+});
+
+test('reads Meta confirmation of Business app coexistence before skipping number registration', async () => {
+  const fetchImpl = fakeFetch([{ body: { id: '123', is_on_biz_app: true, platform_type: 'CLOUD_API' } }]);
+  const result = await getPhoneMode({ phoneNumberId:'123', accessToken:'token', fetchImpl });
+  assert.equal(result.is_on_biz_app, true);
+  assert.equal(result.platform_type, 'CLOUD_API');
+  const url = new URL(fakeFetch.calls[0].url);
+  assert.equal(url.pathname, '/v24.0/123');
+  assert.equal(url.searchParams.get('fields'), 'is_on_biz_app,platform_type');
 });
