@@ -61,6 +61,22 @@ begin
     set status = 'paid'
   where order_id = v_order.order_id;
 
+  -- The 1 UAH QA payment tests the real acquiring webhook and DB
+  -- settlement but must NEVER grant a full-price subscription.
+  if v_order.plan = 'mono_qa_1uah' then
+    if v_order.amount_uah <> 1 then
+      raise exception 'Invalid test invoice amount';
+    end if;
+    result := 'paid_test';
+    property_id := v_order.property_id;
+    return next;
+    return;
+  end if;
+
+  if v_order.plan not in ('start', 'pro', 'network') then
+    raise exception 'Unrecognized paid subscription plan';
+  end if;
+
   update public.properties
   set subscription_status = 'active',
       subscription_plan = v_order.plan,
@@ -81,4 +97,24 @@ $$;
 revoke all on function public.finalize_mono_subscription(text,text,bigint)
   from public, anon, authenticated;
 grant execute on function public.finalize_mono_subscription(text,text,bigint)
+  to service_role;
+
+-- The merchant token is encrypted at rest in Supabase Vault.
+-- Edge Functions may retrieve it using their server-only service_role key.
+-- Do not ever grant this function to anon/authenticated.
+create or replace function public.stayai_mono_merchant_token()
+returns text
+language sql
+security definer
+set search_path = pg_catalog, vault
+as $$
+  select decrypted_secret::text
+  from vault.decrypted_secrets
+  where name = 'stayai_mono_merchant_token'
+  limit 1;
+$$;
+
+revoke all on function public.stayai_mono_merchant_token()
+  from public, anon, authenticated;
+grant execute on function public.stayai_mono_merchant_token()
   to service_role;

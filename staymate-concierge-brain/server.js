@@ -86,6 +86,8 @@ const {
 } = require('./meta-oauth');
 const { parseCoexistenceEvents, requestBusinessAppSync } = require('./whatsapp-coexistence');
 const { createClient } = require('@supabase/supabase-js');
+const { createMonoSubscriptions } = require('./mono-subscriptions');
+const { createMonoSubscriptionHttp } = require('./mono-subscriptions-http');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -98,6 +100,20 @@ const WFP_MERCHANT_SECRET =
 
 const API_BASE_URL =
   process.env.API_BASE_URL || 'http://localhost:3000';
+
+// Rollout switch: until explicitly enabled, the existing payment routes are untouched.
+const USE_MONO_SUBSCRIPTIONS = process.env.PAYMENT_PROVIDER === 'monobank';
+const monoSubscriptions = USE_MONO_SUBSCRIPTIONS
+  ? createMonoSubscriptions({
+      db: supabase,
+      merchantToken: process.env.MONO_MERCHANT_TOKEN,
+      apiBaseUrl: API_BASE_URL,
+      onSubscriptionActivated: (propertyId) => propertyCache.delete(propertyId),
+    })
+  : null;
+const monoSubscriptionHttp = monoSubscriptions
+  ? createMonoSubscriptionHttp(monoSubscriptions)
+  : null;
 
 const RESEND_API_KEY =
   process.env.RESEND_API_KEY || '';
@@ -1048,6 +1064,42 @@ const server =
           req.url,
           'http://localhost'
         );
+
+      // mono acquiring takes over card subscription checkout only after explicit cutover.
+      // No WayForPay subscription invoice or callback can be triggered via this path.
+      if (
+        monoSubscriptionHttp &&
+        ['/api/create-subscription-invoice', '/webhook/mono-subscription']
+          .includes(requestUrl.pathname)
+      ) {
+        monoSubscriptionHttp(req, res).catch(() => {
+          if (!res.headersSent) {
+            sendJson(res, 503, { error: 'Платіжна система тимчасово недоступна.' });
+          }
+        });
+        return;
+      }
+
+      // Old provider must not be able to activate a mono-backed subscription.
+      if (
+        USE_MONO_SUBSCRIPTIONS &&
+        requestUrl.pathname === '/webhook/wayforpay-subscription'
+      ) {
+        return sendJson(res, 410, { error: 'Legacy subscription webhook disabled.' });
+      }
+
+      // Card capture for a future trial charge is not yet supported by mono
+      // acquiring without a separately configured recurring/tokenization flow.
+      // Never fall back to WayForPay when mono is the selected provider.
+      if (
+        USE_MONO_SUBSCRIPTIONS &&
+        requestUrl.pathname === '/api/create-trial-invoice' &&
+        req.method === 'POST'
+      ) {
+        return sendJson(res, 409, {
+          error: 'Автосписання після тріалу ще не налаштоване. Поки можна сплатити тариф звичайним платежем.'
+        }, { 'Access-Control-Allow-Origin': 'https://stayai.online' });
+      }
 
       if (
         req.method === 'GET' &&

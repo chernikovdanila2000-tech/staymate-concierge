@@ -1845,13 +1845,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
     msgEl.className = 'msg';
     msgEl.textContent = isTrial ? t('sub.creatingTrialLink', getLang()) : t('sub.creatingInvoice', getLang());
+    // mono subscriptions use the dedicated signed-payment function. We do not
+    // silently fall back to WayForPay for card payments, including trial cards.
+    if (isTrial && method !== 'crypto') {
+      msgEl.className = 'msg error';
+      msgEl.textContent = 'Автосписання після пробного періоду ще не підтримується mono. Оплатити тариф можна звичайним платежем після тріалу.';
+      return;
+    }
     try {
       const endpoint = method === 'crypto'
-        ? '/api/create-subscription-invoice-crypto'
-        : isTrial ? '/api/create-trial-invoice' : '/api/create-subscription-invoice';
-      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+        ? `${API_BASE_URL}/api/create-subscription-invoice-crypto`
+        : 'https://nyknlyufbwjodbpyehtv.supabase.co/functions/v1/mono-subscriptions';
+      const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
         body: JSON.stringify({ propertyId: currentProperty.property_id, plan }),
       });
       const data = await res.json();

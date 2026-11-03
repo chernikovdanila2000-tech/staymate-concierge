@@ -16,7 +16,7 @@ class MonoSubscriptionError extends Error {
   }
 }
 
-function createMonoSubscriptions({ db, merchantToken, apiBaseUrl, mono = monoClient }) {
+function createMonoSubscriptions({ db, merchantToken, apiBaseUrl, mono = monoClient, onSubscriptionActivated = () => {} }) {
   if (!db || typeof db.from !== 'function' || typeof db.rpc !== 'function') {
     throw new Error('Database client is required');
   }
@@ -136,10 +136,12 @@ function createMonoSubscriptions({ db, merchantToken, apiBaseUrl, mono = monoCli
     });
     if (finalizeError) throw new MonoSubscriptionError('Could not finalize subscription.', 503);
     const state = Array.isArray(finalResult) ? finalResult[0]?.result : finalResult?.result;
-    if (state !== 'paid' && state !== 'already_paid') {
+    if (state !== 'paid' && state !== 'already_paid' && state !== 'paid_test') {
       throw new MonoSubscriptionError('Unexpected finalization result.', 503);
     }
-    return { acknowledged: true, credited: state === 'paid', duplicate: state === 'already_paid' };
+    if (state === 'paid') onSubscriptionActivated(order.property_id);
+    return { acknowledged: true, credited: state === 'paid',
+      duplicate: state === 'already_paid', testPaid: state === 'paid_test' };
   }
 
   return { createSubscriptionInvoice, receiveSignedWebhook };

@@ -1,34 +1,41 @@
-# StayAI mono acquiring subscriptions: production rollout
+# StayAI mono acquiring: current deployment status (2026-11-03)
 
-**State:** code and isolated tests prepared in codex/mono-payment-20261103. NOT deployed or enabled.
-**Goal:** replace WayForPay for HOTEL SUBSCRIPTIONS first. Guest booking payments are a separate phase.
+## Verified live
+- Merchant X-Token authenticated at `GET /api/merchant/details`: HTTP 200, merchantName StayAI.
+- Existing production Supabase project: `nyknlyufbwjodbpyehtv` (no new database).
+- Applied additive SQL migration `mono_acquiring_subscriptions_vault_20261103`.
+- Stored merchant token encrypted in Supabase Vault as `stayai_mono_merchant_token`.
+- Supabase Edge Function `mono-subscriptions` deployed and healthy:
+  `https://nyknlyufbwjodbpyehtv.supabase.co/functions/v1/mono-subscriptions`
+- Health endpoint responds 200. Unauthenticated invoice creation is rejected. Unsigned webhook is rejected.
+- 1 UAH QA plan `mono_qa_1uah` finalizes to `paid_test` without activating/renewing a real hotel subscription.
+- Source prepared on feature branch `codex/mono-payment-20261103` and isolated tests pass.
 
-## Source files
-- mono-acquiring.js: API client, invoices, read-only merchant verification, signed webhook helper.
-- mono-subscriptions.js: owner-verified subscription invoice creation and authenticated provider reconciliation.
-- mono-subscriptions-http.js: HTTP adapter for the existing invoice route and /webhook/mono-subscription.
-- mono-subscriptions-migration.sql: additive schema and atomic, idempotent subscription finalization.
-- test/mono-*.test.js: isolated tests; no real charge.
+## LIVE BLOCKER: mono refuses to create any invoice
+With the real merchant token, `POST /api/merchant/invoice/create` returns:
+`HTTP 400 {"errCode":"INVALID_MERCHANT_PAYM_INFO"}`.
+This persists for 1 UAH (100 kopecks), minimal JSON, and 42 UAH with a documented basket and 32-hex order/item references. No invoice was created and no card charged. Authorization alone does **not** guarantee that the merchant has fully enabled acquiring, or that the currently configured fiscalization rules accept the request. Further identical API attempts are not useful without provider clarification.
 
-## Important production requirements
-1. Confirm the supplied token via GET https://api.monobank.ua/api/merchant/details with X-Token as a **server-only** secret. If it returns HTTP 403, the supplied token is not usable as an acquiring merchant token. The merchant for StayAI subscriptions must settle funds to StayAI, NOT to a hotel.
-2. Merchant token must be set as MONO_MERCHANT_TOKEN on the production backend, not in source code, frontend, logs, Git or chat. Rotate the provided token if the provider advises it, since it was shared in conversation.
-3. Coordinate with active Codex board tasks: staymate-concierge-brain/server.js and StayMate-Project-3/site/cabinet/index.html are allocated to active tasks. Don't edit/mount conflicting files before they are free or explicitly reassigned by an owner.
-4. When allowed, run mono-subscriptions-migration.sql in the **existing** production Supabase project; DO NOT create a new DB.
-5. Mount the HTTP adapter at the beginning of the backend request handler ONLY when a validated MONO_MERCHANT_TOKEN is present and PAYMENT_PROVIDER=monobank. The adapter intercepts POST /api/create-subscription-invoice and handles /webhook/mono-subscription. Do not enable the feature flag before a real merchant-token probe.
-6. Use the existing backend Supabase service_role only on the server; the POST invoice endpoint requires a Supabase session Bearer token and checks owner_id.
-7. Update the cabinet subscription invoice fetch to send Authorization: Bearer <session.access_token> (as its other protected API requests already do).
-8. Test (a) webhook ECDSA validation on original bytes; (b) receipt success matched against GET invoice/status; (c) DB function finalizes once; (d) duplicate delivery does not add another 31 days; (e) incorrect tenant/amount/status does not activate.
-9. Execute a small **real** payment deliberately with owner-approved card and amount; check settlement and invoice status. No simulation can substitute for this production E2E.
-10. Keep the WayForPay routes for rollback until mono production payments are verified. Remove stale test credentials / disable the legacy path only after reliable cutover.
-11. Trial card capture and recurring charges via mono require separately enabled card tokenization or recurring payment support and explicit payer consent. Never silently turn on auto-renew.
-12. Hotel guest payments must be implemented later with separate settlement to the hotel and a verified merchant/submerchant mapping. Never send hotel guest money to StayAI's subscription merchant.
+Request mono support/partner to inspect merchant ID (obtain from authorized account; do not post secret token) and explain the required merchantPaymInfo/basketOrder/PRRO settings or activate invoice creation for StayAI's own UAH subscriptions.
 
-## Local non-financial test
-cd staymate-concierge-brain
-node --test test/mono-acquiring.test.js test/mono-subscriptions.test.js
+## PRODUCTION CUTOVER NOT DONE
+- The live cabinet still points to existing Railway API; it has not been switched to mono.
+- Cabinet source patch to use the Edge Function is on the feature branch ONLY. Existing crypto payments use NOWPayments.
+- Local Railway backend integration is feature-flagged by `PAYMENT_PROVIDER=monobank`, NOT deployed; do not set this flag until merchant invoicing and provider webhook are proven.
+- The connected Railway account does NOT contain the current live backend `staymate-concierge-production.up.railway.app`. Its visible backend is offline. Do not modify unrelated Railway projects.
+- The GitHub `main` branch is unchanged. Use an reviewed PR and the normal site deploy pipeline when ready.
+- Trial card capture/automatic renew requires separately configured and consented card tokenization; do not pretend it works yet.
+- Hotel guest booking settlement is a separate later phase; never mix guest funds with StayAI subscription merchant.
 
-## Safe merchant credential check (read-only)
-The client exports checkMerchantToken(token) which GETs /api/merchant/details.
-A 200 with merchantId establishes merchant-scope access; a 403 is not merchant-scope access.
-Never POST /api/merchant/invoice/create merely to test whether the token is valid.
+## After mono fixes invoice creation
+1. With real merchant token, create exactly a **1 UAH** test invoice for the admin-owned `test-hotel-x8ok` property, `plan = mono_qa_1uah`, `payment_provider='monobank'`; persist reference and invoice ID.
+2. The owner pays **only 1 UAH** via mono-hosted https://pay.mbnk.biz/... link.
+3. Check signed webhook + invoice status + atomic SQL finalization once, and duplicate delivery. Test order must be `paid` and hotel subscription must remain unchanged.
+4. Then release/merge website card-payment cutover (after coordination of board's active cabin/server ownership) and verify normal full-price invoice generation without paying the full amount.
+5. Remove WayForPay subscription use only after confirmed success and rollback plan. Do not delete historic records.
+
+## Security
+- Never publish raw X-Token (Git, chat, frontend, URL, tests).
+- Revoke leaked or old merchant token before final launch if provider deems necessary.
+- Supabase Vault function `stayai_mono_merchant_token()` and atomic finalizer `finalize_mono_subscription()` are service-role only.
+- All invoice requests require an authenticated owner; special 1 UAH QA uses an additional internal-admin restriction.

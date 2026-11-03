@@ -129,3 +129,34 @@ test('acquiring invoice mismatch cannot activate subscription', async () => {
   }), e => e.statusCode === 409);
   assert.equal(calls.rpc, null);
 });
+
+test('one-hryvnia QA invoice is recorded but does not activate subscription', async () => {
+  const { db, calls } = makeDb({
+    finalize: 'paid_test',
+    order: {
+      order_id: 'SUBABC123', property_id: 'hotel-1', amount_uah: 1,
+      status: 'pending', payment_provider: 'monobank', mono_invoice_id: 'p2_abc123',
+      is_trial_card: false, plan: 'mono_qa_1uah',
+    },
+  });
+  let activated = false;
+  const mono = {
+    ...fakeMono(),
+    getInvoiceStatus: async () => ({
+      invoiceId: 'p2_abc123', reference: 'SUBABC123', status: 'success',
+      ccy: 980, amount: 100,
+    }),
+  };
+  const service = createMonoSubscriptions({
+    ...config, db, mono,
+    onSubscriptionActivated: () => { activated = true; },
+  });
+  const result = await service.receiveSignedWebhook({
+    rawBody: JSON.stringify({ invoiceId: 'p2_abc123', status: 'success' }),
+    xSign: 'signature',
+  });
+  assert.equal(result.testPaid, true);
+  assert.equal(result.credited, false);
+  assert.equal(activated, false);
+  assert.equal(calls.rpc.params.p_amount_kopecks, 100);
+});
