@@ -1000,6 +1000,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.oauthBtn":"Підключити новий номер через Meta",
       "ch.whatsapp.businessBtn":"Підключити чинний WhatsApp Business",
       "ch.whatsapp.businessHint":"Чинний номер можна підключити без видалення застосунку лише з WhatsApp Business. Звичайний WhatsApp не підтримується.",
+      "ch.whatsapp.syncingMsg":"WhatsApp підключено. Синхронізація історії та контактів триває. Тримайте WhatsApp Business відкритим.",
+      "ch.whatsapp.syncWarning":"WhatsApp підключено, але синхронізація не розпочалась. Не відключайте номер і зверніться до підтримки.",
       "ch.meta.oauthBtn":"Підключити через Facebook","ch.meta.manualDivider":"— або введіть дані вручну нижче —",
       "ch.meta.notConfigured":"Вхід через Meta ще не налаштовано на сервері.","ch.meta.cancelled":"Вхід через Meta скасовано.",
       "ch.meta.choosePage":"Оберіть сторінку:","ch.meta.noWabaInfo":"Не вдалося отримати дані WhatsApp-акаунта з вікна підключення. Спробуйте ще раз.",
@@ -1197,6 +1199,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "ch.whatsapp.oauthBtn":"Connect a new number via Meta",
       "ch.whatsapp.businessBtn":"Connect existing WhatsApp Business",
       "ch.whatsapp.businessHint":"Connect your existing number without removing the WhatsApp Business app. Personal WhatsApp is not supported.",
+      "ch.whatsapp.syncingMsg":"WhatsApp connected. Contact and message history sync is running. Keep WhatsApp Business open.",
+      "ch.whatsapp.syncWarning":"WhatsApp connected, but data sync could not start. Do not disconnect the number. Contact support.",
       "ch.meta.oauthBtn":"Connect via Facebook","ch.meta.manualDivider":"— or enter the details manually below —",
       "ch.meta.notConfigured":"Meta login isn't configured on the server yet.","ch.meta.cancelled":"Meta login was cancelled.",
       "ch.meta.choosePage":"Choose a page:","ch.meta.noWabaInfo":"Couldn't get the WhatsApp account details from the connect window. Please try again.",
@@ -2605,8 +2609,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      msg.className = 'msg ok';
-      msg.textContent = t('ch.connectedMsg', getLang());
+      msg.className = data.coexistence && !data.syncStarted ? 'msg error' : 'msg ok';
+      msg.textContent = data.coexistence
+        ? t(data.syncStarted ? 'ch.whatsapp.syncingMsg' : 'ch.whatsapp.syncWarning', getLang())
+        : t('ch.connectedMsg', getLang());
       await fetchChannels();
     } catch (e) {
       msg.className = 'msg error';
