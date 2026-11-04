@@ -8,7 +8,7 @@
 const { buildSystemPrompt } = require('./system-prompt');
 const { toolDefinitions, createTools } = require('./tools');
 const { getHotelInfo } = require('./hotel-info');
-const { normalizeAlternation } = require('./message-alternation');
+const { toApiMessages } = require('./message-alternation');
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
@@ -59,10 +59,15 @@ async function runConciergeTurn(conversationHistory, property) {
   const { propertyId, propertyName, channel, chatId } = property;
   const toolImplementations = createTools(propertyId, channel, chatId);
   const hotelInfo = await getHotelInfo(propertyId);
-  let messages = normalizeAlternation(conversationHistory);
+  // `messages` keeps every field (e.g. from_owner, used only by the widget
+  // and cabinet to style/display an owner's reply) and is what gets saved
+  // back as the conversation's history. The Anthropic API rejects any
+  // field on a message besides role/content, so each call sends a
+  // stripped, alternation-normalized copy instead of `messages` itself.
+  let messages = [...conversationHistory];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const data = await callClaude(messages, propertyName, hotelInfo);
+    const data = await callClaude(toApiMessages(messages), propertyName, hotelInfo);
 
     const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
     const textBlocks = data.content.filter(b => b.type === 'text');

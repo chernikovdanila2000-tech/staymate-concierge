@@ -26,4 +26,13 @@ function normalizeAlternation(messages) {
   return result;
 }
 
-module.exports = { normalizeAlternation };
+// The Anthropic API rejects a message object that carries any field besides
+// role/content — e.g. from_owner, which escalations/reply adds so the
+// widget and cabinet can tell an owner's reply from the AI's own. Strip
+// everything else right before a message list is sent to the API; the
+// stored conversation history keeps those extra fields untouched.
+function toApiMessages(messages) {
+  return normalizeAlternation(messages).map(m => ({ role: m.role, content: m.content }));
+}
+
+module.exports = { normalizeAlternation, toApiMessages };

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeAlternation } = require('../message-alternation');
+const { normalizeAlternation, toApiMessages } = require('../message-alternation');
 
 test('leaves an already-alternating conversation untouched', () => {
   const history = [
@@ -43,6 +43,29 @@ test('never merges across array content (tool calls/results), only plain strings
     { role: 'user', content: toolResult },
   ];
   assert.deepEqual(normalizeAlternation(history), history);
+});
+
+test('toApiMessages strips from_owner and any other extra fields Anthropic rejects', () => {
+  const history = [
+    { role: 'user', content: 'Питання' },
+    { role: 'assistant', content: 'Відповідь', from_owner: true },
+  ];
+  assert.deepEqual(toApiMessages(history), [
+    { role: 'user', content: 'Питання' },
+    { role: 'assistant', content: 'Відповідь' },
+  ]);
+});
+
+test('toApiMessages merges consecutive owner replies before stripping the field', () => {
+  const history = [
+    { role: 'user', content: 'Питання' },
+    { role: 'assistant', content: 'Перша', from_owner: true },
+    { role: 'assistant', content: 'Друга', from_owner: true },
+  ];
+  assert.deepEqual(toApiMessages(history), [
+    { role: 'user', content: 'Питання' },
+    { role: 'assistant', content: 'Перша\nДруга' },
+  ]);
 });
 
 test('does not mutate the original messages', () => {
