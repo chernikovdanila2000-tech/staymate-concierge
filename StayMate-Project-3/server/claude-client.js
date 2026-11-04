@@ -8,6 +8,7 @@
 const { buildSystemPrompt } = require('./system-prompt');
 const { toolDefinitions, createTools } = require('./tools');
 const { getHotelInfo } = require('./hotel-info');
+const { normalizeAlternation } = require('./message-alternation');
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
@@ -58,7 +59,7 @@ async function runConciergeTurn(conversationHistory, property) {
   const { propertyId, propertyName, channel, chatId } = property;
   const toolImplementations = createTools(propertyId, channel, chatId);
   const hotelInfo = await getHotelInfo(propertyId);
-  let messages = [...conversationHistory];
+  let messages = normalizeAlternation(conversationHistory);
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const data = await callClaude(messages, propertyName, hotelInfo);
