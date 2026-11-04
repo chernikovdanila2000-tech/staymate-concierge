@@ -364,6 +364,10 @@ function createTools(propertyId, channel, chatId) {
         .limit(1)
         .maybeSingle();
 
+      if (lookupError) {
+        console.error('[escalateToHuman] Supabase error (lookup):', lookupError);
+      }
+
       if (!lookupError && existing) {
         const { error: updateError } = await supabase
           .from('escalations')
