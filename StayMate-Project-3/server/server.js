@@ -42,6 +42,7 @@ const {
 const { getHistory, saveHistory } = require('./conversations');
 const { isConversationTakenOver } = require('./takeover');
 const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
+const { runOnboardingTurn } = require('./onboarding');
 const {
   verifyMonobankToken,
   fetchMonobankStatement,
@@ -1860,6 +1861,95 @@ const server =
       }
 
       // =========================
+      // ONBOARDING (AI-інтерв'ю для нового бізнесу — ще без акаунту)
+      // =========================
+
+      if (req.method === 'POST' && req.url === '/api/onboarding-chat') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { sessionId, message } = parsed;
+          if (!sessionId || !message) {
+            return sendJson(res, 400, { error: 'Потрібні sessionId і message.' }, corsHeaders);
+          }
+          if (String(message).length > 2000) {
+            return sendJson(res, 400, { error: 'Повідомлення занадто довге.' }, corsHeaders);
+          }
+
+          try {
+            const { replyText, profile, priceProposal } = await runOnboardingTurn(String(sessionId), String(message));
+            return sendJson(res, 200, { reply: replyText, profile, priceProposal }, corsHeaders);
+          } catch (error) {
+            console.error('[onboarding-chat]', sessionId, error.message, error.stack);
+            return sendJson(res, 500, { error: error.message }, corsHeaders);
+          }
+        });
+
+        return;
+      }
+
+      if (req.method === 'POST' && req.url === '/api/onboarding-voice') {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+
+        let bb;
+        try {
+          bb = busboy({ headers: req.headers, limits: { fileSize: MAX_AUDIO_BYTES, files: 1 } });
+        } catch (error) {
+          return sendJson(res, 400, { error: 'Некоректний запит завантаження аудіо.' }, corsHeaders);
+        }
+
+        let mediaType = '';
+        let fileChunks = [];
+        let fileTooLarge = false;
+        let sawFile = false;
+
+        bb.on('file', (name, stream, info) => {
+          sawFile = true;
+          mediaType = (info && info.mimeType) || '';
+          stream.on('data', (chunk) => fileChunks.push(chunk));
+          stream.on('limit', () => { fileTooLarge = true; });
+        });
+
+        bb.on('error', (error) => {
+          if (!res.headersSent) {
+            sendJson(res, 400, { error: 'Не вдалося прочитати аудіо: ' + error.message }, corsHeaders);
+          }
+        });
+
+        bb.on('close', async () => {
+          if (res.headersSent) return;
+          try {
+            if (fileTooLarge) {
+              return sendJson(res, 413, { error: `Аудіо завелике — максимум ${Math.round(MAX_AUDIO_BYTES / (1024 * 1024))} МБ.` }, corsHeaders);
+            }
+            if (!sawFile || !fileChunks.length) {
+              return sendJson(res, 400, { error: 'Аудіо не завантажено.' }, corsHeaders);
+            }
+
+            const text = await transcribeAudio({
+              audio: Buffer.concat(fileChunks),
+              mediaType,
+              filename: 'onboarding-voice.webm',
+            });
+            return sendJson(res, 200, { text }, corsHeaders);
+          } catch (error) {
+            console.error('[onboarding-voice]', error.message);
+            return sendJson(res, 400, { error: error.message }, corsHeaders);
+          }
+        });
+
+        req.pipe(bb);
+        return;
+      }
+
+      // =========================
       // CORS
       // =========================
 
@@ -1902,6 +1992,8 @@ const server =
           '/api/disconnect-channel',
           '/api/contact',
           '/api/escalations/reply',
+          '/api/onboarding-chat',
+          '/api/onboarding-voice',
         ].includes(req.url)
       ) {
         res.writeHead(
