@@ -379,6 +379,28 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     </div>
   </div>
 
+  <!-- Підключення після AI-онбордингу (onboard.html): бізнес і персональна
+       ціна вже відомі, лишається тільки підтвердити й оплатити. -->
+  <div class="hidden wrap-cab" id="obAiScreen">
+    <h1 class="page-title" data-i18n="onboardAi.title">Майже готово</h1>
+    <p class="lede" data-i18n="onboardAi.lede">Ось що ми зафіксували з розмови з AI-консультантом.</p>
+    <div class="card">
+      <div style="margin-bottom:18px;">
+        <div class="hint" data-i18n="onboardAi.businessLabel">Бізнес</div>
+        <div id="obAiBusinessName" style="font-size:17px; font-weight:600;"></div>
+      </div>
+      <div style="margin-bottom:18px;">
+        <div class="hint" data-i18n="onboardAi.priceLabel">Персональна ціна</div>
+        <div id="obAiPrice" style="font-size:26px; font-weight:700;"></div>
+        <div id="obAiJustification" class="hint" style="margin-top:4px;"></div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" id="obAiConfirmBtn" data-i18n="onboardAi.confirmBtn">Підключити й оплатити</button>
+      </div>
+      <div class="msg" id="obAiMsg"></div>
+    </div>
+  </div>
+
   <!-- Екран "підписку призупинено" / вибір тарифу одразу при онбордингу -->
   <div class="hidden wrap-cab" id="gateScreen">
     <h1 class="page-title" id="gateTitle">Підписку призупинено</h1>
@@ -812,6 +834,21 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // Домен, де лежить widget.js (маркетинговий сайт на Netlify).
   const SITE_ORIGIN = 'https://stayai.online';
 
+  // ---- AI-онбординг (onboard.html): sessionId розмови-інтерв'ю, якщо
+  // власник прийняв персональну ціну там. URL-параметр покриває і прямий
+  // перехід в межах однієї вкладки, і повернення сюди з листа підтвердження
+  // пошти (нова вкладка, де sessionStorage оригінальної вкладки вже
+  // недоступний) — тому дублюємо його і в sessionStorage, і в посилання
+  // emailRedirectTo нижче.
+  const ONBOARDING_SESSION_KEY = 'stayai_onboarding_session';
+  let onboardingSessionId = new URLSearchParams(location.search).get('ob') || '';
+  if (onboardingSessionId) {
+    try { sessionStorage.setItem(ONBOARDING_SESSION_KEY, onboardingSessionId); } catch (e) {}
+  } else {
+    try { onboardingSessionId = sessionStorage.getItem(ONBOARDING_SESSION_KEY) || ''; } catch (e) {}
+  }
+  const cabinetRedirectUrl = SITE_ORIGIN + '/cabinet/' + (onboardingSessionId ? '?ob=' + encodeURIComponent(onboardingSessionId) : '');
+
   // ---- i18n: той самий стан мови (localStorage-ключ), що й на решті сайту.
   // Раніше перекладені були тільки шапка й акаунт-меню — решта кабінету
   // (номери/канали/дані готелю) завжди показувалась українською, незалежно
@@ -859,6 +896,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboard.addressLabel":"Адреса","onboard.addressPh":"Місто, вулиця, номер будинку",
       "onboard.trialBtn":"Почати 3 дні безкоштовно","onboard.payBtn":"Оплатити зараз",
       "onboard.err.nameRequired":"Вкажіть назву готелю.",
+
+      "onboardAi.title":"Майже готово","onboardAi.lede":"Ось що ми зафіксували з розмови з AI-консультантом.",
+      "onboardAi.businessLabel":"Бізнес","onboardAi.priceLabel":"Персональна ціна",
+      "onboardAi.confirmBtn":"Підключити й оплатити","onboardAi.connecting":"Підключаємо...",
+      "onboardAi.err.profileLost":"Дані профілю втрачено — поверніться на головну сторінку і пройдіть розмову ще раз.",
+      "plan.custom":"Індивідуальний план",
 
       "gate.chooseTariff":"Оберіть тариф",
       "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.",
@@ -1058,6 +1101,12 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboard.addressLabel":"Address","onboard.addressPh":"City, street, building number",
       "onboard.trialBtn":"Start a free 3-day trial","onboard.payBtn":"Pay now",
       "onboard.err.nameRequired":"Enter your hotel's name.",
+
+      "onboardAi.title":"Almost there","onboardAi.lede":"Here's what we captured from your conversation with the AI consultant.",
+      "onboardAi.businessLabel":"Business","onboardAi.priceLabel":"Your custom price",
+      "onboardAi.confirmBtn":"Connect and pay","onboardAi.connecting":"Connecting...",
+      "onboardAi.err.profileLost":"Profile data was lost — go back to the homepage and go through the conversation again.",
+      "plan.custom":"Custom plan",
 
       "gate.chooseTariff":"Choose a plan",
       "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in Ukrainian hryvnia (UAH).",
@@ -1311,6 +1360,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   const loadingScreen = document.getElementById('loadingScreen');
   const resetScreen = document.getElementById('resetScreen');
   const onboardScreen = document.getElementById('onboardScreen');
+  const obAiScreen = document.getElementById('obAiScreen');
   const gateScreen = document.getElementById('gateScreen');
   const dashScreen = document.getElementById('dashScreen');
   const accountStatus = document.getElementById('accountStatus');
@@ -1319,6 +1369,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   let mode = 'signin'; // 'signin' | 'signup'
   let currentUser = null;
   let currentProperty = null;
+  let pendingOnboardingProfile = null;
   let rooms = [];
   let channelsByType = {};
 
@@ -1327,6 +1378,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     loadingScreen.classList.add('hidden');
     resetScreen.classList.add('hidden');
     onboardScreen.classList.add('hidden');
+    obAiScreen.classList.add('hidden');
     gateScreen.classList.add('hidden');
     dashScreen.classList.add('hidden');
   }
@@ -1554,7 +1606,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     try {
       const { data, error } = mode === 'signin'
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: SITE_ORIGIN + '/cabinet/' } });
+        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: cabinetRedirectUrl } });
 
       if (error) {
         msg.className = 'msg error';
@@ -1680,6 +1732,27 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     hideAllScreens();
 
     if (!property) {
+      // Прийшов з onboard.html, де AI уже зібрав профіль і назвав ціну —
+      // пропускаємо звичайну форму назва/адреса й одразу показуємо
+      // підтвердження. Сесія AI-розмови могла протухнути (30 хв TTL) між
+      // onboard.html і підтвердженням email — тоді просто падаємо назад
+      // на звичайну форму, а не блокуємо людину без пояснення.
+      if (onboardingSessionId) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/onboarding-profile/${encodeURIComponent(onboardingSessionId)}`);
+          if (res.ok) {
+            const { profile } = await res.json();
+            if (profile && typeof profile.proposedPriceUah === 'number') {
+              pendingOnboardingProfile = profile;
+              document.getElementById('obAiBusinessName').textContent = profile.business_name || '—';
+              document.getElementById('obAiPrice').textContent = profile.proposedPriceUah.toLocaleString('uk-UA') + ' ₴ / міс';
+              document.getElementById('obAiJustification').textContent = profile.priceJustification || '';
+              obAiScreen.classList.remove('hidden');
+              return;
+            }
+          }
+        } catch (e) {}
+      }
       onboardScreen.classList.remove('hidden');
       return;
     }
@@ -1757,6 +1830,80 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     currentProperty = data;
     onboardScreen.classList.add('hidden');
     showGate('choose_plan');
+  });
+
+  // ---- Підключення після AI-онбордингу (onboard.html) ----
+  onClickGuarded(document.getElementById('obAiConfirmBtn'), async () => {
+    const msg = document.getElementById('obAiMsg');
+    msg.className = 'msg';
+    if (!pendingOnboardingProfile) {
+      msg.className = 'msg error';
+      msg.textContent = t('onboardAi.err.profileLost', getLang());
+      return;
+    }
+    const profile = pendingOnboardingProfile;
+    const name = (profile.business_name || 'Бізнес на StayAI').trim();
+    const slug = name.toLowerCase()
+      .replace(/[^a-z0-9а-яіїєʼ' ]/gi, '')
+      .trim()
+      .replace(/\s+/g, '-')
+      .slice(0, 40) || 'business';
+    const propertyId = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+
+    msg.textContent = t('onboardAi.connecting', getLang());
+
+    const { data: property, error: propError } = await supabase
+      .from('properties')
+      .insert({
+        property_id: propertyId,
+        owner_id: currentUser.id,
+        hotel_name: name,
+        address: profile.location || null,
+        business_type: profile.business_type || 'generic',
+      })
+      .select()
+      .single();
+
+    if (propError) {
+      msg.className = 'msg error';
+      msg.textContent = translateAuthError(propError.message);
+      return;
+    }
+
+    // Факти бізнесу не блокують підключення, якщо запис не вдався —
+    // власник завжди може дозаповнити їх пізніше в кабінеті; головне, щоб
+    // акаунт і оплата вже існували.
+    const { error: factsError } = await supabase.from('business_facts').insert({
+      property_id: propertyId,
+      description: profile.description || null,
+      hours: profile.hours || null,
+      location: profile.location || null,
+      contact_info: profile.contact_info || null,
+      services_offered: profile.services_offered || null,
+      pricing_info: profile.pricing_info || null,
+      policies: profile.policies || null,
+      additional_info: profile.additional_info || null,
+    });
+    if (factsError) {
+      console.error('[onboarding] business_facts insert failed:', factsError);
+    }
+
+    currentProperty = property;
+    try { sessionStorage.removeItem(ONBOARDING_SESSION_KEY); } catch (e) {}
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/create-subscription-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ propertyId, plan: 'custom', customPriceUah: profile.proposedPriceUah }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Не вдалося створити рахунок.');
+      window.location.href = data.invoiceUrl;
+    } catch (e) {
+      msg.className = 'msg error';
+      msg.textContent = e.message;
+    }
   });
 
   // ---- Гейтинг доступу за статусом підписки (Фаза 2.3) ----

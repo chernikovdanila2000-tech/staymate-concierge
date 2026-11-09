@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StayAI — Підключення бізнесу</title>
+<link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png?v=2" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<link rel="mask-icon" href="favicon-mask.svg?v=2" color="#7CE0A8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{ --radius-s:6px; --radius-m:14px; --radius-l:28px; --maxw:720px; }
+html[data-theme="light"]{
+  --bg:#F6F6F3; --surface:#FFFFFF;
+  --ink:#17181B; --ink-soft:#4B4D53; --muted:#84868D;
+  --line:#E4E4E0; --line-strong:#CFD0CB;
+  --accent:#33513F; --accent-text:#33513F; --accent-ink:#EAF0EC; --accent-soft:#E7ECE8;
+  --warn:#8C4A34;
+  --chat-ai-bg:#17181B; --chat-ai-fg:#FFFFFF;
+  --shadow-soft:0 30px 60px -30px rgba(23,24,27,0.18);
+  --input-bg:#F6F6F3;
+}
+html[data-theme="dark"]{
+  --bg:#111214; --surface:#18191C;
+  --ink:#F2F2F0; --ink-soft:#C2C3C8; --muted:#8A8C93;
+  --line:#28292D; --line-strong:#37383D;
+  --accent:#7CE0A8; --accent-text:#7CE0A8; --accent-ink:#0F1A14; --accent-soft:#1B2621;
+  --warn:#E29372;
+  --chat-ai-bg:#232427; --chat-ai-fg:#F2F2F0;
+  --shadow-soft:0 30px 60px -30px rgba(0,0,0,0.5);
+  --input-bg:#111214;
+}
+*{box-sizing:border-box;}
+body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; display:flex; flex-direction:column; min-height:100vh;}
+h1,h2{font-family:'Space Grotesk',sans-serif;}
+a{color:inherit;}
+.top{display:flex; align-items:center; justify-content:space-between; padding:18px 24px; border-bottom:1px solid var(--line);}
+.logo{display:flex; align-items:center; gap:8px; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; text-decoration:none; color:var(--ink);}
+.logo-mark{width:10px; height:10px; border-radius:3px; background:var(--accent);}
+.top-back{font-size:13px; color:var(--muted); text-decoration:none;}
+.top-back:hover{color:var(--ink);}
+
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 20px; width:100%; flex:1; display:flex; flex-direction:column;}
+.ob-head{padding:28px 0 16px; text-align:center;}
+.ob-head h1{font-size:26px; margin:0 0 6px;}
+.ob-head p{color:var(--muted); font-size:14px; margin:0;}
+
+.ob-body{flex:1; overflow-y:auto; padding:8px 0 16px; display:flex; flex-direction:column; gap:12px;}
+.ob-msg{max-width:84%; padding:12px 16px; border-radius:var(--radius-m); font-size:14.5px; line-height:1.5; white-space:pre-wrap;}
+.ob-msg.user{align-self:flex-end; background:var(--accent); color:var(--accent-ink); border-bottom-right-radius:4px;}
+.ob-msg.ai{align-self:flex-start; background:var(--chat-ai-bg); color:var(--chat-ai-fg); border-bottom-left-radius:4px;}
+.ob-msg.pending{align-self:flex-start; color:var(--muted); font-style:italic; font-size:13px;}
+
+.ob-price-card{align-self:stretch; background:var(--surface); border:1px solid var(--line-strong); border-radius:var(--radius-l); padding:22px; box-shadow:var(--shadow-soft);}
+.ob-price-card .label{font-size:12px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 6px;}
+.ob-price-card .amount{font-family:'Space Grotesk',sans-serif; font-size:34px; font-weight:700; margin:0 0 10px;}
+.ob-price-card .amount span{font-size:16px; font-weight:500; color:var(--muted);}
+.ob-price-card .why{font-size:13.5px; color:var(--ink-soft); margin:0 0 18px;}
+.ob-price-actions{display:flex; gap:10px;}
+.ob-btn{border:none; border-radius:100px; padding:12px 22px; font-size:14px; font-weight:600; cursor:pointer; font-family:inherit;}
+.ob-btn-accept{background:var(--accent); color:var(--accent-ink); flex:1;}
+.ob-btn-decline{background:transparent; color:var(--ink-soft); border:1px solid var(--line-strong);}
+.ob-btn:disabled{opacity:.6; cursor:default;}
+
+.ob-foot{display:flex; gap:8px; padding:14px 0 22px; border-top:1px solid var(--line); background:var(--bg);}
+.ob-input{flex:1; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink); border-radius:100px; padding:13px 18px; font-size:14.5px; outline:none; font-family:inherit;}
+.ob-input:focus{border-color:var(--accent);}
+.ob-mic, .ob-send{width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+.ob-mic{background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-soft);}
+.ob-mic.rec{background:var(--warn); color:#fff; border-color:var(--warn);}
+.ob-send{background:var(--accent); color:var(--accent-ink);}
+.ob-send:disabled{opacity:.5; cursor:default;}
+
+.ob-fixed-plan{text-align:center; padding-bottom:18px; font-size:12.5px; color:var(--muted);}
+.ob-fixed-plan a{color:var(--accent-text); text-decoration:underline;}
+</style>
+<script>(function(){try{var m=localStorage.getItem('stayMateThemeMode')||'dark';document.documentElement.setAttribute('data-theme',m);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+</head>
+<body>
+
+<div class="top">
+  <a href="index.html" class="logo"><span class="logo-mark"></span>StayAI</a>
+  <a href="index.html" class="top-back">← На головну</a>
+</div>
+
+<div class="wrap">
+  <div class="ob-head">
+    <h1>Розкажіть про свій бізнес</h1>
+    <p>StayAI сама підбере формат і ціну — просто відповідайте на питання.</p>
+  </div>
+
+  <div class="ob-body" id="obBody"></div>
+
+  <div class="ob-foot">
+    <input id="obInput" class="ob-input" type="text" placeholder="Напишіть повідомлення..." maxlength="2000" autocomplete="off">
+    <button id="obMic" class="ob-mic" type="button" aria-label="Диктувати голосом" title="Диктувати голосом">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" stroke-width="1.7"/><path d="M19 11a7 7 0 01-14 0M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </button>
+    <button id="obSend" class="ob-send" type="button" aria-label="Надіслати">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="ob-fixed-plan">...або <a href="pricing.html">обрати готовий тариф</a> без розмови з ШІ</div>
+</div>
+
+<script>
+  const API_BASE_URL = 'https://staymate-concierge-production.up.railway.app';
+  const SESSION_KEY = 'stayai_onboarding_session';
+  const QUOTE_KEY = 'stayai_onboarding_quote';
+
+  let sessionId = null;
+  try { sessionId = sessionStorage.getItem(SESSION_KEY); } catch (e) {}
+  if (!sessionId) {
+    sessionId = 'ob' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { sessionStorage.setItem(SESSION_KEY, sessionId); } catch (e) {}
+  }
+
+  const body = document.getElementById('obBody');
+  const input = document.getElementById('obInput');
+  const sendBtn = document.getElementById('obSend');
+  const micBtn = document.getElementById('obMic');
+
+  function addMessage(who, text) {
+    const el = document.createElement('div');
+    el.className = 'ob-msg ' + who;
+    el.textContent = text;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+    return el;
+  }
+
+  function addPriceCard(priceProposal) {
+    const card = document.createElement('div');
+    card.className = 'ob-price-card';
+    card.innerHTML =
+      '<p class="label">Персональна пропозиція</p>' +
+      '<p class="amount">' + priceProposal.priceUah.toLocaleString('uk-UA') + ' <span>грн / міс</span></p>' +
+      '<p class="why"></p>' +
+      '<div class="ob-price-actions">' +
+        '<button type="button" class="ob-btn ob-btn-accept">Прийняти й підключити</button>' +
+        '<button type="button" class="ob-btn ob-btn-decline">Не зараз</button>' +
+      '</div>';
+    card.querySelector('.why').textContent = priceProposal.justification || '';
+    const acceptBtn = card.querySelector('.ob-btn-accept');
+    const declineBtn = card.querySelector('.ob-btn-decline');
+    acceptBtn.addEventListener('click', () => {
+      acceptBtn.disabled = true;
+      declineBtn.disabled = true;
+      acceptBtn.textContent = 'Переходимо...';
+      try {
+        sessionStorage.setItem(QUOTE_KEY, sessionId);
+      } catch (e) {}
+      window.location.href = 'cabinet/?ob=' + encodeURIComponent(sessionId);
+    });
+    declineBtn.addEventListener('click', () => {
+      card.remove();
+      addMessage('ai', 'Добре, розкажіть детальніше, і я запропоную іншу ціну.');
+    });
+    body.appendChild(card);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function setBusy(busy) {
+    sendBtn.disabled = busy;
+    input.disabled = busy;
+  }
+
+  function send(text) {
+    text = (text || '').trim();
+    if (!text) return;
+    input.value = '';
+    addMessage('user', text);
+    setBusy(true);
+    const pending = addMessage('pending', 'Друкує…');
+
+    fetch(API_BASE_URL + '/api/onboarding-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, message: text }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        pending.remove();
+        setBusy(false);
+        if (data && data.reply) addMessage('ai', data.reply);
+        if (data && data.priceProposal) addPriceCard(data.priceProposal);
+        if (!data || (!data.reply && !data.priceProposal)) {
+          addMessage('ai', 'Вибачте, сталася технічна помилка. Спробуйте, будь ласка, ще раз.');
+        }
+      })
+      .catch(() => {
+        pending.remove();
+        setBusy(false);
+        addMessage('ai', 'Не вдалося зв’язатися з сервером. Перевірте інтернет-з’єднання і спробуйте ще раз.');
+      });
+  }
+
+  sendBtn.addEventListener('click', () => send(input.value));
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(input.value); });
+
+  // ---- Голос: запис з мікрофона браузера -> /api/onboarding-voice -> текст у те саме поле вводу ----
+  let mediaRecorder = null;
+  let audioChunks = [];
+
+  function startRecording() {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.addEventListener('dataavailable', (e) => { if (e.data.size) audioChunks.push(e.data); });
+      mediaRecorder.addEventListener('stop', () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+        if (!blob.size) return;
+        micBtn.classList.remove('rec');
+        setBusy(true);
+        const pending = addMessage('pending', 'Розпізнаю голос…');
+        const form = new FormData();
+        form.append('audio', blob, 'voice.webm');
+        fetch(API_BASE_URL + '/api/onboarding-voice', { method: 'POST', body: form })
+          .then((res) => res.json())
+          .then((data) => {
+            pending.remove();
+            setBusy(false);
+            if (data && data.text) {
+              send(data.text);
+            } else {
+              addMessage('ai', (data && data.error) || 'Не вдалося розпізнати голос. Спробуйте ще раз або напишіть текстом.');
+            }
+          })
+          .catch(() => {
+            pending.remove();
+            setBusy(false);
+            addMessage('ai', 'Не вдалося розпізнати голос. Спробуйте ще раз або напишіть текстом.');
+          });
+      });
+      mediaRecorder.start();
+      micBtn.classList.add('rec');
+    }).catch(() => {
+      addMessage('ai', 'Не вдалося отримати доступ до мікрофона. Перевірте дозвіл у браузері або напишіть текстом.');
+    });
+  }
+
+  micBtn.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    } else {
+      startRecording();
+    }
+  });
+
+  // ---- Перше повідомлення, якщо гість уже щось написав на головній сторінці ----
+  let firstMessage = '';
+  try {
+    firstMessage = sessionStorage.getItem('stayai_onboarding_first_message') || '';
+    sessionStorage.removeItem('stayai_onboarding_first_message');
+  } catch (e) {}
+
+  addMessage('ai', 'Привіт! Розкажіть, яким бізнесом ви займаєтесь — а я підберу формат підключення й персональну ціну.');
+  if (firstMessage) send(firstMessage);
+</script>
+</body>
+</html>

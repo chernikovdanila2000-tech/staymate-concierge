@@ -44,7 +44,7 @@ const {
 const { getHistory, saveHistory } = require('./conversations');
 const { isConversationTakenOver } = require('./takeover');
 const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
-const { runOnboardingTurn } = require('./onboarding');
+const { runOnboardingTurn, getSessionProfile } = require('./onboarding');
 const {
   verifyMonobankToken,
   fetchMonobankStatement,
@@ -53,6 +53,7 @@ const {
 const { verifyIpnSignature: verifyNowPaymentsIpn } = require('./nowpayments');
 const {
   createSubscriptionInvoice,
+  createCustomSubscriptionInvoice,
   createCryptoSubscriptionInvoice,
   cancelRegularPayment,
 } = require('./tools');
@@ -1922,6 +1923,16 @@ const server =
         return;
       }
 
+      if (req.method === 'GET' && req.url.startsWith('/api/onboarding-profile/')) {
+        const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
+        const sessionId = decodeURIComponent(req.url.slice('/api/onboarding-profile/'.length));
+        const profile = getSessionProfile(sessionId);
+        if (!profile || typeof profile.proposedPriceUah !== 'number') {
+          return sendJson(res, 404, { error: 'Сесію не знайдено або ціну ще не запропоновано.' }, corsHeaders);
+        }
+        return sendJson(res, 200, { profile }, corsHeaders);
+      }
+
       if (req.method === 'POST' && req.url === '/api/onboarding-voice') {
         const corsHeaders = { 'Access-Control-Allow-Origin': '*' };
 
@@ -3086,6 +3097,7 @@ const server =
             const {
               propertyId,
               plan,
+              customPriceUah,
             } = parsed;
 
             if (
@@ -3128,11 +3140,24 @@ const server =
                 .toUpperCase();
 
             try {
+              // Акаунт, підключений через AI-онбординг (onboarding.js),
+              // має персональну ціну замість одного з трьох фіксованих
+              // тарифів — plan: 'custom' + customPriceUah замінюють пошук
+              // за ключем SUBSCRIPTION_PLANS на прямий рахунок на цю суму.
               const {
                 invoiceUrl,
                 priceUah,
               } =
-                await createSubscriptionInvoice(
+                plan === 'custom'
+                  ? await createCustomSubscriptionInvoice(
+                      {
+                        orderId,
+                        priceUah: customPriceUah,
+                        propertyName:
+                          property.hotel_name,
+                      }
+                    )
+                  : await createSubscriptionInvoice(
                   {
                     orderId,
                     plan,

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createOnboardingTools, buildOnboardingSystemPrompt, ONBOARDING_TOOL_DEFINITIONS } = require('../onboarding');
+const { createOnboardingTools, getSessionProfile, buildOnboardingSystemPrompt, ONBOARDING_TOOL_DEFINITIONS } = require('../onboarding');
 
 test('save_business_profile merges fields into the session profile without wiping the rest', () => {
   const session = { profile: { business_name: 'Кавʼярня "Дім"' } };
@@ -41,6 +41,10 @@ test('tool schema requires the fields propose_price and the server depend on', (
 
   const saveProfile = ONBOARDING_TOOL_DEFINITIONS.find((t) => t.name === 'save_business_profile');
   assert.deepEqual(saveProfile.input_schema.required, []);
+});
+
+test('getSessionProfile returns null for a session that was never created', () => {
+  assert.equal(getSessionProfile('does-not-exist'), null);
 });
 
 test('the onboarding prompt never mentions hotel/room concepts and tells the model to use propose_price, not to haggle', () => {

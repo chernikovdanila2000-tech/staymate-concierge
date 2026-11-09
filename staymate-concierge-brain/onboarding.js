@@ -27,6 +27,18 @@ function getOrCreateSession(sessionId) {
   return fresh;
 }
 
+/**
+ * Профіль ще не підключеного бізнесу для кроку "прийняв ціну -> створюємо
+ * акаунт" (cabinet/index.html) — читає той самий сесійний стан, не
+ * продовжуючи розмову. null, якщо сесія не існує або вже протухла
+ * (TTL), щоб кабінет міг безпечно впасти назад на звичайну форму.
+ */
+function getSessionProfile(sessionId) {
+  const session = sessions.get(sessionId);
+  if (!session || session.expiresAt <= Date.now()) return null;
+  return { ...session.profile };
+}
+
 const SAVE_PROFILE_TOOL = {
   name: 'save_business_profile',
   description: 'Зберегти чи оновити профіль бізнесу в міру того, як дізнаєшся нові деталі з розмови. Можна викликати кілька разів за розмову — кожен виклик лише оновлює передані поля, інші лишаються як були.',
@@ -224,6 +236,7 @@ async function runOnboardingTurn(sessionId, userMessage) {
 module.exports = {
   runOnboardingTurn,
   createOnboardingTools,
+  getSessionProfile,
   buildOnboardingSystemPrompt,
   ONBOARDING_TOOL_DEFINITIONS,
 };

@@ -155,6 +155,29 @@ async function createSubscriptionInvoice({ orderId, plan, propertyName, autoRene
 }
 
 /**
+ * Той самий рахунок, але для акаунтів, підключених через AI-онбординг
+ * (onboarding.js): ціна персональна (её назвав AI у propose_price), а не
+ * один із трьох фіксованих тарифів SUBSCRIPTION_PLANS — тому напряму
+ * викликає createWayForPayInvoice, минаючи пошук за ключем тарифу.
+ */
+async function createCustomSubscriptionInvoice({ orderId, priceUah, propertyName, autoRenewDateBegin }) {
+  const price = Number(priceUah);
+  if (!Number.isInteger(price) || price <= 0) {
+    throw new Error('Некоректна сума customPriceUah.');
+  }
+
+  const { invoiceUrl } = await createWayForPayInvoice({
+    orderReference: orderId,
+    productName: `StayAI — індивідуальний тариф ${propertyName || ''}`.trim(),
+    price,
+    currency: 'UAH',
+    serviceUrl: `${API_BASE_URL}/webhook/wayforpay-subscription`,
+    regular: autoRenewDateBegin ? { mode: 'monthly', dateBegin: autoRenewDateBegin } : undefined,
+  });
+  return { invoiceUrl, priceUah: price };
+}
+
+/**
  * Той самий тариф, але оплата криптовалютою через NOWPayments замість
  * картки через WayForPay. На відміну від WayForPay тут немає збереженого
  * платіжного засобу для автопродовження — кожен період власник оплачує
@@ -469,6 +492,7 @@ module.exports = {
   getToolDefinitions,
   createTools,
   createSubscriptionInvoice,
+  createCustomSubscriptionInvoice,
   createCryptoSubscriptionInvoice,
   cancelRegularPayment,
   SUBSCRIPTION_PLANS,

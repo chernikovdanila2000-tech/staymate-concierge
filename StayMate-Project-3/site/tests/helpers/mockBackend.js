@@ -25,6 +25,7 @@ const DEFAULT_STATE = {
   failEscalationReply: false, // make /api/escalations/reply respond with an error, to test the cabinet's failure path
   failEscalationDelete: false, // simulate RLS silently blocking escalations/conversations .delete() (no error, 0 rows), e.g. before the delete migration is run
   failPropertiesQuery: false, // make the properties select() return an error, to test the cabinet's "stuck on the login screen while actually signed in" failure path
+  onboardingProfile: null, // { business_name, business_type, proposedPriceUah, priceJustification, ... } | null — served from GET /api/onboarding-profile/:sessionId
 };
 
 function buildClientSource() {
@@ -341,9 +342,24 @@ async function installBackendMock(page, initialState = {}) {
   });
 
   // Backend API (Railway). Cover every /api/* route the frontend calls.
-  await page.route('**/api/create-subscription-invoice', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-invoice', orderId: 'SUBMOCK', priceUah: 4999 }) })
-  );
+  await page.route('**/api/create-subscription-invoice', async (route) => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    await page.evaluate((b) => {
+      window.__qaCreateSubscriptionInvoiceCalls = window.__qaCreateSubscriptionInvoiceCalls || [];
+      window.__qaCreateSubscriptionInvoiceCalls.push(b);
+    }, body);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://secure.wayforpay.com/mock-invoice', orderId: 'SUBMOCK', priceUah: body.customPriceUah || 4999 }) });
+  });
+  // GET /api/onboarding-profile/:sessionId — served from onboarding.js's
+  // in-memory session state on the real backend; here it's just whatever
+  // the test configured via state.onboardingProfile (null = 404, same as
+  // a real expired/missing session).
+  await page.route('**/api/onboarding-profile/*', (route) => {
+    if (!state.onboardingProfile) {
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not found' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ profile: state.onboardingProfile }) });
+  });
   await page.route('**/api/create-subscription-invoice-crypto', (route) =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ invoiceUrl: 'https://nowpayments.io/mock-invoice', orderId: 'SUBCMOCK', priceUah: 4999 }) })
   );
