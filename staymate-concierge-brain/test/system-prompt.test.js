@@ -45,7 +45,7 @@ test('a non-hospitality business gets the generic prompt instead, with no room/b
   const prompt = buildSystemPrompt({
     businessType: 'services',
     propertyName: 'Салон краси «Лілея»',
-    businessInfo: { description: 'Перукарня та манікюр', hours: 'Пн-Сб 9:00-19:00' },
+    businessInfo: { fields: { 'Чим займається бізнес': 'Перукарня та манікюр', 'Графік роботи': 'Пн-Сб 9:00-19:00' } },
   });
 
   assert.match(prompt, /Салон краси «Лілея»/u);
@@ -56,13 +56,27 @@ test('a non-hospitality business gets the generic prompt instead, with no room/b
   assert.doesNotMatch(prompt, /заїзд|виїзд|бронюван/u);
 });
 
+test('a business with arbitrary, non-hospitality-shaped fields (not a fixed vocabulary) renders them as-is', () => {
+  const prompt = buildGenericSystemPrompt({
+    propertyName: 'Боксерський автомат «Удар»',
+    businessInfo: { fields: { 'Обладнання': '2 боксерські груші', 'Ціна за раунд': '50 грн' } },
+  });
+  assert.match(prompt, /Обладнання: 2 боксерські груші/u);
+  assert.match(prompt, /Ціна за раунд: 50 грн/u);
+});
+
 test('generic prompt escalates missing business info instead of inventing it, same rule as hotels', () => {
   const prompt = buildGenericSystemPrompt({ propertyName: 'Кавʼярня', businessInfo: null });
   assert.match(prompt, /\(Власник ще не заповнив цю інформацію\.\)/u);
   assert.match(prompt, /одразу виклич escalate_to_human/u);
 });
 
-test('formatBusinessInfo lists only filled-in fields, in label order', () => {
-  const formatted = formatBusinessInfo({ hours: 'Щодня 10:00-22:00', pricing_info: '' , description: 'Кавʼярня' });
-  assert.equal(formatted, '- Чим займається бізнес: Кавʼярня\n- Графік роботи: Щодня 10:00-22:00');
+test('formatBusinessInfo lists only filled-in fields, in the order they were set', () => {
+  const formatted = formatBusinessInfo({ fields: { 'Графік роботи': 'Щодня 10:00-22:00', 'Ціна': '', 'Чим займається бізнес': 'Кавʼярня' } });
+  assert.equal(formatted, '- Графік роботи: Щодня 10:00-22:00\n- Чим займається бізнес: Кавʼярня');
+});
+
+test('formatBusinessInfo treats a missing or malformed fields object the same as no info at all', () => {
+  assert.equal(formatBusinessInfo({}), '(Власник ще не заповнив цю інформацію.)');
+  assert.equal(formatBusinessInfo({ fields: 'not an object' }), '(Власник ще не заповнив цю інформацію.)');
 });

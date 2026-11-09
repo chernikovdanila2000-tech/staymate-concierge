@@ -136,6 +136,12 @@ h1.page-title{font-size:clamp(26px,4vw,32px); line-height:1.15; margin-bottom:8p
 .card h2{font-size:16px; font-weight:600; margin:0 0 4px;}
 .card .hint{font-size:13.5px; color:var(--muted); margin:0 0 20px; line-height:1.55;}
 .row{display:flex; gap:12px;}
+.bf-field-row{display:flex; gap:10px; align-items:flex-start; margin-top:16px;}
+.bf-field-row .bf-field-inputs{flex:1; min-width:0;}
+.bf-field-row .bf-field-inputs label{margin-top:0;}
+.bf-field-row .bf-field-inputs input{margin-bottom:8px;}
+.bf-field-remove{flex-shrink:0; margin-top:30px; width:34px; height:34px; border-radius:50%; border:1px solid var(--line-strong); background:none; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center;}
+.bf-field-remove:hover{color:var(--warn); border-color:var(--warn);}
 .row > *{flex:1;}
 .actions{margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
 .msg{font-size:13px; margin-top:12px;}
@@ -465,8 +471,8 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
     </div>
 
     <div class="card">
-      <h2 data-i18n="hotel.title">Дані готелю</h2>
-      <p class="hint" data-i18n="hotel.hint">Це ім'я ШІ-адміністратор називає гостям.</p>
+      <h2 data-i18n="hotel.title" id="hotelCardTitle">Дані готелю</h2>
+      <p class="hint" data-i18n="hotel.hint" id="hotelCardHint">Це ім'я ШІ-адміністратор називає гостям.</p>
       <label for="dashName" data-i18n="hotel.nameLabel">Назва</label>
       <input id="dashName" type="text">
       <label for="dashAddress" data-i18n="hotel.addressLabel">Адреса</label>
@@ -477,7 +483,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="hotelInfoCard">
       <h2 data-i18n="hi.title">Інформація для гостей</h2>
       <p class="hint" data-i18n="hi.hint">ШІ-адміністратор відповідає на питання гостей САМЕ на основі цих даних. Якщо поле порожнє, а гість про це спитає — бот чесно скаже, що уточнить, і передасть питання вам (в «Ескалації»), а не вигадає відповідь. Заповніть те, що встигаєте — решту можна дозаповнити пізніше.</p>
 
@@ -533,7 +539,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="roomsCard">
       <h2 data-i18n="rooms.title">Номери</h2>
       <p class="hint" data-i18n="rooms.hint">Ці дані ШІ-адміністратор використовує, щоб відповідати на питання про наявність і ціни, і рахувати реальну зайнятість по датах. "Кількість" — скільки фізичних номерів цього типу є в закладі.</p>
       <div class="actions" style="margin-bottom:18px;">
@@ -544,6 +550,25 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <div id="roomsList"></div>
       <p class="rooms-empty hidden" id="roomsEmptyHint" data-i18n="rooms.emptyHint">Ще немає жодного номера — додайте вручну або завантажте файлом.</p>
       <span class="msg" id="roomsMsg"></span>
+    </div>
+
+    <!-- Інформація про бізнес для НЕ-готельних акаунтів: поля повністю
+         довільні — ШІ сам визначив їх під час онбордингу під конкретний
+         бізнес, а не фіксований набір. Власник може редагувати значення й
+         додавати власні поля. Навмисно йде ПІСЛЯ roomsCard (а не між
+         hotelInfoCard і roomsCard), щоб не зсувати індекси h2-карток для
+         готельних акаунтів — на них спирається dashboard.spec.js. -->
+    <div class="card hidden" id="businessFactsCard">
+      <h2 data-i18n="bf.title">Інформація про бізнес</h2>
+      <p class="hint" data-i18n="bf.hint">ШІ-асистент відповідає клієнтам САМЕ на основі цих даних. Поля визначились під час розмови з AI — можете відредагувати значення або додати власні.</p>
+      <div id="bfFieldsList"></div>
+      <div class="actions" style="margin-bottom:18px;">
+        <button class="btn-secondary" id="bfAddField" data-i18n="bf.addFieldBtn">+ Додати поле</button>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" id="bfSave" data-i18n="common.save">Зберегти</button>
+        <span class="msg" id="bfMsg"></span>
+      </div>
     </div>
 
     <!-- Модалка: додати / редагувати один номер -->
@@ -903,6 +928,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboardAi.err.profileLost":"Дані профілю втрачено — поверніться на головну сторінку і пройдіть розмову ще раз.",
       "plan.custom":"Індивідуальний план",
 
+      "bf.title":"Інформація про бізнес",
+      "bf.hint":"ШІ-асистент відповідає клієнтам САМЕ на основі цих даних. Поля визначились під час розмови з AI — можете відредагувати значення або додати власні.",
+      "bf.addFieldBtn":"+ Додати поле","bf.fieldLabelPh":"Назва поля","bf.fieldValuePh":"Значення",
+      "bf.removeFieldLabel":"Видалити поле",
+
       "gate.chooseTariff":"Оберіть тариф",
       "gate.planRowHint":"Один тариф — на один об'єкт (готель/апартаменти). Оплата — в гривнях.",
       "gate.payBtn":"Карткою","gate.payCryptoBtn":"Криптою",
@@ -959,6 +989,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "planCard.network.name":"Мережа","planCard.network.price":"14999 ₴ / міс",
 
       "hotel.title":"Дані готелю","hotel.hint":"Це ім'я ШІ-адміністратор називає гостям.",
+      "hotel.title.generic":"Дані бізнесу","hotel.hint.generic":"Це ім'я ШІ-асистент називає клієнтам.",
       "hotel.nameLabel":"Назва","hotel.addressLabel":"Адреса",
 
       "hi.title":"Інформація для гостей",
@@ -1108,6 +1139,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "onboardAi.err.profileLost":"Profile data was lost — go back to the homepage and go through the conversation again.",
       "plan.custom":"Custom plan",
 
+      "bf.title":"Business information",
+      "bf.hint":"The AI assistant answers customers based on exactly this data. The fields came from your conversation with the AI — edit the values or add your own.",
+      "bf.addFieldBtn":"+ Add field","bf.fieldLabelPh":"Field name","bf.fieldValuePh":"Value",
+      "bf.removeFieldLabel":"Remove field",
+
       "gate.chooseTariff":"Choose a plan",
       "gate.planRowHint":"One plan per property (hotel/apartments). Payment is in Ukrainian hryvnia (UAH).",
       "gate.payBtn":"By card","gate.payCryptoBtn":"By crypto",
@@ -1164,6 +1200,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "planCard.network.name":"Network","planCard.network.price":"14999 ₴ / mo",
 
       "hotel.title":"Hotel details","hotel.hint":"This is the name the AI administrator gives guests.",
+      "hotel.title.generic":"Business details","hotel.hint.generic":"This is the name the AI assistant gives customers.",
       "hotel.nameLabel":"Name","hotel.addressLabel":"Address",
 
       "hi.title":"Guest information",
@@ -1305,6 +1342,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     if (typeof renderEscalationsList === 'function' && currentProperty) renderEscalationsList();
     if (typeof renderBookingsList === 'function' && currentProperty) renderBookingsList();
     if (typeof renderSubscriptionCard === 'function' && currentProperty) renderSubscriptionCard();
+    if (typeof renderHotelCardLabels === 'function' && currentProperty) renderHotelCardLabels();
     if (typeof renderBulkPreview === 'function' && bulkPreviewRows && bulkPreviewRows.length) renderBulkPreview();
     if (typeof applyAuthMode === 'function') applyAuthMode();
     if (typeof showGate === 'function' && currentGateReason && gateScreen && !gateScreen.classList.contains('hidden')) showGate(currentGateReason);
@@ -1875,14 +1913,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     // акаунт і оплата вже існували.
     const { error: factsError } = await supabase.from('business_facts').insert({
       property_id: propertyId,
-      description: profile.description || null,
-      hours: profile.hours || null,
-      location: profile.location || null,
-      contact_info: profile.contact_info || null,
-      services_offered: profile.services_offered || null,
-      pricing_info: profile.pricing_info || null,
-      policies: profile.policies || null,
-      additional_info: profile.additional_info || null,
+      fields: profile.fields || {},
     });
     if (factsError) {
       console.error('[onboarding] business_facts insert failed:', factsError);
@@ -2090,6 +2121,19 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   });
 
   // ---- Дашборд ----
+  // "Дані готелю"/"Це ім'я ШІ-адміністратор називає гостям" читається
+  // дивно для будь-якого іншого бізнесу — підміняємо текст залежно від
+  // business_type. Викликається і з showDashboard(), і (через хук у
+  // applyI18n вище) при кожному перемиканні мови, інакше перемикач
+  // відкотив би назад на "hotel.title" (той самий data-i18n на елементі).
+  function renderHotelCardLabels() {
+    if (!currentProperty) return;
+    const isHospitality = (currentProperty.business_type || 'hospitality') === 'hospitality';
+    const lang = getLang();
+    document.getElementById('hotelCardTitle').textContent = t(isHospitality ? 'hotel.title' : 'hotel.title.generic', lang);
+    document.getElementById('hotelCardHint').textContent = t(isHospitality ? 'hotel.hint' : 'hotel.hint.generic', lang);
+  }
+
   async function showDashboard() {
     document.getElementById('dashHotelName').textContent = currentProperty.hotel_name;
     document.getElementById('dashName').value = currentProperty.hotel_name || '';
@@ -2099,6 +2143,17 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('payoutRecipient').value = currentProperty.payout_recipient_name || '';
     renderSubscriptionCard();
 
+    // Готельні картки (Номери, Інформація для гостей — фіксовані поля
+    // check-in/паркування/сніданок тощо) мають сенс лише для
+    // business_type === 'hospitality'. Будь-який інший бізнес бачить
+    // замість них картку з довільними полями, які ШІ сам визначив під час
+    // онбордингу під конкретно цей бізнес.
+    const isHospitality = (currentProperty.business_type || 'hospitality') === 'hospitality';
+    document.getElementById('hotelInfoCard').classList.toggle('hidden', !isHospitality);
+    document.getElementById('roomsCard').classList.toggle('hidden', !isHospitality);
+    document.getElementById('businessFactsCard').classList.toggle('hidden', isHospitality);
+    renderHotelCardLabels();
+
     // Раніше кабінет показувався лише ПІСЛЯ того, як відповідять усі чотири
     // незалежні запити (номери/інформація для гостей/канали/ескалації) —
     // кнопка "Увійти" лишалась заблокованою, а екран порожнім, аж поки не
@@ -2107,7 +2162,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     // час очікування. Тепер каркас кабінету показуємо одразу, а кожен розділ
     // підвантажується у фоні й самостійно перемальовується, щойно готовий.
     dashScreen.classList.remove('hidden');
-    Promise.all([reloadRooms(), loadHotelInfo(), fetchChannels(), fetchEscalations(), fetchBookings()])
+    const infoLoad = isHospitality ? loadHotelInfo() : loadBusinessFacts();
+    Promise.all([isHospitality ? reloadRooms() : Promise.resolve(), infoLoad, fetchChannels(), fetchEscalations(), fetchBookings()])
       .catch((err) => console.error('Не вдалося завантажити дані кабінету:', err));
   }
 
@@ -2139,6 +2195,77 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       payload[field] = document.getElementById(elId).value.trim();
     });
     const { error } = await supabase.from('hotel_info').upsert(payload, { onConflict: 'property_id' });
+    if (error) {
+      msg.className = 'msg error';
+      msg.textContent = error.message;
+      return;
+    }
+    msg.className = 'msg ok';
+    msg.textContent = t('common.saved', getLang());
+    setTimeout(() => { msg.textContent = ''; }, 2500);
+  });
+
+  // ---- Інформація про бізнес для НЕ-готельних акаунтів: довільні поля
+  // (business_facts.fields, jsonb), а не фіксований набір колонок — ШІ сам
+  // вирішує, які поля доречні під час онбордингу (onboarding.js), а
+  // власник може відредагувати значення й додати свої поля тут. ----
+  function bfFieldRow(label, value) {
+    const lang = getLang();
+    const row = document.createElement('div');
+    row.className = 'bf-field-row';
+    row.innerHTML = `
+      <div class="bf-field-inputs">
+        <input type="text" class="bf-field-label">
+        <textarea class="bf-field-value"></textarea>
+      </div>
+      <button type="button" class="bf-field-remove">✕</button>
+    `;
+    row.querySelector('.bf-field-label').value = label || '';
+    row.querySelector('.bf-field-label').setAttribute('placeholder', t('bf.fieldLabelPh', lang));
+    row.querySelector('.bf-field-value').value = value || '';
+    row.querySelector('.bf-field-value').setAttribute('placeholder', t('bf.fieldValuePh', lang));
+    const removeBtn = row.querySelector('.bf-field-remove');
+    removeBtn.setAttribute('aria-label', t('bf.removeFieldLabel', lang));
+    removeBtn.addEventListener('click', () => row.remove());
+    return row;
+  }
+
+  function renderBfFields(fields) {
+    const list = document.getElementById('bfFieldsList');
+    list.innerHTML = '';
+    const entries = Object.entries(fields || {});
+    if (!entries.length) {
+      list.appendChild(bfFieldRow('', ''));
+      return;
+    }
+    entries.forEach(([label, value]) => list.appendChild(bfFieldRow(label, value)));
+  }
+
+  async function loadBusinessFacts() {
+    const { data } = await supabase
+      .from('business_facts')
+      .select('*')
+      .eq('property_id', currentProperty.property_id)
+      .maybeSingle();
+    renderBfFields(data && data.fields);
+  }
+
+  document.getElementById('bfAddField').addEventListener('click', () => {
+    document.getElementById('bfFieldsList').appendChild(bfFieldRow('', ''));
+  });
+
+  onClickGuarded(document.getElementById('bfSave'), async () => {
+    const msg = document.getElementById('bfMsg');
+    msg.className = 'msg';
+    const fields = {};
+    document.querySelectorAll('#bfFieldsList .bf-field-row').forEach((row) => {
+      const label = row.querySelector('.bf-field-label').value.trim();
+      const value = row.querySelector('.bf-field-value').value.trim();
+      if (label) fields[label] = value;
+    });
+    const { error } = await supabase
+      .from('business_facts')
+      .upsert({ property_id: currentProperty.property_id, fields }, { onConflict: 'property_id' });
     if (error) {
       msg.className = 'msg error';
       msg.textContent = error.message;

@@ -75,24 +75,15 @@ function formatHotelInfo(hotelInfo) {
   return lines.length ? lines.join('\n') : '(Власник ще не заповнив цю інформацію в кабінеті.)';
 }
 
-const BUSINESS_INFO_LABELS = {
-  description: 'Чим займається бізнес',
-  hours: 'Графік роботи',
-  location: 'Адреса / як дістатися',
-  contact_info: 'Контакти',
-  services_offered: 'Послуги/товари',
-  pricing_info: 'Орієнтовні ціни',
-  policies: 'Умови, скасування, повернення',
-  additional_info: 'Додатково',
-};
-
+// На відміну від hotel_info (фіксований набір полів нижче), business_facts
+// зберігає довільні пари "назва поля -> значення" (businessInfo.fields,
+// jsonb) — AI сам визначив доречні поля під час онбордингу (onboarding.js)
+// під конкретний бізнес, тому тут немає фіксованого списку назв.
 function formatBusinessInfo(businessInfo) {
-  if (!businessInfo) return '(Власник ще не заповнив цю інформацію.)';
-  const lines = Object.entries(BUSINESS_INFO_LABELS)
-    .map(([key, label]) => {
-      const value = businessInfo[key];
-      return value && String(value).trim() ? `- ${label}: ${String(value).trim()}` : null;
-    })
+  const fields = businessInfo && businessInfo.fields;
+  if (!fields || typeof fields !== 'object') return '(Власник ще не заповнив цю інформацію.)';
+  const lines = Object.entries(fields)
+    .map(([label, value]) => (value && String(value).trim() ? `- ${label}: ${String(value).trim()}` : null))
     .filter(Boolean);
   return lines.length ? lines.join('\n') : '(Власник ще не заповнив цю інформацію.)';
 }
