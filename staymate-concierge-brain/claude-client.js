@@ -6,15 +6,16 @@
    ============================================================ */
 
 const { buildSystemPrompt } = require('./system-prompt');
-const { toolDefinitions, createTools } = require('./tools');
+const { getToolDefinitions, createTools } = require('./tools');
 const { getHotelInfo } = require('./hotel-info');
+const { getBusinessInfo } = require('./business-info');
 const { toApiMessages } = require('./message-alternation');
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOOL_ROUNDS = 5; // запобіжник від нескінченного циклу викликів інструментів
 
-async function callClaude(messages, propertyName, hotelInfo) {
+async function callClaude(messages, { propertyName, businessType, hotelInfo, businessInfo }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error('ANTHROPIC_API_KEY не встановлено в змінних середовища.');
@@ -30,8 +31,8 @@ async function callClaude(messages, propertyName, hotelInfo) {
     body: JSON.stringify({
       model: MODEL,
       max_tokens: 1024,
-      system: buildSystemPrompt({ propertyName, hotelInfo }),
-      tools: toolDefinitions,
+      system: buildSystemPrompt({ propertyName, businessType, hotelInfo, businessInfo }),
+      tools: getToolDefinitions(businessType),
       messages,
     }),
   });
@@ -56,9 +57,12 @@ async function callClaude(messages, propertyName, hotelInfo) {
  * @returns {Promise<{ replyText: string, updatedHistory: Array }>}
  */
 async function runConciergeTurn(conversationHistory, property) {
-  const { propertyId, propertyName, channel, chatId } = property;
-  const toolImplementations = createTools(propertyId, channel, chatId);
-  const hotelInfo = await getHotelInfo(propertyId);
+  const { propertyId, propertyName, channel, chatId, businessType = 'hospitality' } = property;
+  const toolImplementations = createTools(propertyId, channel, chatId, businessType);
+  // hotel_info/business_facts are separate tables (see system-prompt.js) —
+  // only fetch the one this account's business_type actually uses.
+  const hotelInfo = businessType === 'hospitality' ? await getHotelInfo(propertyId) : null;
+  const businessInfo = businessType === 'hospitality' ? null : await getBusinessInfo(propertyId);
   // `messages` keeps every field (e.g. from_owner, used only by the widget
   // and cabinet to style/display an owner's reply) and is what gets saved
   // back as the conversation's history. The Anthropic API rejects any
@@ -67,7 +71,7 @@ async function runConciergeTurn(conversationHistory, property) {
   let messages = [...conversationHistory];
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const data = await callClaude(toApiMessages(messages), propertyName, hotelInfo);
+    const data = await callClaude(toApiMessages(messages), { propertyName, businessType, hotelInfo, businessInfo });
 
     const toolUseBlocks = data.content.filter(b => b.type === 'tool_use');
     const textBlocks = data.content.filter(b => b.type === 'text');

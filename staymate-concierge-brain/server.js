@@ -248,7 +248,7 @@ async function getProperty(propertyId) {
     await supabase
       .from('properties')
       .select(
-        'property_id, hotel_name, telegram_bot_token, subscription_status, trial_ends_at, subscription_active_until'
+        'property_id, hotel_name, business_type, telegram_bot_token, subscription_status, trial_ends_at, subscription_active_until'
       )
       .eq('property_id', id)
       .maybeSingle();
@@ -1252,6 +1252,7 @@ const server =
                           propertyId: connection.propertyId,
                           propertyName:
                             property.hotel_name,
+                          businessType: property.business_type,
                           channel: 'messenger',
                           chatId: event.senderId,
                         }
@@ -1575,6 +1576,9 @@ const server =
                             propertyName:
                               property.hotel_name,
 
+                            businessType:
+                              property.business_type,
+
                             channel:
                               'instagram',
 
@@ -1851,7 +1855,7 @@ const server =
 
                 const { replyText, updatedHistory } = await runConciergeTurn(
                   history,
-                  { propertyId: connection.propertyId, propertyName: property.hotel_name, channel: 'whatsapp', chatId: event.senderId }
+                  { propertyId: connection.propertyId, propertyName: property.hotel_name, businessType: property.business_type, channel: 'whatsapp', chatId: event.senderId }
                 );
 
                 await saveHistory(
@@ -2049,6 +2053,7 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    businessType: property.business_type,
                     channel: 'test',
                     chatId: userId,
                   }
@@ -2224,6 +2229,7 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    businessType: property.business_type,
                     channel: 'telegram',
                     chatId,
                   }
@@ -2382,6 +2388,7 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    businessType: property.business_type,
                     channel: 'viber',
                     chatId,
                   }
@@ -2553,6 +2560,7 @@ const server =
                     propertyId,
                     propertyName:
                       property.hotel_name,
+                    businessType: property.business_type,
                     channel: 'website',
                     chatId: sessionId,
                   }

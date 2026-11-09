@@ -182,7 +182,7 @@ async function createCryptoSubscriptionInvoice({ orderId, plan, propertyName }) 
  * Схема інструментів (toolDefinitions) однакова для всіх готелів — Claude API
  * не потребує per-tenant версії схеми, тільки реалізація (виконання) різниться.
  */
-function createTools(propertyId, channel, chatId) {
+function createTools(propertyId, channel, chatId, businessType = 'hospitality') {
   async function checkAvailability({ check_in, check_out, guests } = {}) {
     let query = supabase
       .from('rooms')
@@ -400,15 +400,29 @@ function createTools(propertyId, channel, chatId) {
     return { ok: true, message: 'Звернення передано адміністрації закладу.' };
   }
 
-  return {
-    check_availability: checkAvailability,
-    create_booking: createBooking,
-    escalate_to_human: escalateToHuman,
-  };
+  const tools = { escalate_to_human: escalateToHuman };
+  if (businessType === 'hospitality') {
+    tools.check_availability = checkAvailability;
+    tools.create_booking = createBooking;
+  }
+  return tools;
 }
 
-/* ---------- схема інструментів для Claude API (однакова для всіх готелів) ---------- */
-const toolDefinitions = [
+const ESCALATE_TOOL_DEFINITION = {
+  name: 'escalate_to_human',
+  description: 'Передати звернення живому адміністратору/власнику бізнесу (скарга, складний випадок, пряме прохання клієнта).',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: { type: 'string', description: 'Короткий опис причини ескалації' },
+      urgency: { type: 'string', enum: ['low', 'normal', 'high'] },
+    },
+    required: ['reason'],
+  },
+};
+
+/* ---------- схема інструментів для готельних акаунтів (business_type === 'hospitality') ---------- */
+const HOSPITALITY_TOOL_DEFINITIONS = [
   {
     name: 'check_availability',
     description: 'Показати номери готелю з цінами. Можна викликати БЕЗ дат, якщо гість просто питає "які у вас є номери" — тоді повертається каталог без перевірки зайнятості. Якщо вказано дати заїзду й виїзду — додатково перевіряється реальна зайнятість на цей період.',
@@ -437,18 +451,25 @@ const toolDefinitions = [
       required: ['room_type', 'check_in', 'check_out', 'guest_name', 'guest_contact'],
     },
   },
-  {
-    name: 'escalate_to_human',
-    description: 'Передати звернення живому адміністратору закладу (скарга, складний випадок, пряме прохання гостя).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        reason: { type: 'string', description: 'Короткий опис причини ескалації' },
-        urgency: { type: 'string', enum: ['low', 'normal', 'high'] },
-      },
-      required: ['reason'],
-    },
-  },
+  ESCALATE_TOOL_DEFINITION,
 ];
 
-module.exports = { toolDefinitions, createTools, createSubscriptionInvoice, createCryptoSubscriptionInvoice, cancelRegularPayment, SUBSCRIPTION_PLANS };
+/* ---------- схема інструментів для будь-якого іншого бізнесу (поки лише ескалація — спеціалізовані інструменти по типу бізнесу заплановані окремо) ---------- */
+const GENERIC_TOOL_DEFINITIONS = [ESCALATE_TOOL_DEFINITION];
+
+/** Збережено для сумісності зі старими імпортами — завжди готельний набір. */
+const toolDefinitions = HOSPITALITY_TOOL_DEFINITIONS;
+
+function getToolDefinitions(businessType = 'hospitality') {
+  return businessType === 'hospitality' ? HOSPITALITY_TOOL_DEFINITIONS : GENERIC_TOOL_DEFINITIONS;
+}
+
+module.exports = {
+  toolDefinitions,
+  getToolDefinitions,
+  createTools,
+  createSubscriptionInvoice,
+  createCryptoSubscriptionInvoice,
+  cancelRegularPayment,
+  SUBSCRIPTION_PLANS,
+};
