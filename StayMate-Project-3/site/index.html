@@ -195,25 +195,30 @@ html[data-theme="dark"] .btn-primary{background:var(--accent); color:var(--accen
 
 /* ---------- hero (home) ---------- */
 .hero{padding:88px 0 104px; position:relative; overflow:hidden;}
-.hero-grid{display:grid; grid-template-columns:1.05fr 0.95fr; gap:64px; align-items:center; position:relative; z-index:1;}
+.hero-grid{display:flex; flex-direction:column; align-items:center; gap:60px; position:relative; z-index:1;}
+.hero-main{display:flex; flex-direction:column; align-items:center; text-align:center; max-width:680px;}
 .eyebrow{display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--accent-text); background:var(--accent-soft); border:1px solid var(--line); padding:6px 12px; border-radius:100px; margin-bottom:22px;}
 .eyebrow-dot{width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 2.2s infinite;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 .hero h1{font-size:clamp(34px,4.4vw,54px); line-height:1.06; color:var(--ink);}
 .hero h1 em{font-style:normal; color:var(--accent-text);}
-.hero-sub{margin-top:22px; font-size:18px; color:var(--ink-soft); max-width:480px; line-height:1.6;}
-.hero-actions{margin-top:34px; display:flex; gap:14px; flex-wrap:wrap;}
-.hero-onboard{margin-top:34px; max-width:480px;}
+.hero-sub{margin-top:22px; font-size:18px; color:var(--ink-soft); max-width:460px; line-height:1.6;}
+.hero-actions{margin-top:34px; display:flex; gap:14px; flex-wrap:wrap; justify-content:center;}
+.hero-onboard{margin-top:34px; width:100%; max-width:480px;}
 .hero-onboard-form{display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line-strong); border-radius:100px; padding:6px 6px 6px 22px; box-shadow:var(--shadow-soft);}
-.hero-onboard-form input{flex:1; border:none; background:none; outline:none; font-family:inherit; font-size:15px; color:var(--ink); padding:10px 0;}
+.hero-onboard-form input{flex:1; border:none; background:none; outline:none; font-family:inherit; font-size:15px; color:var(--ink); padding:10px 0; text-align:left;}
 .hero-onboard-form input::placeholder{color:var(--muted);}
 .hero-onboard-icon-btn{width:42px; height:42px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
 .hero-onboard-mic{background:var(--accent-soft); color:var(--accent-text);}
 .hero-onboard-send{background:var(--ink); color:var(--bg);}
 html[data-theme="dark"] .hero-onboard-send{background:var(--accent); color:var(--accent-ink);}
 .hero-onboard-hint{margin:12px 2px 0; font-size:13px; color:var(--muted);}
-.hero-proof{margin-top:44px; display:flex; gap:28px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--muted); flex-wrap:wrap;}
-.hero-proof b{display:block; font-family:'Space Grotesk',sans-serif; font-size:22px; color:var(--ink); font-weight:600;}
+.hero-proof{margin-top:44px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-m); overflow:hidden; max-width:560px; width:100%;}
+.hero-proof-item{background:var(--surface); padding:22px 16px; text-align:center;}
+.hero-proof-icon{width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent-text); display:flex; align-items:center; justify-content:center; margin:0 auto 12px;}
+.hero-proof b{display:block; font-family:'Space Grotesk',sans-serif; font-size:19px; color:var(--ink); font-weight:600;}
+.hero-proof span{display:block; margin-top:4px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); line-height:1.4;}
+.hero-chat-wrap{width:100%; max-width:420px;}
 
 /* ---------- chat demo ---------- */
 .chat-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-l); padding:22px; box-shadow:var(--shadow-soft); position:relative;}
@@ -238,7 +243,9 @@ html[data-theme="dark"] .hero-onboard-send{background:var(--accent); color:var(-
 .chat-foot{margin-top:16px; padding-top:14px; border-top:1px solid var(--line); display:flex; align-items:center; justify-content:space-between;}
 .chat-foot-badge{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);}
 .chat-foot-badge b{color:var(--accent-text);}
-@media (max-width:940px){.hero-grid{grid-template-columns:1fr; gap:48px;} .hero{padding:56px 0 72px;} .hero-sub{max-width:none;}}
+@media (max-width:940px){.hero-grid{gap:44px;} .hero{padding:56px 0 72px;}}
+@media (max-width:420px){.hero-proof-item{padding:16px 8px;} .hero-proof b{font-size:15px;} .hero-proof span{font-size:10px;} .hero-onboard-form input{font-size:12.5px;} .hero-onboard-form{padding-left:14px; gap:4px;} .hero-onboard-icon-btn{width:38px; height:38px;}}
+@media (max-width:340px){.hero-proof{grid-template-columns:1fr;}}
 
 /* ---------- section shell ---------- */
 section{padding:96px 0;}
@@ -425,13 +432,13 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
 
 <section class="hero">
   <div class="wrap hero-grid">
-    <div>
+    <div class="hero-main">
       <span class="eyebrow"><span class="eyebrow-dot"></span><span data-i18n="home.eyebrow">StayAI вже відповідає клієнтам прямо зараз</span></span>
-      <h1><span data-i18n="home.h1pre">Клієнти пишуть цілодобово.</span> <em data-i18n="home.h1em">Відповідає StayAI.</em></h1>
-      <p class="hero-sub" data-i18n="home.sub">ШІ-асистент для будь-якого бізнесу: відповідає клієнтам, консультує, бронює й приймає оплату у ваших каналах — поки ви зайняті іншим.</p>
+      <h1><span data-i18n="home.h1pre">Клієнти пишуть.</span> <em data-i18n="home.h1em">StayAI відповідає.</em></h1>
+      <p class="hero-sub" data-i18n="home.sub">ШІ-асистент для будь-якого бізнесу: консультує, бронює та приймає оплату.</p>
       <div class="hero-onboard">
         <form class="hero-onboard-form" id="heroOnboardForm">
-          <input type="text" id="heroOnboardInput" maxlength="800" autocomplete="off" data-i18n-ph="home.onboard.placeholder" placeholder="Розкажіть, яким бізнесом ви займаєтесь...">
+          <input type="text" id="heroOnboardInput" maxlength="800" autocomplete="off" data-i18n-ph="home.onboard.placeholder" placeholder="Опиши свій бізнес текстом або голосом">
           <button type="button" class="hero-onboard-icon-btn hero-onboard-mic" id="heroOnboardMic" data-i18n-aria="home.onboard.micLabel" aria-label="Диктувати голосом">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" stroke-width="1.7"/><path d="M19 11a7 7 0 01-14 0M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
           </button>
@@ -439,30 +446,41 @@ html[data-theme="dark"] .toast{background:var(--accent); color:var(--accent-ink)
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 12h15M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </form>
-        <p class="hero-onboard-hint" data-i18n-html="home.onboard.hint">StayAI сама підбере формат і персональну ціну — або просто <a href="pricing.html">обери готовий тариф</a>.</p>
+        <p class="hero-onboard-hint" data-i18n="home.onboard.hint">StayAI підбере формат і персональну ціну за хвилину.</p>
       </div>
       <div class="hero-proof">
-        <div><b data-i18n="home.proof1val">24/7</b><span data-i18n="home.proof1label">без вихідних і обіду</span></div>
-        <div><b data-i18n="home.proof2val">&lt; 9 сек</b><span data-i18n="home.proof2label">середній час відповіді</span></div>
-        <div><b data-i18n="home.proof3val">Будь-яка мова</b><span data-i18n="home.proof3label">якою напише гість</span></div>
+        <div class="hero-proof-item">
+          <div class="hero-proof-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+          <b data-i18n="home.proof1val">24/7</b><span data-i18n="home.proof1label">без вихідних</span>
+        </div>
+        <div class="hero-proof-item">
+          <div class="hero-proof-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+          <b data-i18n="home.proof2val">&lt; 9 сек</b><span data-i18n="home.proof2label">середній час відповіді</span>
+        </div>
+        <div class="hero-proof-item">
+          <div class="hero-proof-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 12h17M12 3.5a13 13 0 010 17M12 3.5a13 13 0 000 17" stroke="currentColor" stroke-width="1.6"/></svg></div>
+          <b data-i18n="home.proof3val">Будь-яка мова</b><span data-i18n="home.proof3label">відповідає мовою клієнта</span>
+        </div>
       </div>
     </div>
 
-    <div class="chat-card reveal">
-      <div class="chat-head">
-        <div class="chat-head-id">
-          <div class="chat-avatar">S</div>
-          <div>
-            <div class="chat-head-name">StayAI</div>
-            <div class="chat-head-status" data-i18n="home.chat.status">на зв'язку</div>
+    <div class="hero-chat-wrap">
+      <div class="chat-card reveal">
+        <div class="chat-head">
+          <div class="chat-head-id">
+            <div class="chat-avatar">S</div>
+            <div>
+              <div class="chat-head-name">StayAI</div>
+              <div class="chat-head-status" data-i18n="home.chat.status">на зв'язку</div>
+            </div>
           </div>
+          <span class="mono" style="font-size:11px;color:var(--muted);" data-i18n="home.chat.object">апартаменти «Промінь»</span>
         </div>
-        <span class="mono" style="font-size:11px;color:var(--muted);" data-i18n="home.chat.object">апартаменти «Промінь»</span>
-      </div>
-      <div class="chat-body" id="chatBody"></div>
-      <div class="chat-foot">
-        <span class="chat-foot-badge"><span data-i18n="home.chat.foot.status">статус ·</span> <b data-i18n="home.chat.foot.confirmed">бронь підтверджена</b></span>
-        <span class="chat-foot-badge">02:41</span>
+        <div class="chat-body" id="chatBody"></div>
+        <div class="chat-foot">
+          <span class="chat-foot-badge"><span data-i18n="home.chat.foot.status">статус ·</span> <b data-i18n="home.chat.foot.confirmed">бронь підтверджена</b></span>
+          <span class="chat-foot-badge">02:41</span>
+        </div>
       </div>
     </div>
   </div>
@@ -609,16 +627,16 @@ uk: {
 
   "checkout.authgate.title":"Спочатку увійдіть в акаунт","checkout.authgate.desc":"Підписка прив'язується до вашого акаунта StayAI, щоб залишатися доступною з будь-якого пристрою.",
 
-  "home.eyebrow":"StayAI вже відповідає клієнтам прямо зараз",
-  "home.h1pre":"Клієнти пишуть цілодобово.","home.h1em":"Відповідає StayAI.",
-  "home.sub":"ШІ-асистент для будь-якого бізнесу: відповідає клієнтам, консультує, бронює й приймає оплату у ваших каналах — поки ви зайняті іншим.",
+  "home.eyebrow":"StayAI вже відповідає клієнтам 24/7",
+  "home.h1pre":"Клієнти пишуть.","home.h1em":"StayAI відповідає.",
+  "home.sub":"ШІ-асистент для будь-якого бізнесу: консультує, бронює та приймає оплату.",
   "home.cta1":"Обрати тариф","home.cta2":"Як це працює",
-  "home.onboard.placeholder":"Розкажіть, яким бізнесом ви займаєтесь...",
+  "home.onboard.placeholder":"Опиши свій бізнес текстом або голосом",
   "home.onboard.micLabel":"Диктувати голосом","home.onboard.sendLabel":"Почати",
-  "home.onboard.hint":"StayAI сама підбере формат і персональну ціну — або просто <a href=\"pricing.html\">обери готовий тариф</a>.",
-  "home.proof1val":"24/7","home.proof1label":"без вихідних і обіду",
+  "home.onboard.hint":"StayAI підбере формат і персональну ціну за хвилину.",
+  "home.proof1val":"24/7","home.proof1label":"без вихідних",
   "home.proof2val":"< 9 сек","home.proof2label":"середній час відповіді",
-  "home.proof3val":"Будь-яка мова","home.proof3label":"якою напише гість",
+  "home.proof3val":"Будь-яка мова","home.proof3label":"відповідає мовою клієнта",
   "home.chat.status":"на зв'язку","home.chat.object":"апартаменти «Промінь»",
   "home.chat.foot.status":"статус ·","home.chat.foot.confirmed":"бронь підтверджена",
   "chat.g1":"Доброго вечора! Є вільна студія на 14–17 серпня?",
@@ -743,16 +761,16 @@ en: {
 
   "checkout.authgate.title":"Log in first","checkout.authgate.desc":"Your subscription is tied to your StayAI account, so it stays available on any device.",
 
-  "home.eyebrow":"StayAI is already answering customers right now",
-  "home.h1pre":"Customers message around the clock.","home.h1em":"StayAI replies.",
-  "home.sub":"An AI assistant for any business: answers customers, consults, books and takes payment in your channels — while you're busy with everything else.",
+  "home.eyebrow":"StayAI is already answering customers 24/7",
+  "home.h1pre":"Customers message.","home.h1em":"StayAI replies.",
+  "home.sub":"An AI assistant for any business: consults, books and takes payment.",
   "home.cta1":"Choose a plan","home.cta2":"How it works",
-  "home.onboard.placeholder":"Tell us what your business does...",
+  "home.onboard.placeholder":"Describe your business by text or voice",
   "home.onboard.micLabel":"Speak instead","home.onboard.sendLabel":"Start",
-  "home.onboard.hint":"StayAI will work out the right fit and a custom price — or just <a href=\"pricing.html\">pick a fixed plan</a>.",
-  "home.proof1val":"24/7","home.proof1label":"no days off, no lunch break",
+  "home.onboard.hint":"StayAI will work out the right fit and a custom price in a minute.",
+  "home.proof1val":"24/7","home.proof1label":"no days off",
   "home.proof2val":"< 9 sec","home.proof2label":"average reply time",
-  "home.proof3val":"Any language","home.proof3label":"the guest writes in",
+  "home.proof3val":"Any language","home.proof3label":"replies in the customer's language",
   "home.chat.status":"online","home.chat.object":"Ray Apartments",
   "home.chat.foot.status":"status ·","home.chat.foot.confirmed":"booking confirmed",
   "chat.g1":"Good evening! Any studio free Aug 14–17?",
