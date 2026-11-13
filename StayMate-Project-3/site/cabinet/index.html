@@ -787,6 +787,7 @@ footer{border-top:1px solid var(--line); padding:32px 0;}
       <h2 data-i18n="esc.title">Ескалації</h2>
       <p class="hint" data-i18n="esc.hint">Звернення гостей, з якими ШІ-адміністратор не впорався сам і передав вам — тут ви бачите весь діалог і можете відповісти гостю напряму.</p>
       <div id="escList"></div>
+      <p id="escLoadError" class="msg error hidden" role="alert"></p>
       <p class="hint rooms-empty hidden" id="escEmptyHint" data-i18n="esc.empty">Ескалацій поки немає — усі звернення гостей ШІ-адміністратор обробляє сам.</p>
     </div>
     </div><!-- /tabEscalations -->
@@ -2314,6 +2315,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       document.getElementById('tabChannels').classList.toggle('hidden', tab !== 'channels');
       document.getElementById('tabBookings').classList.toggle('hidden', tab !== 'bookings');
       document.getElementById('tabEscalations').classList.toggle('hidden', tab !== 'escalations');
+      if (tab === 'escalations' && currentProperty) fetchEscalations();
     });
   });
 
@@ -2329,13 +2331,24 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   const ESC_REPLYABLE_CHANNELS = ['telegram', 'viber', 'whatsapp', 'instagram', 'messenger', 'website'];
 
   async function fetchEscalations() {
-    const { data } = await supabase
-      .from('escalations')
-      .select('*')
-      .eq('property_id', currentProperty.property_id)
-      .order('created_at', { ascending: false });
-    escalations = data || [];
-    renderEscalationsList();
+    const errorNode = document.getElementById('escLoadError');
+    errorNode.classList.add('hidden');
+    try {
+      const headers = await authHeader();
+      const response = await fetch(
+        API_BASE_URL + '/api/escalations?propertyId=' + encodeURIComponent(currentProperty.property_id),
+        { headers }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+      escalations = Array.isArray(result.escalations) ? result.escalations : [];
+      renderEscalationsList();
+    } catch (error) {
+      console.error('[escalations] load failed:', error);
+      document.getElementById('escEmptyHint').classList.add('hidden');
+      errorNode.textContent = 'Не вдалося завантажити звернення. Перевірте з’єднання та спробуйте ще раз. (' + (error.message || 'невідома помилка') + ')';
+      errorNode.classList.remove('hidden');
+    }
   }
 
   function renderEscalationsList() {
@@ -2420,14 +2433,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('escalationModal').classList.remove('hidden');
 
     if (esc.channel && esc.chat_id) {
-      const { data } = await supabase
-        .from('conversations')
-        .select('messages')
-        .eq('property_id', currentProperty.property_id)
-        .eq('channel', esc.channel)
-        .eq('chat_id', esc.chat_id)
-        .maybeSingle();
-      renderEscMessages(data && data.messages);
+      try {
+        const headers = await authHeader();
+        const params = new URLSearchParams({
+          propertyId: currentProperty.property_id,
+          escalationId: String(esc.id),
+        });
+        const response = await fetch(API_BASE_URL + '/api/escalations/history?' + params, { headers });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+        renderEscMessages(result.messages);
+      } catch (error) {
+        console.error('[escalations] history failed:', error);
+        document.getElementById('escChatHistory').textContent = 'Не вдалося завантажити історію діалогу.';
+      }
     } else {
       renderEscMessages(null);
     }

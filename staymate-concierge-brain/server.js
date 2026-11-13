@@ -2059,6 +2059,63 @@ const server =
         return res.end();
       }
 
+      // Escalation owner read APIs: use the same authenticated owner check
+      // as /api/escalations/reply. Never return another business's tickets.
+      if (req.method === 'OPTIONS' && ['/api/escalations', '/api/escalations/history'].includes(requestUrl.pathname)) {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        });
+        return res.end();
+      }
+
+      if (req.method === 'GET' && ['/api/escalations', '/api/escalations/history'].includes(requestUrl.pathname)) {
+        const cors = { 'Access-Control-Allow-Origin': '*' };
+        (async () => {
+          const propertyId = requestUrl.searchParams.get('propertyId');
+          if (!propertyId) return sendJson(res, 400, { error: 'Потрібен propertyId.' }, cors);
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, cors);
+          }
+
+          if (requestUrl.pathname === '/api/escalations') {
+            const { data, error } = await supabase
+              .from('escalations')
+              .select('*')
+              .eq('property_id', propertyId)
+              .order('created_at', { ascending: false });
+            if (error) {
+              console.error('[escalations] list failed:', error.code || 'DATABASE_ERROR');
+              return sendJson(res, 500, { error: 'Не вдалося завантажити ескалації.' }, cors);
+            }
+            return sendJson(res, 200, { escalations: data || [] }, cors);
+          }
+
+          const escalationId = requestUrl.searchParams.get('escalationId');
+          if (!escalationId) return sendJson(res, 400, { error: 'Потрібен escalationId.' }, cors);
+          const { data: escalation, error } = await supabase
+            .from('escalations')
+            .select('id, channel, chat_id')
+            .eq('property_id', propertyId)
+            .eq('id', escalationId)
+            .maybeSingle();
+          if (error || !escalation) return sendJson(res, 404, { error: 'Ескалацію не знайдено.' }, cors);
+          const messages = escalation.channel && escalation.chat_id
+            ? await getHistory(propertyId, escalation.channel, escalation.chat_id)
+            : [];
+          return sendJson(res, 200, { messages }, cors);
+        })().catch(error => {
+          console.error('[escalations] read failed:', error?.code || 'UNEXPECTED_ERROR');
+          if (!res.headersSent) {
+            sendJson(res, 500, { error: 'Не вдалося завантажити дані звернення.' }, { 'Access-Control-Allow-Origin': '*' });
+          }
+        });
+        return;
+      }
+
       // =========================
       // TEST CHAT
       // =========================
