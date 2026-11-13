@@ -1830,7 +1830,11 @@ const server =
                   } catch (error) {
                     // The webhook was accepted, but a temporary media or
                     // transcription failure must not look like silence to a guest.
-                    console.error('[whatsapp] Voice processing error:', error && error.message ? error.message : error);
+                    console.error('[whatsapp] Voice processing failed:', {
+                      code: (error && error.code) || 'VOICE_PROCESSING_ERROR',
+                      ...(error && error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                      ...(error && error.providerReason ? { providerReason: error.providerReason } : {}),
+                    });
                     await sendWhatsAppMessage(
                       connection.accessToken,
                       connection.phoneNumberId,
@@ -1978,7 +1982,11 @@ const server =
             });
             return sendJson(res, 200, { text }, corsHeaders);
           } catch (error) {
-            console.error('[onboarding-voice]', error.message);
+            console.error('[onboarding-voice] Voice processing failed:', {
+              code: error.code || 'VOICE_PROCESSING_ERROR',
+              ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+              ...(error.providerReason ? { providerReason: error.providerReason } : {}),
+            });
             return sendJson(res, 400, { error: error.message }, corsHeaders);
           }
         });
@@ -2300,8 +2308,14 @@ const server =
                 console.info('[telegram] voice transcribed');
               } catch (error) {
                 // Errors from transcription are already customer-safe.  Do
-                // not log raw audio, bot credentials, or provider responses.
-                console.error('[telegram voice]', error.code || 'VOICE_PROCESSING_ERROR');
+                // not log raw audio or bot credentials — providerStatus/
+                // providerReason are pre-sanitized by transcribeAudio() for
+                // exactly this (see transcription.js safeProviderReason()).
+                console.error('[telegram voice] Voice processing failed:', {
+                  code: error.code || 'VOICE_PROCESSING_ERROR',
+                  ...(error.providerStatus ? { providerStatus: error.providerStatus } : {}),
+                  ...(error.providerReason ? { providerReason: error.providerReason } : {}),
+                });
                 await sendTelegramMessage(botToken, chatId, error.message || 'Не вдалося розпізнати голосове повідомлення.');
                 return;
               }
