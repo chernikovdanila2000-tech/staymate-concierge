@@ -15,6 +15,8 @@ const MAX_AUDIO_DURATION_SECONDS = 10 * 60;
 const TRANSCRIPTION_TIMEOUT_MS = 45 * 1000;
 const DEFAULT_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 const DEFAULT_MODEL = 'gpt-4o-mini-transcribe';
+const CLOUDFLARE_MODEL = '@cf/openai/whisper-large-v3-turbo';
+const CLOUDFLARE_BASE_URL = 'https://api.cloudflare.com/client/v4/accounts';
 const SUPPORTED_MEDIA_TYPES = new Set([
   'audio/aac', 'audio/flac', 'audio/m4a', 'audio/mpeg', 'audio/mp4',
   'audio/ogg', 'audio/opus', 'audio/wav', 'audio/webm',
@@ -78,7 +80,9 @@ function detectAudioMediaType(audio) {
 // Provider messages may contain request-specific information. Keep production
 // observability useful without persisting those messages or any media data.
 function safeProviderReason(payload) {
-  const error = payload && typeof payload === 'object' ? payload.error : null;
+  const error = payload && typeof payload === 'object'
+    ? payload.error || (Array.isArray(payload.errors) ? payload.errors[0] : null)
+    : null;
   const source = `${error?.type || ''} ${error?.code || ''} ${error?.message || ''}`.toLowerCase();
   if (/file|audio/.test(source) && /format|decode|corrupt|invalid/.test(source)) return 'invalid_audio_payload';
   if (/model/.test(source) && /access|exist|available|found/.test(source)) return 'model_unavailable';
@@ -98,10 +102,18 @@ async function transcribeAudio({
   endpoint = process.env.TRANSCRIPTION_API_URL || DEFAULT_ENDPOINT,
   apiKey = process.env.TRANSCRIPTION_API_KEY || '',
   model = process.env.TRANSCRIPTION_MODEL || DEFAULT_MODEL,
+  provider = process.env.TRANSCRIPTION_PROVIDER || 'openai',
+  cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID || '',
+  cloudflareApiToken = process.env.CLOUDFLARE_WORKERS_AI_API_TOKEN || '',
   fetchImpl = globalThis.fetch,
   timeoutMs = TRANSCRIPTION_TIMEOUT_MS,
 } = {}) {
-  if (!apiKey) {
+  const selectedProvider = String(provider).trim().toLowerCase();
+  const useCloudflare = selectedProvider === 'cloudflare';
+  const cloudflareAccountIdValid = /^[a-f0-9]{32}$/i.test(cloudflareAccountId);
+  if (!['openai', 'cloudflare'].includes(selectedProvider)
+    || (useCloudflare && (!cloudflareApiToken || !cloudflareAccountIdValid))
+    || (!useCloudflare && !apiKey)) {
     throw new TranscriptionError('TRANSCRIPTION_NOT_CONFIGURED', 'Распознавание голосовых сообщений ещё не подключено.');
   }
   if (typeof fetchImpl !== 'function') {
@@ -122,13 +134,28 @@ async function transcribeAudio({
     throw new TranscriptionError('UNSUPPORTED_MEDIA_TYPE', 'Этот формат голосового сообщения пока не поддерживается.');
   }
 
-  const form = new FormData();
-  form.append('file', new Blob([audio], { type: resolvedMediaType }), safeFilename(filename, resolvedMediaType));
-  form.append('model', String(model));
-  // gpt-4o transcribe models only return JSON. Be explicit instead of relying
-  // on endpoint defaults that can vary between provider versions.
-  form.append('response_format', 'json');
-  if (language) form.append('language', String(language).slice(0, 12));
+  // Cloudflare Workers AI uses base64 JSON instead of OpenAI multipart.
+  // OpenAI remains selectable for rollback without replacing its API key.
+  let requestUrl = endpoint;
+  let requestOptions;
+  if (useCloudflare) {
+    requestUrl = CLOUDFLARE_BASE_URL + '/' + cloudflareAccountId + '/ai/run/' + CLOUDFLARE_MODEL;
+    requestOptions = {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + cloudflareApiToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio: audio.toString('base64'), task: 'transcribe',
+        ...(language ? { language: String(language).slice(0, 12) } : {}),
+      }),
+    };
+  } else {
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type: resolvedMediaType }), safeFilename(filename, resolvedMediaType));
+    form.append('model', String(model));
+    form.append('response_format', 'json');
+    if (language) form.append('language', String(language).slice(0, 12));
+    requestOptions = { method: 'POST', headers: { Authorization: 'Bearer ' + apiKey }, body: form };
+  }
 
   let response;
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
@@ -139,10 +166,8 @@ async function transcribeAudio({
     ? setTimeout(() => controller.abort(), safeTimeoutMs)
     : null;
   try {
-    response = await fetchImpl(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
+    response = await fetchImpl(requestUrl, {
+      ...requestOptions,
       ...(controller ? { signal: controller.signal } : {}),
     });
   } catch {
@@ -160,7 +185,7 @@ async function transcribeAudio({
   } catch {
     // Keep a customer-safe error below; do not expose a provider response.
   }
-  if (!response.ok) {
+  if (!response.ok || (useCloudflare && payload.success === false)) {
     throw new TranscriptionError(
       'TRANSCRIPTION_PROVIDER_ERROR',
       'Сервис распознавания не смог обработать голосовое сообщение.',
@@ -168,7 +193,7 @@ async function transcribeAudio({
     );
   }
 
-  const text = normalizeText(payload.text);
+  const text = normalizeText(useCloudflare ? (payload.result?.text ?? payload.text) : payload.text);
   if (!text) {
     throw new TranscriptionError('EMPTY_TRANSCRIPTION', 'Не удалось распознать речь в голосовом сообщении.');
   }
@@ -178,6 +203,7 @@ async function transcribeAudio({
 module.exports = {
   DEFAULT_ENDPOINT,
   DEFAULT_MODEL,
+  CLOUDFLARE_MODEL,
   MAX_AUDIO_BYTES,
   MAX_AUDIO_DURATION_SECONDS,
   TRANSCRIPTION_TIMEOUT_MS,

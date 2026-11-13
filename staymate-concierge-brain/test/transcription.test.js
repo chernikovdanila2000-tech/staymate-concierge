@@ -121,3 +121,55 @@ test('aborts a stalled provider request instead of leaving the channel webhook w
   assert.ok(receivedSignal?.aborted);
   assert.equal(TRANSCRIPTION_TIMEOUT_MS, 45 * 1000);
 });
+
+test('Cloudflare sends base64 JSON and reads the nested Workers AI result', async () => {
+  const raw = Buffer.from('OggS-exact-voice-content');
+  let request;
+  const text = await transcribeAudio({
+    audio: raw, mediaType: 'audio/ogg', language: 'uk',
+    provider: 'cloudflare', cloudflareAccountId: '0d9988f4660d9c0eeb4c4ff1b2ea93e6',
+    cloudflareApiToken: 'mock-secret',
+    fetchImpl: async (url, options) => {
+      request = { url, options };
+      return { status: 200, ok: true, json: async () => ({
+        success: true, result: { text: '  Доброго дня, є вільні номери? ' }
+      }) };
+    },
+  });
+  assert.equal(text, 'Доброго дня, є вільні номери?');
+  assert.match(request.url, /\/ai\/run\/@cf\/openai\/whisper-large-v3-turbo$/);
+  assert.equal(request.options.headers.Authorization, 'Bearer mock-secret');
+  assert.equal(request.options.headers['Content-Type'], 'application/json');
+  assert.deepEqual(JSON.parse(request.options.body), {
+    audio: raw.toString('base64'), task: 'transcribe', language: 'uk'
+  });
+});
+
+test('Cloudflare missing API credentials fails closed without fallback to OpenAI', async () => {
+  let calls = 0;
+  await assert.rejects(
+    transcribeAudio({
+      provider: 'cloudflare', apiKey: 'even-when-openai-key-exists',
+      cloudflareAccountId: '0d9988f4660d9c0eeb4c4ff1b2ea93e6',
+      cloudflareApiToken: '',
+      audio: Buffer.from('OggS-voice'), mediaType: 'audio/ogg',
+      fetchImpl: async () => { calls++; },
+    }),
+    error => error.code === 'TRANSCRIPTION_NOT_CONFIGURED'
+  );
+  assert.equal(calls, 0);
+});
+
+test('Cloudflare provider failures are sanitized and preserve HTTP status', async () => {
+  await assert.rejects(transcribeAudio({
+    provider: 'cloudflare', cloudflareAccountId: '0d9988f4660d9c0eeb4c4ff1b2ea93e6',
+    cloudflareApiToken: 'mock-secret',
+    audio: Buffer.from('OggS-test'), mediaType: 'audio/ogg',
+    fetchImpl: async () => ({
+      status: 401, ok: false,
+      json: async () => ({ success: false, errors: [{ code: 10000, message: 'Authentication error, secret hidden' }] }),
+    }),
+  }), error => error.code === 'TRANSCRIPTION_PROVIDER_ERROR'
+    && error.providerStatus === 401
+    && !error.message.includes('secret'));
+});
