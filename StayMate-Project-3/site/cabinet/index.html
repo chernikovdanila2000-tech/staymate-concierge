@@ -945,9 +945,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "gate.trialCard.disclosure":"Перше списання станеться {date} — тільки якщо ви не скасуєте підписку раніше. Скасувати автопродовження можна будь-коли в кабінеті, в картці \"Тариф і підписка\", без жодних додаткових умов.",
       "gate.trialCard.inDays":"через 3 дні",
       "gate.title.choosePlan":"Оберіть тариф","gate.title.suspended":"Підписку призупинено",
+      "gate.title.custom":"Оплатіть підписку",
       "gate.lede.activeExpired":"Термін дії останньої оплати вже минув. Оберіть тариф, щоб продовжити.",
       "gate.lede.choosePlan":"Оберіть тариф і оплатіть — доступ відкриється одразу, без обмежень пробного періоду.",
       "gate.lede.trialEnded":"Пробний 3-денний період завершився. Оберіть тариф, щоб продовжити користуватися кабінетом і ботом.",
+      "gate.lede.custom":"Щоб відкрити кабінет, оплатіть вашу персональну підписку: {price} ₴ / міс. Цю ціну визначив AI-консультант під час підключення.",
 
       "common.save":"Зберегти","common.cancel":"Скасувати","common.connect":"Підключити","common.disconnect":"Відключити",
       "common.loading":"Завантаження…","common.saved":"Збережено.","common.close":"Закрити",
@@ -1156,9 +1158,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       "gate.trialCard.disclosure":"The first charge will happen on {date} — only if you don't cancel the subscription before then. You can cancel auto-renewal any time in the cabinet, in the \"Plan & subscription\" card, with no extra conditions.",
       "gate.trialCard.inDays":"in 3 days",
       "gate.title.choosePlan":"Choose a plan","gate.title.suspended":"Subscription suspended",
+      "gate.title.custom":"Pay your subscription",
       "gate.lede.activeExpired":"Your last payment has expired. Choose a plan to continue.",
       "gate.lede.choosePlan":"Choose a plan and pay — access opens immediately, with no trial-period limits.",
       "gate.lede.trialEnded":"The 3-day trial period has ended. Choose a plan to keep using the cabinet and the bot.",
+      "gate.lede.custom":"To unlock the cabinet, pay your personal subscription: {price} UAH / month. This price was set by the AI consultant during onboarding.",
 
       "common.save":"Save","common.cancel":"Cancel","common.connect":"Connect","common.disconnect":"Disconnect",
       "common.loading":"Loading…","common.saved":"Saved.","common.close":"Close",
@@ -1898,6 +1902,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         hotel_name: name,
         address: profile.location || null,
         business_type: profile.business_type || 'generic',
+        custom_price_uah: profile.proposedPriceUah || null,
       })
       .select()
       .single();
@@ -1960,11 +1965,29 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     const payCryptoBtn = document.getElementById('gatePayCryptoBtn');
     const cryptoHint = document.getElementById('gateCryptoHint');
     const disclosure = document.getElementById('gateDisclosure');
+    const planRow = document.getElementById('gatePlanRow');
+    // Акаунт, підключений через AI-онбординг (onboarding.js), має персональну
+    // ціну замість одного з трьох фіксованих тарифів — показуємо саме її, а
+    // не загальний вибір тарифу, інакше власник міг би випадково оплатити не
+    // ту суму, яку йому щойно назвав AI.
+    const customPriceUah = currentProperty && currentProperty.custom_price_uah;
+    planRow.classList.toggle('hidden', Boolean(customPriceUah));
+    document.getElementById('gateUseTrialBtn').classList.toggle('hidden', reason !== 'choose_plan');
     // Crypto has no saved-card equivalent, so it can't do the "link now,
     // charge at trial end" flow — only offer it for an immediate payment.
-    payCryptoBtn.classList.toggle('hidden', reason === 'trial_card');
-    cryptoHint.classList.toggle('hidden', reason === 'trial_card');
-    if (reason === 'trial_card') {
+    // Custom (AI-proposed) pricing isn't wired into the crypto invoice path
+    // either, so hide it there too rather than offer a button that would
+    // silently charge a fixed-tier price instead of the quoted one.
+    payCryptoBtn.classList.toggle('hidden', reason === 'trial_card' || Boolean(customPriceUah));
+    cryptoHint.classList.toggle('hidden', reason === 'trial_card' || Boolean(customPriceUah));
+    if (customPriceUah) {
+      payBtn.querySelector('.btn-label').textContent = t('gate.payBtn', lang);
+      disclosure.textContent = t('gate.disclosure.default', lang);
+      document.getElementById('gateTitle').textContent = t('gate.title.custom', lang);
+      document.getElementById('gateLede').textContent = t('gate.lede.custom', lang, {
+        price: customPriceUah.toLocaleString('uk-UA'),
+      });
+    } else if (reason === 'trial_card') {
       document.getElementById('gateTitle').textContent = t('gate.trialCard.title', lang);
       document.getElementById('gateLede').textContent = t('gate.trialCard.lede', lang);
       payBtn.querySelector('.btn-label').textContent = t('gate.trialCard.payBtn', lang);
@@ -1980,8 +2003,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         ? t('gate.lede.choosePlan', lang)
         : t('gate.lede.trialEnded', lang);
     }
-    document.getElementById('gateUseTrialBtn').classList.toggle('hidden', reason !== 'choose_plan');
-    setupPlanPicker(document.getElementById('gatePlanRow'));
+    if (!customPriceUah) setupPlanPicker(planRow);
     gateScreen.classList.remove('hidden');
   }
 
@@ -2015,7 +2037,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     }
   }
 
-  async function createInvoiceAndRedirect(plan, msgEl, isTrial, method) {
+  async function createInvoiceAndRedirect(plan, msgEl, isTrial, method, customPriceUah) {
     if (!plan) {
       msgEl.className = 'msg error';
       msgEl.textContent = t('sub.noPlanSelected', getLang());
@@ -2030,7 +2052,11 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ propertyId: currentProperty.property_id, plan }),
+        body: JSON.stringify({
+          propertyId: currentProperty.property_id,
+          plan,
+          ...(customPriceUah ? { customPriceUah } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Не вдалося створити рахунок.');
@@ -2044,7 +2070,9 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   let currentGateReason = null;
 
   onClickGuarded(document.getElementById('gatePayBtn'), () => {
-    return createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), currentGateReason === 'trial_card');
+    const customPriceUah = currentProperty && currentProperty.custom_price_uah;
+    const plan = customPriceUah ? 'custom' : selectedGatePlan;
+    return createInvoiceAndRedirect(plan, document.getElementById('gateMsg'), currentGateReason === 'trial_card', undefined, customPriceUah);
   });
   onClickGuarded(document.getElementById('gatePayCryptoBtn'), () => {
     return createInvoiceAndRedirect(selectedGatePlan, document.getElementById('gateMsg'), false, 'crypto');
