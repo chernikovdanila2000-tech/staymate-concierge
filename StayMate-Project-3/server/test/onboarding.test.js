@@ -1,6 +1,31 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createOnboardingTools, getSessionProfile, buildOnboardingSystemPrompt, ONBOARDING_TOOL_DEFINITIONS } = require('../onboarding');
+const { createOnboardingTools, getSessionProfile, buildOnboardingSystemPrompt, ONBOARDING_TOOL_DEFINITIONS, runOnboardingTurn } = require('../onboarding');
+
+test('a question asked in the same response as a tool call reaches the owner (not just the final filler)', async (t) => {
+  const responses = [
+    {
+      content: [
+        { type: 'text', text: 'Скільки у вас постів і майстрів?' },
+        { type: 'tool_use', id: 'tu1', name: 'save_business_profile', input: { business_name: 'ADEX STU', business_type: 'СТО' } },
+      ],
+    },
+    { content: [{ type: 'text', text: 'Чекаю на відповідь.' }] },
+  ];
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'test-key';
+  globalThis.fetch = async () => ({ ok: true, json: async () => responses.shift() });
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = originalKey;
+  });
+
+  const result = await runOnboardingTurn('test-session-question', 'В мене СТО, називається ADEX STU');
+
+  assert.match(result.replyText, /Скільки у вас постів і майстрів\?/u);
+  assert.equal(result.profile.business_name, 'ADEX STU');
+});
 
 test('save_business_profile merges fields into the session profile without wiping the rest', () => {
   const session = { profile: { business_name: 'Кавʼярня "Дім"' } };

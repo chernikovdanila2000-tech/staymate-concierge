@@ -26,6 +26,50 @@ test.describe('AI onboarding — onboard.html chat', () => {
     await page.waitForURL(/cabinet\/\?ob=/);
   });
 
+  test('mic: second press stops recording and puts the transcript into the input — nothing is sent until the user sends it', async ({ page }) => {
+    // Headless Chromium has no microphone: stand in for getUserMedia and
+    // MediaRecorder so the page's own record/stop/upload flow runs as-is.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        configurable: true,
+        value: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }] }) },
+      });
+      window.MediaRecorder = class {
+        constructor() { this.state = 'inactive'; this.mimeType = 'audio/webm'; this.listeners = {}; }
+        addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
+        start() { this.state = 'recording'; }
+        stop() {
+          this.state = 'inactive';
+          (this.listeners.dataavailable || []).forEach((fn) => fn({ data: new Blob(['voice'], { type: 'audio/webm' }) }));
+          (this.listeners.stop || []).forEach((fn) => fn());
+        }
+      };
+    });
+    let chatCalls = 0;
+    await page.route('**/api/onboarding-chat', (route) => {
+      chatCalls += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ reply: 'ok', profile: {} }) });
+    });
+    await page.route('**/api/onboarding-voice', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'В мене СТО, 20 машин на день' }) })
+    );
+
+    await page.goto('/onboard.html');
+    await page.fill('#obInput', 'Привіт.');
+    await page.click('#obMic');
+    await expect(page.locator('#obMic')).toHaveClass(/rec/);
+    await page.click('#obMic');
+
+    await expect(page.locator('#obMic')).not.toHaveClass(/rec/);
+    await expect(page.locator('#obInput')).toHaveValue('Привіт. В мене СТО, 20 машин на день');
+    expect(chatCalls).toBe(0);
+    await expect(page.locator('.ob-msg.user')).toHaveCount(0);
+
+    await page.click('#obSend');
+    await expect(page.locator('.ob-msg.user')).toContainText('В мене СТО, 20 машин на день');
+    expect(chatCalls).toBe(1);
+  });
+
   test('declining a price card dismisses it and lets the conversation continue', async ({ page }) => {
     await page.route('**/api/onboarding-chat', (route) =>
       route.fulfill({

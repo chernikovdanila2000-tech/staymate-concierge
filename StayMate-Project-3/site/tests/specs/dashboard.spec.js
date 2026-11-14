@@ -668,6 +668,9 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     // Reply gets appended to the conversation and re-rendered right away —
     // the owner sees it land in the same thread, not just a "sent" toast.
     await expect(page.locator('#escChatHistory')).toContainText("Ми зв'яжемось");
+    // Replying does not resolve it — the manager decides that with the button.
+    await expect(page.locator('#escToggleStatus')).toContainText(/вирішеною/i);
+    await expect(page.locator('#escTabBadge')).toHaveText('1');
   });
 
   test('a test-chat escalation has no reply box — that channel has no way to push a delayed message', async ({ page }) => {

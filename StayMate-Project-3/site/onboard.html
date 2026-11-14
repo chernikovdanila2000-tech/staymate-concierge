@@ -201,9 +201,18 @@ a{color:inherit;}
   sendBtn.addEventListener('click', () => send(input.value));
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(input.value); });
 
-  // ---- Голос: запис з мікрофона браузера -> /api/onboarding-voice -> текст у те саме поле вводу ----
+  // ---- Голос: перше натискання на мікрофон — запис, друге — зупинка.
+  // Розпізнаний текст лише з'являється в полі вводу (дописується до вже
+  // набраного) — людина може його виправити й сама натискає "надіслати".
   let mediaRecorder = null;
   let audioChunks = [];
+
+  function putTranscriptIntoInput(text) {
+    const current = input.value.trim();
+    input.value = current ? current + ' ' + text : text;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
 
   function startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
@@ -212,10 +221,11 @@ a{color:inherit;}
       mediaRecorder.addEventListener('dataavailable', (e) => { if (e.data.size) audioChunks.push(e.data); });
       mediaRecorder.addEventListener('stop', () => {
         stream.getTracks().forEach((t) => t.stop());
+        micBtn.classList.remove('rec');
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         if (!blob.size) return;
-        micBtn.classList.remove('rec');
         setBusy(true);
+        micBtn.disabled = true;
         const pending = addMessage('pending', 'Розпізнаю голос…');
         const form = new FormData();
         form.append('audio', blob, 'voice.webm');
@@ -224,8 +234,9 @@ a{color:inherit;}
           .then((data) => {
             pending.remove();
             setBusy(false);
+            micBtn.disabled = false;
             if (data && data.text) {
-              send(data.text);
+              putTranscriptIntoInput(data.text);
             } else {
               addMessage('ai', (data && data.error) || 'Не вдалося розпізнати голос. Спробуйте ще раз або напишіть текстом.');
             }
@@ -233,6 +244,7 @@ a{color:inherit;}
           .catch(() => {
             pending.remove();
             setBusy(false);
+            micBtn.disabled = false;
             addMessage('ai', 'Не вдалося розпізнати голос. Спробуйте ще раз або напишіть текстом.');
           });
       });

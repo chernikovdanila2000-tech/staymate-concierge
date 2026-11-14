@@ -3764,26 +3764,11 @@ const server =
           history.push({ role: 'assistant', content: text, from_owner: true });
           await saveHistory(propertyId, escalation.channel, escalation.chat_id, history);
 
-          // Власник відповів гостю — для нього це й означає "питання
-          // вирішено". Без цього AI лишався б мовчати на всі наступні
-          // повідомлення цього гостя, поки хтось окремо не натисне
-          // "Позначити вирішеним" у кабінеті.
-          let resolvedIds = [];
-          try {
-            resolvedIds = await resolveConversationEscalations({
-              supabase,
-              propertyId,
-              channel: escalation.channel,
-              chatId: escalation.chat_id,
-            });
-          } catch (resolveError) {
-            // The reply itself was already delivered, so don't report the
-            // whole request as failed — but the AI stays paused, so say so.
-            console.error('[escalations/reply] resolve failed:', resolveError.message);
-            return sendJson(res, 200, { ok: true, resolved: false, resolvedIds }, corsHeaders);
-          }
-
-          return sendJson(res, 200, { ok: true, resolved: true, resolvedIds }, corsHeaders);
+          // A reply does NOT resolve the escalation: the manager may need
+          // several messages, and only they know when the question is
+          // settled. The AI resumes once they press "Позначити вирішеною"
+          // (/api/escalations/status).
+          return sendJson(res, 200, { ok: true }, corsHeaders);
         });
 
         return;
