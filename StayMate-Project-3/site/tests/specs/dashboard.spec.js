@@ -736,6 +736,41 @@ test.describe('Dashboard — Escalations (new feature)', () => {
     await expect(page.locator('#escTabBadge')).toHaveText('1');
   });
 
+  test('resolving one escalation closes every open escalation of that chat, so the AI really resumes (regression)', async ({ page }) => {
+    // Two open escalations for the same Instagram chat (e.g. created before
+    // duplicate-prevention) plus an unrelated one. The AI stays paused while
+    // ANY escalation of a chat is open, so resolving only the clicked one
+    // used to leave the conversation stuck with the manager.
+    await installBackendMock(page, {
+      session: baseSession,
+      property: baseProperty,
+      escalations: [
+        { id: 'a1', property_id: 'p1', reason: 'Питання 1', urgency: 'normal', status: 'open', channel: 'instagram', chat_id: '777', created_at: new Date().toISOString() },
+        { id: 'a2', property_id: 'p1', reason: 'Питання 2', urgency: 'normal', status: 'open', channel: 'instagram', chat_id: '777', created_at: new Date().toISOString() },
+        { id: 'b1', property_id: 'p1', reason: 'Інший гість', urgency: 'normal', status: 'open', channel: 'telegram', chat_id: '555', created_at: new Date().toISOString() },
+      ],
+    });
+    await page.goto('/cabinet/');
+    await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/, { timeout: 5000 });
+    await page.click('.dash-tab[data-tab="escalations"]');
+    await expect(page.locator('#escTabBadge')).toHaveText('3');
+
+    await page.click('.esc-row[data-id="a1"]');
+    await page.click('#escToggleStatus');
+    await expect(page.locator('#escToggleStatus')).toContainText(/знову/i);
+
+    const calls = await page.evaluate(() => window.__qaEscalationStatusCalls);
+    expect(calls).toEqual([{ propertyId: 'p1', escalationId: 'a1', status: 'resolved' }]);
+    const statuses = await page.evaluate(() => Object.fromEntries(window.__qaState.escalations.map((e) => [e.id, e.status])));
+    expect(statuses).toEqual({ a1: 'resolved', a2: 'resolved', b1: 'open' });
+
+    // Only the other guest's escalation is still open.
+    await expect(page.locator('#escTabBadge')).toHaveText('1');
+    await page.click('#escModalClose');
+    await expect(page.locator('.esc-row[data-id="a2"]')).toHaveClass(/is-resolved/);
+    await expect(page.locator('.esc-row[data-id="b1"]')).not.toHaveClass(/is-resolved/);
+  });
+
   test('a reply failure shows an error and keeps the draft in the textbox', async ({ page }) => {
     await installBackendMock(page, {
       session: baseSession,

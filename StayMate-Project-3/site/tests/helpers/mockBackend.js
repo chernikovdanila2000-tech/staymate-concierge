@@ -406,6 +406,37 @@ async function installBackendMock(page, initialState = {}) {
     }, body);
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
   });
+  // Mirrors the real /api/escalations/status: resolving closes EVERY open
+  // escalation of the same conversation (the AI stays paused while any one
+  // is open); reopening touches only the clicked one.
+  await page.route('**/api/escalations/status', async (route) => {
+    const body = JSON.parse(route.request().postData() || '{}');
+    const result = await page.evaluate((b) => {
+      window.__qaEscalationStatusCalls = window.__qaEscalationStatusCalls || [];
+      window.__qaEscalationStatusCalls.push(b);
+      const st = window.__qaState;
+      const all = st.escalations || [];
+      const esc = all.find((e) => String(e.id) === String(b.escalationId));
+      if (!esc) return { notFound: true };
+      if (b.status === 'open') {
+        esc.status = 'open';
+        return { resolvedIds: [] };
+      }
+      const resolvedIds = [];
+      all.forEach((e) => {
+        const sameChat = esc.channel && esc.chat_id && e.channel === esc.channel && String(e.chat_id) === String(esc.chat_id);
+        if ((sameChat || e.id === esc.id) && e.status !== 'resolved') {
+          e.status = 'resolved';
+          resolvedIds.push(e.id);
+        }
+      });
+      return { resolvedIds };
+    }, body);
+    if (result.notFound) {
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not found' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, status: body.status, resolvedIds: result.resolvedIds }) });
+  });
   // /api/connect-channel and /api/disconnect-channel are handled by the
   // in-page window.fetch() override in buildClientSource() instead of a
   // page.route here — they need to mutate __qaState (so a later

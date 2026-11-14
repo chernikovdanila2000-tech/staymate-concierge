@@ -42,7 +42,7 @@ const {
   invalidateChannel,
 } = require('./channels');
 const { getHistory, saveHistory } = require('./conversations');
-const { isConversationTakenOver } = require('./takeover');
+const { isConversationTakenOver, resolveConversationEscalations } = require('./takeover');
 const { MAX_AUDIO_BYTES, transcribeAudio } = require('./transcription');
 const { runOnboardingTurn, getSessionProfile } = require('./onboarding');
 const {
@@ -2038,6 +2038,7 @@ const server =
           '/api/disconnect-channel',
           '/api/contact',
           '/api/escalations/reply',
+          '/api/escalations/status',
           '/api/onboarding-chat',
           '/api/onboarding-voice',
         ].includes(req.url)
@@ -3794,12 +3795,100 @@ const server =
           // вирішено". Без цього AI лишався б мовчати на всі наступні
           // повідомлення цього гостя, поки хтось окремо не натисне
           // "Позначити вирішеним" у кабінеті.
-          await supabase
-            .from('escalations')
-            .update({ status: 'resolved', resolved_at: new Date().toISOString() })
-            .eq('id', escalationId);
+          let resolvedIds = [];
+          try {
+            resolvedIds = await resolveConversationEscalations({
+              supabase,
+              propertyId,
+              channel: escalation.channel,
+              chatId: escalation.chat_id,
+            });
+          } catch (resolveError) {
+            // The reply itself was already delivered, so don't report the
+            // whole request as failed — but the AI stays paused, so say so.
+            console.error('[escalations/reply] resolve failed:', resolveError.message);
+            return sendJson(res, 200, { ok: true, resolved: false, resolvedIds }, corsHeaders);
+          }
 
-          return sendJson(res, 200, { ok: true }, corsHeaders);
+          return sendJson(res, 200, { ok: true, resolved: true, resolvedIds }, corsHeaders);
+        });
+
+        return;
+      }
+
+      // Кнопка "Позначити вирішеним / Відкрити знову" в кабінеті. Йде через
+      // бекенд (service key), а не прямим update із браузера: той мовчки
+      // не змінював жодного рядка, якщо RLS-політика UPDATE не застосована,
+      // і кабінет показував "вирішено", поки ШІ лишався на паузі.
+      if (req.method === 'POST' && req.url === '/api/escalations/status') {
+        const corsHeaders = {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        };
+
+        readBody(req).then(async (body) => {
+          let parsed;
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            return sendJson(res, 400, { error: 'Некоректний JSON.' }, corsHeaders);
+          }
+
+          const { propertyId, escalationId, status } = parsed;
+          if (!propertyId || !escalationId || !['resolved', 'open'].includes(status)) {
+            return sendJson(res, 400, { error: "Потрібні propertyId, escalationId і status ('resolved' або 'open')." }, corsHeaders);
+          }
+
+          try {
+            await requireOwnedProperty(req, propertyId);
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
+          }
+
+          const { data: escalation, error: escError } = await supabase
+            .from('escalations')
+            .select('id, channel, chat_id')
+            .eq('id', escalationId)
+            .eq('property_id', propertyId)
+            .maybeSingle();
+          if (escError || !escalation) {
+            return sendJson(res, 404, { error: 'Ескалацію не знайдено.' }, corsHeaders);
+          }
+
+          try {
+            if (status === 'resolved') {
+              const resolvedIds = await resolveConversationEscalations({
+                supabase,
+                propertyId,
+                channel: escalation.channel,
+                chatId: escalation.chat_id,
+              });
+              // Old escalations without channel/chat_id aren't matched by the
+              // conversation-wide update, so close the clicked one directly.
+              if (!resolvedIds.some((id) => String(id) === String(escalation.id))) {
+                const { error: oneError } = await supabase
+                  .from('escalations')
+                  .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+                  .eq('id', escalation.id)
+                  .eq('property_id', propertyId);
+                if (oneError) throw new Error(oneError.message);
+                resolvedIds.push(escalation.id);
+              }
+              return sendJson(res, 200, { ok: true, status, resolvedIds }, corsHeaders);
+            }
+
+            const { error: reopenError } = await supabase
+              .from('escalations')
+              .update({ status: 'open', resolved_at: null })
+              .eq('id', escalation.id)
+              .eq('property_id', propertyId);
+            if (reopenError) throw new Error(reopenError.message);
+            return sendJson(res, 200, { ok: true, status, resolvedIds: [] }, corsHeaders);
+          } catch (statusError) {
+            console.error('[escalations/status] update failed:', statusError.message);
+            return sendJson(res, 500, { error: 'Не вдалося змінити статус ескалації.' }, corsHeaders);
+          }
         });
 
         return;

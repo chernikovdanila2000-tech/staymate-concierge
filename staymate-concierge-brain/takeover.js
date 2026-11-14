@@ -25,4 +25,28 @@ async function isConversationTakenOver({ supabase, propertyId, channel, chatId }
   return Array.isArray(data) && data.length > 0;
 }
 
-module.exports = { isConversationTakenOver };
+// The pause above holds while ANY escalation in the conversation is open, so
+// handing the conversation back to the AI must close all of them — closing
+// only the one the owner clicked leaves older duplicates still pausing it.
+async function resolveConversationEscalations({ supabase, propertyId, channel, chatId, now = new Date() }) {
+  if (!propertyId || !channel || chatId === undefined || chatId === null) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('escalations')
+    .update({ status: 'resolved', resolved_at: now.toISOString() })
+    .eq('property_id', String(propertyId))
+    .eq('channel', String(channel))
+    .eq('chat_id', String(chatId))
+    .neq('status', 'resolved')
+    .select('id');
+
+  if (error) {
+    throw new Error(`Не вдалося повернути розмову ШІ: ${error.message || error}`);
+  }
+
+  return Array.isArray(data) ? data.map((row) => row.id) : [];
+}
+
+module.exports = { isConversationTakenOver, resolveConversationEscalations };
