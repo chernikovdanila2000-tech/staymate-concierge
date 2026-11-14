@@ -2434,23 +2434,27 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('escChatHistory').innerHTML = `<p class="hint" style="text-align:center;">${t('common.loading', lang)}</p>`;
     document.getElementById('escalationModal').classList.remove('hidden');
 
-    if (esc.channel && esc.chat_id) {
-      try {
-        const headers = await authHeader();
-        const params = new URLSearchParams({
-          propertyId: currentProperty.property_id,
-          escalationId: String(esc.id),
-        });
-        const response = await fetch(API_BASE_URL + '/api/escalations/history?' + params, { headers });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
-        renderEscMessages(result.messages);
-      } catch (error) {
-        console.error('[escalations] history failed:', error);
-        document.getElementById('escChatHistory').textContent = 'Не вдалося завантажити історію діалогу.';
-      }
-    } else {
+    await loadEscHistory(esc);
+  }
+
+  async function loadEscHistory(esc) {
+    if (!esc.channel || !esc.chat_id) {
       renderEscMessages(null);
+      return;
+    }
+    try {
+      const headers = await authHeader();
+      const params = new URLSearchParams({
+        propertyId: currentProperty.property_id,
+        escalationId: String(esc.id),
+      });
+      const response = await fetch(API_BASE_URL + '/api/escalations/history?' + params, { headers });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'HTTP ' + response.status);
+      renderEscMessages(result.messages);
+    } catch (error) {
+      console.error('[escalations] history failed:', error);
+      document.getElementById('escChatHistory').textContent = 'Не вдалося завантажити історію діалогу.';
     }
   }
 
@@ -2597,14 +2601,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       updateEscStatusButton('resolved');
     }
     renderEscalationsList();
-    const { data } = await supabase
-      .from('conversations')
-      .select('messages')
-      .eq('property_id', currentProperty.property_id)
-      .eq('channel', esc.channel)
-      .eq('chat_id', esc.chat_id)
-      .maybeSingle();
-    renderEscMessages(data && data.messages);
+    await loadEscHistory(esc);
   });
 
   // ---- Канали зв'язку (Блок 4: реальне підключення WhatsApp/Instagram/

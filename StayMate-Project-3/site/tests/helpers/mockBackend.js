@@ -406,6 +406,33 @@ async function installBackendMock(page, initialState = {}) {
     }, body);
     return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) });
   });
+  // Mirrors the real owner-authenticated read APIs the cabinet uses for the
+  // escalations list and a single escalation's conversation history.
+  await page.route((url) => url.pathname === '/api/escalations', async (route) => {
+    const propertyId = new URL(route.request().url()).searchParams.get('propertyId');
+    const rows = await page.evaluate((pid) => {
+      const st = window.__qaState;
+      return (st.escalations || [])
+        .filter((e) => !e.property_id || e.property_id === pid)
+        .slice()
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+    }, propertyId);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ escalations: rows }) });
+  });
+  await page.route((url) => url.pathname === '/api/escalations/history', async (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    const messages = await page.evaluate(({ pid, eid }) => {
+      const st = window.__qaState;
+      const esc = (st.escalations || []).find((e) => String(e.id) === String(eid));
+      if (!esc) return null;
+      const conv = (st.conversations || []).find((c) => c.property_id === pid && c.channel === esc.channel && c.chat_id === esc.chat_id);
+      return conv ? conv.messages || [] : [];
+    }, { pid: params.get('propertyId'), eid: params.get('escalationId') });
+    if (messages === null) {
+      return route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'not found' }) });
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ messages }) });
+  });
   // Mirrors the real /api/escalations/status: resolving closes EVERY open
   // escalation of the same conversation (the AI stays paused while any one
   // is open); reopening touches only the clicked one.
