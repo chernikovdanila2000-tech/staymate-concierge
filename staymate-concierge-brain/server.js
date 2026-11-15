@@ -1951,6 +1951,13 @@ const server =
         let fileChunks = [];
         let fileTooLarge = false;
         let sawFile = false;
+        // Without a hint Whisper guesses the language from a few seconds of
+        // audio and often mixes up Ukrainian and Russian.
+        let language;
+
+        bb.on('field', (name, value) => {
+          if (name === 'language' && ['uk', 'ru', 'en'].includes(String(value))) language = String(value);
+        });
 
         bb.on('file', (name, stream, info) => {
           sawFile = true;
@@ -1979,6 +1986,7 @@ const server =
               audio: Buffer.concat(fileChunks),
               mediaType,
               filename: 'onboarding-voice.webm',
+              language,
             });
             return sendJson(res, 200, { text }, corsHeaders);
           } catch (error) {

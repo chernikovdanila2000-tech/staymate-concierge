@@ -71,6 +71,15 @@ a{color:inherit;}
 .ob-mic, .ob-send{width:46px; height:46px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
 .ob-mic{background:var(--surface); border:1px solid var(--line-strong); color:var(--ink-soft);}
 .ob-mic.rec{background:var(--warn); color:#fff; border-color:var(--warn);}
+.ob-lang{height:46px; min-width:52px; padding:0 12px; border-radius:100px; border:1px solid var(--line-strong); background:var(--surface); color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; cursor:pointer; flex-shrink:0;}
+.ob-lang:disabled{opacity:.5; cursor:default;}
+.ob-input{min-width:0;}
+@media (max-width:420px){
+  .ob-foot{gap:6px;}
+  .ob-input{padding:12px 14px;}
+  .ob-lang{height:42px; min-width:44px; padding:0 8px;}
+  .ob-mic, .ob-send{width:42px; height:42px;}
+}
 .ob-send{background:var(--accent); color:var(--accent-ink);}
 .ob-send:disabled{opacity:.5; cursor:default;}
 
@@ -96,6 +105,7 @@ a{color:inherit;}
 
   <div class="ob-foot">
     <input id="obInput" class="ob-input" type="text" placeholder="Напишіть повідомлення..." maxlength="2000" autocomplete="off">
+    <button id="obLang" class="ob-lang" type="button" aria-label="Мова диктування" title="Мова диктування">УКР</button>
     <button id="obMic" class="ob-mic" type="button" aria-label="Диктувати голосом" title="Диктувати голосом">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 003-3V6a3 3 0 10-6 0v6a3 3 0 003 3z" stroke="currentColor" stroke-width="1.7"/><path d="M19 11a7 7 0 01-14 0M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
     </button>
@@ -201,11 +211,43 @@ a{color:inherit;}
   sendBtn.addEventListener('click', () => send(input.value));
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(input.value); });
 
-  // ---- Голос: перше натискання на мікрофон — запис, друге — зупинка.
-  // Розпізнаний текст лише з'являється в полі вводу (дописується до вже
-  // набраного) — людина може його виправити й сама натискає "надіслати".
-  let mediaRecorder = null;
-  let audioChunks = [];
+  // ---- Голос: перше натискання на мікрофон — диктування, друге — зупинка.
+  // Де браузер уміє розпізнавати мову сам (Safari, Chrome, Edge), текст
+  // з'являється в полі вводу прямо під час диктування. Інакше (Firefox) —
+  // запис і розпізнавання на сервері після зупинки. В обох випадках текст
+  // лише потрапляє в поле — людина може виправити й сама натискає "надіслати".
+  const langBtn = document.getElementById('obLang');
+  const VOICE_LANGS = ['uk', 'ru', 'en'];
+  const VOICE_LANG_LABEL = { uk: 'УКР', ru: 'РУС', en: 'ENG' };
+  const VOICE_LANG_LOCALE = { uk: 'uk-UA', ru: 'ru-RU', en: 'en-US' };
+  const VOICE_LANG_KEY = 'stayai_voice_lang';
+
+  function defaultVoiceLang() {
+    try {
+      const saved = localStorage.getItem(VOICE_LANG_KEY);
+      if (VOICE_LANGS.includes(saved)) return saved;
+    } catch (e) {}
+    const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ''];
+    for (const tag of prefs) {
+      const code = String(tag).toLowerCase().slice(0, 2);
+      if (VOICE_LANGS.includes(code)) return code;
+    }
+    return 'uk';
+  }
+
+  let voiceLang = defaultVoiceLang();
+  function renderVoiceLang() { langBtn.textContent = VOICE_LANG_LABEL[voiceLang]; }
+  renderVoiceLang();
+  langBtn.addEventListener('click', () => {
+    voiceLang = VOICE_LANGS[(VOICE_LANGS.indexOf(voiceLang) + 1) % VOICE_LANGS.length];
+    try { localStorage.setItem(VOICE_LANG_KEY, voiceLang); } catch (e) {}
+    renderVoiceLang();
+  });
+
+  function setRecordingUi(on) {
+    micBtn.classList.toggle('rec', on);
+    langBtn.disabled = on;
+  }
 
   function putTranscriptIntoInput(text) {
     const current = input.value.trim();
@@ -214,6 +256,65 @@ a{color:inherit;}
     input.setSelectionRange(input.value.length, input.value.length);
   }
 
+  // -- Живе розпізнавання в браузері --
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let liveRec = null;
+  let liveUnavailable = !SpeechRec;
+
+  function startLiveDictation() {
+    const rec = new SpeechRec();
+    rec.lang = VOICE_LANG_LOCALE[voiceLang];
+    rec.interimResults = true;
+    rec.continuous = true;
+    const base = input.value.trim();
+    let finalText = '';
+    let gotResult = false;
+
+    rec.onresult = (e) => {
+      gotResult = true;
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const piece = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += piece; else interim += piece;
+      }
+      const spoken = (finalText + interim).replace(/\s+/g, ' ').trim();
+      input.value = [base, spoken].filter(Boolean).join(' ');
+      input.scrollLeft = input.scrollWidth;
+    };
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed') {
+        addMessage('ai', 'Немає доступу до мікрофона. Дозвольте його в налаштуваннях браузера або напишіть текстом.');
+      } else if (!gotResult && ['service-not-allowed', 'language-not-supported', 'network', 'audio-capture'].includes(e.error)) {
+        // Розпізнавання в браузері недоступне (напр. вимкнена диктовка в
+        // Safari) — далі використовуємо запис і розпізнавання на сервері.
+        liveUnavailable = true;
+        liveRec = null;
+        setRecordingUi(false);
+        startRecording();
+      }
+    };
+    rec.onend = () => {
+      if (liveRec === rec) liveRec = null;
+      if (!mediaRecorder || mediaRecorder.state !== 'recording') setRecordingUi(false);
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    };
+
+    try {
+      rec.start();
+    } catch (err) {
+      liveUnavailable = true;
+      startRecording();
+      return;
+    }
+    liveRec = rec;
+    setRecordingUi(true);
+  }
+
+  // -- Запасний варіант: запис -> розпізнавання на сервері після зупинки --
+  let mediaRecorder = null;
+  let audioChunks = [];
+
   function startRecording() {
     navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
       audioChunks = [];
@@ -221,13 +322,14 @@ a{color:inherit;}
       mediaRecorder.addEventListener('dataavailable', (e) => { if (e.data.size) audioChunks.push(e.data); });
       mediaRecorder.addEventListener('stop', () => {
         stream.getTracks().forEach((t) => t.stop());
-        micBtn.classList.remove('rec');
+        setRecordingUi(false);
         const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
         if (!blob.size) return;
         setBusy(true);
         micBtn.disabled = true;
         const pending = addMessage('pending', 'Розпізнаю голос…');
         const form = new FormData();
+        form.append('language', voiceLang);
         form.append('audio', blob, 'voice.webm');
         fetch(API_BASE_URL + '/api/onboarding-voice', { method: 'POST', body: form })
           .then((res) => res.json())
@@ -249,15 +351,19 @@ a{color:inherit;}
           });
       });
       mediaRecorder.start();
-      micBtn.classList.add('rec');
+      setRecordingUi(true);
     }).catch(() => {
       addMessage('ai', 'Не вдалося отримати доступ до мікрофона. Перевірте дозвіл у браузері або напишіть текстом.');
     });
   }
 
   micBtn.addEventListener('click', () => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
+    if (liveRec) {
+      liveRec.stop();
+    } else if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
+    } else if (!liveUnavailable) {
+      startLiveDictation();
     } else {
       startRecording();
     }
