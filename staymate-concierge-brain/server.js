@@ -315,7 +315,19 @@ function appendGuestMessage(history, text) {
  * захищені RLS-політиками за owner_id). Повертає рядок properties або
  * кидає Error з полем .status для однакової обробки в усіх новых роутах.
  */
-async function requireOwnedProperty(req, propertyId) {
+function hasActiveMetaReviewGrant(user, propertyId) {
+  const grant = user && user.app_metadata;
+  const expiresAt = Date.parse(grant && grant.meta_review_expires_at || '');
+  return Boolean(
+    grant &&
+    typeof grant.meta_review_property_id === 'string' &&
+    grant.meta_review_property_id === String(propertyId || '').trim() &&
+    Number.isFinite(expiresAt) &&
+    expiresAt > Date.now()
+  );
+}
+
+async function requireOwnedProperty(req, propertyId, { allowMetaReview = false } = {}) {
   const authHeader = req.headers['authorization'] || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
   if (!token) {
@@ -343,12 +355,15 @@ async function requireOwnedProperty(req, propertyId) {
     throw err;
   }
 
-  if (property.owner_id !== user.id) {
+  const isMetaReviewer = property.owner_id !== user.id &&
+    allowMetaReview && hasActiveMetaReviewGrant(user, property.property_id);
+  if (property.owner_id !== user.id && !isMetaReviewer) {
     const err = new Error('Немає доступу до цього готелю.');
     err.status = 403;
     throw err;
   }
 
+  req.metaReviewAccess = Boolean(isMetaReviewer);
   return property;
 }
 
@@ -2068,6 +2083,53 @@ const server =
         return res.end();
       }
 
+      // A time-limited Meta reviewer may inspect only the test property's
+      // non-secret details and channel statuses. Never return credentials,
+      // guest data, payment data, or any channel management capability.
+      if (req.method === 'OPTIONS' && requestUrl.pathname === '/api/meta-review/bootstrap') {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, OPTIONS',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+        });
+        return res.end();
+      }
+
+      if (req.method === 'GET' && requestUrl.pathname === '/api/meta-review/bootstrap') {
+        const cors = { 'Access-Control-Allow-Origin': '*' };
+        (async () => {
+          const propertyId = requestUrl.searchParams.get('propertyId');
+          if (!propertyId) return sendJson(res, 400, { error: 'Missing propertyId.' }, cors);
+          try {
+            await requireOwnedProperty(req, propertyId, { allowMetaReview: true });
+          } catch (authError) {
+            return sendJson(res, authError.status || 401, { error: authError.message }, cors);
+          }
+
+          const [propertyResult, channelsResult] = await Promise.all([
+            supabase.from('properties')
+              .select('property_id, hotel_name, address, business_type, subscription_status, trial_ends_at, subscription_active_until, subscription_plan, auto_renew, webhook_connected')
+              .eq('property_id', propertyId).maybeSingle(),
+            supabase.from('channels')
+              .select('channel_type, connected, status')
+              .eq('property_id', propertyId)
+              .in('channel_type', ['instagram', 'messenger']),
+          ]);
+          if (propertyResult.error || !propertyResult.data || channelsResult.error) {
+            return sendJson(res, 500, { error: 'Unable to load the Meta review demo.' }, cors);
+          }
+          return sendJson(res, 200, {
+            property: propertyResult.data,
+            channels: channelsResult.data || [],
+            reviewOnly: Boolean(req.metaReviewAccess),
+          }, cors);
+        })().catch(error => {
+          console.error('[meta-review] bootstrap failed:', error?.code || 'UNEXPECTED_ERROR');
+          if (!res.headersSent) sendJson(res, 500, { error: 'Unable to load the Meta review demo.' }, cors);
+        });
+        return;
+      }
+
       // Escalation owner read APIs: use the same authenticated owner check
       // as /api/escalations/reply. Never return another business's tickets.
       if (req.method === 'OPTIONS' && ['/api/escalations', '/api/escalations/history'].includes(requestUrl.pathname)) {
@@ -2085,17 +2147,18 @@ const server =
           const propertyId = requestUrl.searchParams.get('propertyId');
           if (!propertyId) return sendJson(res, 400, { error: 'Потрібен propertyId.' }, cors);
           try {
-            await requireOwnedProperty(req, propertyId);
+            await requireOwnedProperty(req, propertyId, { allowMetaReview: true });
           } catch (authError) {
             return sendJson(res, authError.status || 401, { error: authError.message }, cors);
           }
 
           if (requestUrl.pathname === '/api/escalations') {
-            const { data, error } = await supabase
+            let query = supabase
               .from('escalations')
               .select('*')
-              .eq('property_id', propertyId)
-              .order('created_at', { ascending: false });
+              .eq('property_id', propertyId);
+            if (req.metaReviewAccess) query = query.in('channel', ['instagram', 'messenger']);
+            const { data, error } = await query.order('created_at', { ascending: false });
             if (error) {
               console.error('[escalations] list failed:', error.code || 'DATABASE_ERROR');
               return sendJson(res, 500, { error: 'Не вдалося завантажити ескалації.' }, cors);
@@ -2112,6 +2175,9 @@ const server =
             .eq('id', escalationId)
             .maybeSingle();
           if (error || !escalation) return sendJson(res, 404, { error: 'Ескалацію не знайдено.' }, cors);
+          if (req.metaReviewAccess && !['instagram', 'messenger'].includes(escalation.channel)) {
+            return sendJson(res, 403, { error: 'Review access is limited to Instagram and Messenger.' }, cors);
+          }
           const messages = escalation.channel && escalation.chat_id
             ? await getHistory(propertyId, escalation.channel, escalation.chat_id)
             : [];
@@ -3826,7 +3892,7 @@ const server =
           }
 
           try {
-            await requireOwnedProperty(req, propertyId);
+            await requireOwnedProperty(req, propertyId, { allowMetaReview: true });
           } catch (authError) {
             return sendJson(res, authError.status || 401, { error: authError.message }, corsHeaders);
           }
@@ -3839,6 +3905,9 @@ const server =
             .maybeSingle();
           if (escError || !escalation) {
             return sendJson(res, 404, { error: 'Ескалацію не знайдено.' }, corsHeaders);
+          }
+          if (req.metaReviewAccess && !['instagram', 'messenger'].includes(escalation.channel)) {
+            return sendJson(res, 403, { error: 'Review access is limited to Instagram and Messenger.' }, corsHeaders);
           }
           if (!escalation.channel || !escalation.chat_id) {
             return sendJson(res, 400, { error: 'У цієї ескалації немає прив\'язаного діалогу (стара ескалація без каналу).' }, corsHeaders);

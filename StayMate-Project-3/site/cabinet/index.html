@@ -1414,6 +1414,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   let mode = 'signin'; // 'signin' | 'signup'
   let currentUser = null;
   let currentProperty = null;
+  let metaReviewMode = false;
   let pendingOnboardingProfile = null;
   let rooms = [];
   let channelsByType = {};
@@ -1741,6 +1742,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   async function afterLogin(knownUser) {
     const user = knownUser || (await supabase.auth.getUser()).data.user;
     currentUser = user;
+    metaReviewMode = false;
     if (!user) return;
 
     renderAccountStatus();
@@ -1765,6 +1767,23 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
         .maybeSingle();
       if (result.error) throw result.error;
       property = result.data;
+      // A reviewer has a separate login, not ownership of the test hotel.
+      // Only the backend can validate its short-lived, admin-issued grant;
+      // never copy Meta channel credentials into the reviewer's account.
+      if (!property && user.app_metadata && user.app_metadata.meta_review_property_id) {
+        const propertyId = user.app_metadata.meta_review_property_id;
+        const response = await fetch(
+          `${API_BASE_URL}/api/meta-review/bootstrap?propertyId=${encodeURIComponent(propertyId)}`,
+          { headers: await authHeader() }
+        );
+        if (!response.ok) throw new Error('Meta review access is unavailable');
+        const demo = await response.json();
+        if (!demo.reviewOnly || !demo.property) throw new Error('Meta review access is unavailable');
+        property = demo.property;
+        metaReviewMode = true;
+        try { localStorage.setItem('stayMateLang', 'en'); } catch (e) {}
+        applyI18n('en');
+      }
     } catch (err) {
       // Так само: якщо запит справді впав (а не просто "властивості ще
       // немає" — це error, а не null-результат), не лишаємо порожній
@@ -2174,6 +2193,18 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     document.getElementById('payoutRecipient').value = currentProperty.payout_recipient_name || '';
     renderSubscriptionCard();
 
+    if (metaReviewMode) {
+      // The reviewer may inspect connected channels and reply to existing
+      // Meta test escalations, but cannot disconnect or reconfigure them.
+      document.querySelectorAll('#tabChannels button, #tabChannels input, #tabChannels select')
+        .forEach(el => { el.disabled = true; });
+      document.getElementById('escToggleStatus').disabled = true;
+      document.getElementById('escDeleteBtn').disabled = true;
+      document.querySelectorAll('.dash-tab[data-tab="bookings"]').forEach(el => el.classList.add('hidden'));
+      ['dashName', 'dashAddress', 'payoutCard', 'payoutIban', 'payoutRecipient']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+    }
+
     // Готельні картки (Номери, Інформація для гостей — фіксовані поля
     // check-in/паркування/сніданок тощо) мають сенс лише для
     // business_type === 'hospitality'. Будь-який інший бізнес бачить
@@ -2193,8 +2224,8 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     // час очікування. Тепер каркас кабінету показуємо одразу, а кожен розділ
     // підвантажується у фоні й самостійно перемальовується, щойно готовий.
     dashScreen.classList.remove('hidden');
-    const infoLoad = isHospitality ? loadHotelInfo() : loadBusinessFacts();
-    Promise.all([isHospitality ? reloadRooms() : Promise.resolve(), infoLoad, fetchChannels(), fetchEscalations(), fetchBookings()])
+    const infoLoad = metaReviewMode ? Promise.resolve() : (isHospitality ? loadHotelInfo() : loadBusinessFacts());
+    Promise.all([isHospitality && !metaReviewMode ? reloadRooms() : Promise.resolve(), infoLoad, fetchChannels(), fetchEscalations(), metaReviewMode ? Promise.resolve() : fetchBookings()])
       .catch((err) => console.error('Не вдалося завантажити дані кабінету:', err));
   }
 
@@ -2486,6 +2517,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   }
 
   document.getElementById('escToggleStatus').addEventListener('click', async () => {
+    if (metaReviewMode) return;
     const esc = escalations.find((e) => String(e.id) === String(currentEscalationId));
     if (!esc) return;
     const btn = document.getElementById('escToggleStatus');
@@ -2522,6 +2554,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   });
 
   onClickGuarded(document.getElementById('escDeleteBtn'), async () => {
+    if (metaReviewMode) return;
     const esc = escalations.find((e) => String(e.id) === String(currentEscalationId));
     if (!esc) return;
     if (!confirm(t('esc.deleteConfirm', getLang()))) return;
@@ -2622,10 +2655,21 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
   // мусить одразу перемалювати пілюлі/підказки статусів каналів) не робить
   // зайвий похід у Supabase щоразу.
   async function fetchChannels() {
-    const { data } = await supabase
-      .from('channels')
-      .select('*')
-      .eq('property_id', currentProperty.property_id);
+    let data;
+    if (metaReviewMode) {
+      const response = await fetch(
+        `${API_BASE_URL}/api/meta-review/bootstrap?propertyId=${encodeURIComponent(currentProperty.property_id)}`,
+        { headers: await authHeader() }
+      );
+      if (!response.ok) throw new Error('Meta review channels are unavailable');
+      data = (await response.json()).channels;
+    } else {
+      const result = await supabase
+        .from('channels')
+        .select('*')
+        .eq('property_id', currentProperty.property_id);
+      data = result.data;
+    }
     channelsByType = {};
     (data || []).forEach(c => { channelsByType[c.channel_type] = c; });
     renderChannelsUI();
