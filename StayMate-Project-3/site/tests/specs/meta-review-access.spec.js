@@ -61,3 +61,46 @@ test('review grant failure does not create or overwrite a property', async ({ pa
   await expect(page.locator('#loadingErrorBlock')).not.toHaveClass(/hidden/);
   await expect(page.locator('#onboardScreen')).toHaveClass(/hidden/);
 });
+
+test('Meta SDK readiness cannot unlock controls after reviewer dashboard opens', async ({ page }) => {
+  let releaseMetaConfig;
+  const waitForReview = new Promise(resolve => { releaseMetaConfig = resolve; });
+  await installBackendMock(page, { session: { user: reviewUser }, property: null });
+  await page.route('**/api/meta-review/bootstrap?**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      reviewOnly: true,
+      property: {
+        property_id: 'test-hotel',
+        hotel_name: 'Test hotel',
+        subscription_status: 'trial',
+        trial_ends_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+        business_type: 'hospitality',
+      },
+      channels: [
+        { channel_type: 'instagram', connected: true, status: 'connected' },
+        { channel_type: 'messenger', connected: true, status: 'connected' },
+      ],
+    }),
+  }));
+  await page.route('**/api/meta-config', async route => {
+    await waitForReview;
+    await route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ appId: 'meta-review-test' }),
+    });
+  });
+  await page.route('https://connect.facebook.net/en_US/sdk.js', route => route.fulfill({
+    status: 200, contentType: 'application/javascript',
+    body: 'window.FB = { init() { window.__metaSdkReady = true; } };',
+  }));
+  await page.goto('/cabinet/');
+  await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#connectMetaPagesIg')).toBeDisabled();
+  releaseMetaConfig();
+  await expect.poll(() => page.evaluate(() => window.__metaSdkReady === true)).toBe(true);
+  for (const id of ['connectMetaPagesIg', 'connectMetaPagesFb', 'connectWhatsappOAuth', 'connectWhatsappBusinessOAuth']) {
+    await expect(page.locator('#' + id)).toBeDisabled();
+  }
+});

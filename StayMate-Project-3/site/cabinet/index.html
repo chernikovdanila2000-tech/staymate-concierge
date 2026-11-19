@@ -2833,9 +2833,10 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
     .map((id) => document.getElementById(id));
   metaOAuthButtons.forEach((btn) => { btn.disabled = true; });
   void loadMetaSdk().then(() => {
-    metaOAuthButtons.forEach((btn) => { btn.disabled = false; });
+    // SDK readiness must never re-enable controls for a review-only account.
+    metaOAuthButtons.forEach((btn) => { btn.disabled = metaReviewMode; });
   }).catch((error) => {
-    metaOAuthButtons.forEach((btn) => { btn.disabled = false; });
+    metaOAuthButtons.forEach((btn) => { btn.disabled = metaReviewMode; });
     ['msgMetaPagesFb', 'msgMetaPagesIg', 'msgWhatsappOAuth'].forEach((id) => {
       const message = document.getElementById(id);
       message.className = 'msg error';
