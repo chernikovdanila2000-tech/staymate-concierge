@@ -2201,6 +2201,20 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
       document.getElementById('escToggleStatus').disabled = true;
       document.getElementById('escDeleteBtn').disabled = true;
       document.querySelectorAll('.dash-tab[data-tab="bookings"]').forEach(el => el.classList.add('hidden'));
+      // Keep payment and property-editing screens out of the review walkthrough.
+      document.querySelector('.dash-tab[data-tab="overview"]').classList.add('hidden');
+      document.querySelector('.dash-tab[data-tab="channels"]').click();
+      document.querySelector('#tabChannels .card > p.hint').textContent =
+        'Meta review: Instagram and Messenger are preconnected. Open Escalations to inspect test messages and reply.';
+      document.querySelectorAll('#tabChannels .channel-card').forEach(card => {
+        if (!['instagram', 'messenger'].includes(card.dataset.channel)) {
+          card.classList.add('hidden');
+        } else {
+          Array.from(card.children).forEach(child => {
+            if (!child.classList.contains('channel-head')) child.classList.add('hidden');
+          });
+        }
+      });
       ['dashName', 'dashAddress', 'payoutCard', 'payoutIban', 'payoutRecipient']
         .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
     }

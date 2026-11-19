@@ -40,7 +40,16 @@ test('a separate Meta reviewer sees connected channel status without managing co
   await expect(page.locator('#dashScreen')).not.toHaveClass(/hidden/);
   await expect(page.locator('#dashHotelName')).toHaveText('Test hotel');
   await expect(page.locator('#langBtnLabel')).toHaveText('EN');
-  await page.locator('.dash-tab[data-tab="channels"]').click();
+  await expect(page.locator('.dash-tab[data-tab="overview"]')).toBeHidden();
+  await expect(page.locator('#tabOverview')).toBeHidden();
+  await expect(page.locator('#manageSubBtn')).toBeHidden();
+  await expect(page.locator('.dash-tab[data-tab="channels"]')).toHaveClass(/active/);
+  await expect(page.locator('#tabChannels')).toBeVisible();
+  await expect(page.locator('.channel-card[data-channel="telegram"]')).toBeHidden();
+  await expect(page.locator('.channel-card[data-channel="whatsapp"]')).toBeHidden();
+  await expect(page.locator('.channel-card[data-channel="instagram"] .channel-head')).toBeVisible();
+  await expect(page.locator('.channel-card[data-channel="messenger"] .channel-head')).toBeVisible();
+  await expect(page.locator('#connectMetaPagesIg')).toBeHidden();
   await expect(page.locator('#connectMetaPagesIg')).toBeDisabled();
   await expect(page.locator('#connectMetaPagesFb')).toBeDisabled();
   await expect(page.locator('#disconnectInstagram')).toBeDisabled();
